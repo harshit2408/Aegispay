@@ -1,0 +1,105 @@
+{
+  "env": {
+    "CAVEMAN_DEFAULT_MODE": "caveman",
+    "PONYTAIL_DEFAULT_MODE": "full",
+    "ECC_MEMORY_HARNESS": "claude"
+  },
+  "enabledPlugins": {
+    "ecc@ecc": true,
+    "ponytail@ponytail": true,
+    "caveman@caveman": true,
+    "obsidian@obsidian-skills": true
+  },
+  "extraKnownMarketplaces": {
+    "ecc": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/affaan-m/ECC.git"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    },
+    "caveman": {
+      "source": {
+        "source": "github",
+        "repo": "JuliusBrussee/caveman"
+      }
+    },
+    "obsidian-skills": {
+      "source": {
+        "source": "github",
+        "repo": "kepano/obsidian-skills"
+      }
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git pull*)",
+      "Bash(git fetch*)",
+      "Bash(ecc memory search*)",
+      "Bash(ecc memory read*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Edit(./.env)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.mjs\"",
+            "timeout": 90,
+            "statusMessage": "AegisPay: syncing with teammate and loading checklist..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/route-hint.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-test-sync.mjs\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-test-sync.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

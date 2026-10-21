@@ -218,3 +218,37 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- AegisPay additions ----
+# Secrets (PRD §7): keep .env.example tracked
+.env.*
+!.env.example
+
+# Per-developer Claude settings (AEGIS_DEV, personal overrides)
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md
+
+# Obsidian workspace state (vault = docs/)
+docs/.obsidian/
+.obsidian/
+.trash/
+
+# Node / Next.js / Playwright
+# (the Python template's `lib/` rule above would hide frontend/src/lib/api.ts and sse.ts)
+!frontend/src/lib/
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.turbo/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+
+# Caveman compress backups
+*.original.md
