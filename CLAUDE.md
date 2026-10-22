@@ -14,7 +14,7 @@ The `SessionStart` hook pulls the remote and injects a brief of 1, 2 and 4. `/st
 
 ## Who is who
 - `AEGIS_DEV=A` — backend, PayPal (both sandbox apps), LangGraph + AI components, settlement, evals.
-- `AEGIS_DEV=B` — frontend, AG Studio cockpit + widgets, vendor portal, CI/Render, user research, video.
+- `AEGIS_DEV=B` — full stack (frontend + backend): AG Studio cockpit + widgets, vendor portal, API routers/auth/DB outside A's PayPal-settlement-AI areas, CI/Render, user research, video.
 - Set it once per machine in `.claude/settings.local.json` → `{"env": {"AEGIS_DEV": "A"}}`.
 
 ## Non-negotiables (PRD §4 — tests enforce them)
@@ -27,11 +27,12 @@ The `SessionStart` hook pulls the remote and injects a brief of 1, 2 and 4. `/st
 - Never commit `.env`, keys, sandbox credentials or the AG licence key.
 
 ## Team protocol (both humans and agents follow it)
-1. **Claim** a checklist item before starting: append ` (WIP A|B)` to its line, commit, push.
-2. **Work** test-first. When a test command passes, the `post-test-sync` hook pulls (rebase) and pushes your commits; if the tree is dirty it tells you to commit — do it, with a conventional message citing the checklist ID (`feat(settlement): P1-07 outbox worker`).
-3. **Finish**: `[x]` + short SHA on the checklist line.
-4. **End of session**: `/handoff` (memory-keeper writes the log entry, team memories, and pushes).
-5. Contract changes (OpenAPI, SSE event shape, status enum) → tell the other dev in the session log and save a team memory `decision`.
+1. **Claim** a checklist item before starting: append ` (WIP A|B)` to its line, commit, push — on `main`. Claims and docs-only edits are the only things committed straight to `main`.
+2. **Branch** for code: `git switch -c <a|b>/<ID>-<slug>` (e.g. `a/P1-07-outbox-worker`). Never commit code to `main`.
+3. **Work** test-first. When a test command passes, the `post-test-sync` hook pushes the branch (`-u` on first push) and pulls your upstream; if the tree is dirty it tells you to commit — do it, with a conventional message citing the checklist ID (`feat(settlement): P1-07 outbox worker`). If the branch is behind `origin/main`, `git merge origin/main` (never force-push).
+4. **Finish**: open a PR into `main` (`gh pr create`), other dev reviews (required for money-safety paths R1–R4, otherwise self-merge once CI is green), **squash-merge** with a conventional title citing the ID. Then `[x]` + short SHA on the checklist line.
+5. **End of session**: `/handoff` (memory-keeper writes the log entry, team memories, and pushes; lists open PRs and unmerged branches).
+6. Contract changes (OpenAPI, SSE event shape, status enum) → tell the other dev in the session log and save a team memory `decision`.
 
 ## Routing — decided by a table, not by guesswork
 - `.claude/routing.json` maps prompt keywords → **agent** to implement, **review** agents, **skills**, **rules**.
@@ -44,7 +45,7 @@ The `SessionStart` hook pulls the remote and injects a brief of 1, 2 and 4. `/st
 |---|---|---|
 | PayPal, settlement, ledger, webhooks, DB, API | `ponytail-backend` | `ecc:security-reviewer`, `ecc:python-reviewer` / `ecc:database-reviewer` |
 | LangGraph, A1–A7, forensics, evals | `ponytail-ai` | `ecc:security-reviewer`, `ecc:python-reviewer` |
-| Next.js, AG Studio widgets, pages | `ponytail-frontend` | `ecc:react-reviewer`, `ecc:typescript-reviewer` |
+| Next.js, AG Studio widgets, pages (Dev B also takes backend rows above) | `ponytail-frontend` | `ecc:react-reviewer`, `ecc:typescript-reviewer` |
 | E2E S1–S4 | `ecc:e2e-runner` | — |
 | Broken build | `ecc:build-error-resolver` / `ecc:react-build-resolver` | — |
 | Plans, ADRs, trade-offs | `ecc:planner`, `ecc:architect` | — |

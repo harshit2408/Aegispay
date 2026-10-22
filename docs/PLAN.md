@@ -12,9 +12,9 @@ Spec: [[PRD_SRS]] (single source of truth). State: [[CHECKLIST]]. Daily log: [[S
 
 | | Dev A | Dev B |
 |---|---|---|
-| Area | Backend, PayPal (both apps), LangGraph + agents, settlement, evals | Frontend, AG Studio cockpit + widgets, vendor portal, CI/Render, user research, video |
-| Main thread agent | `claude --agent ponytail-backend` or `ponytail-ai` | `claude --agent ponytail-frontend` |
-| Owns dirs | `backend/`, `docs/adr/`, `docs/EVAL.md`, `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md` | `frontend/`, `.github/`, `render.yaml`, `docs/USER_RESEARCH.md` |
+| Area | Backend, PayPal (both apps), LangGraph + agents, settlement, evals | Full stack (frontend + backend): AG Studio cockpit + widgets, vendor portal, API routers/auth/DB outside A's areas, CI/Render, user research, video |
+| Main thread agent | `claude --agent ponytail-backend` or `ponytail-ai` | `claude --agent ponytail-frontend` or `ponytail-backend` |
+| Owns dirs | `backend/`, `docs/adr/`, `docs/EVAL.md`, `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md` | `frontend/`, `.github/`, `render.yaml`, `docs/USER_RESEARCH.md`; may also work in `backend/` (claim the item first) |
 | Shared | `docs/CHECKLIST.md`, `docs/SESSION_LOG.md`, `docs/PRD_SRS.md`, `CLAUDE.md`, `.claude/` | same |
 
 Touching the other developer's directory: allowed for small fixes, but say so in the commit message and the session log.
@@ -45,8 +45,9 @@ A change to any of these three = write an ADR or memory `decision` and tell the 
 | When | What | Mechanism |
 |---|---|---|
 | Session start | Pull, see progress + your next items + last handoff | `SessionStart` hook (automatic) → `/standup` for detail |
-| Before starting an item | Claim it: `(WIP A)` on the checklist line, push | manual, 10 s |
-| After every test run | Pull --rebase; push committed work; agent told to commit if dirty | `post-test-sync` hook (automatic) |
+| Before starting an item | Claim it: `(WIP A)` on the checklist line, push to `main`; then `git switch -c <a\|b>/<ID>-<slug>` | manual, 10 s |
+| After every test run | Pull own branch; push branch (`-u` first time); warn if behind `origin/main`; agent told to commit if dirty | `post-test-sync` hook (automatic) |
+| Item done | PR into `main`, other dev reviews (mandatory for money-safety R1–R4), squash-merge; branch protection = PR + green CI | `gh pr create` |
 | End of session | Tick items, append handoff, save decisions to team memory, push | `/handoff` (memory-keeper agent) |
 | Weekly (Mon) | Check phase exit criteria; apply cut order if behind | both devs, 15 min |
 
