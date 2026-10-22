@@ -1017,7 +1017,7 @@ Record each result in this table and update the affected sections.
 
 | ID | Question | How | Pass criterion | Fallback | Result |
 |---|---|---|---|---|---|
-| SPIKE-1 | Vendor app can create + send an invoice to the treasury email with `invoicer` = vendor account email | Two Business sandbox accounts, two REST apps | Invoice status `SENT`/`UNPAID` | — | |
+| SPIKE-1 | Vendor app can create + send an invoice to the treasury email with `invoicer` = vendor account email | Two Business sandbox accounts, two REST apps | Invoice status `SENT`/`UNPAID` | — | 2026-10-22 PASS. Vendor app (country US, Invoicing feature enabled; token scope `https://uri.paypal.com/services/invoicing`) created a draft with `invoicer` = vendor account email and recipient = treasury email: HTTP 201 (debug-id f441602c35130). `/send` with `send_to_recipient=false`: HTTP 200 (f893447b8352a). GET: status `UNPAID`. Create without `invoicer` also 201 (defaults to the token's account). Findings: (1) India-country sandbox accounts blocked send (`INR_FOREIGN_CURRENCY_BLOCKED`) and INR currency is invalid; use US accounts, USD. (2) 403 `NOT_AUTHORIZED` on create until the app's Invoicing feature showed up in the token scopes; it cleared without any code change (dashboard change took time to apply, or needed a fresh save). Check the `invoicing` scope when debugging a 403. |
 | SPIKE-2 | Can Treasury credentials read an invoice addressed to the treasury? | `GET` with Treasury token | 200 with invoice body | Read via VendorGateway (simulated consent, §3) | |
 | SPIKE-3 | Payout Treasury → supplier: batch/item status transitions and webhook latency | Create payout; poll + webhook | Item reaches `SUCCESS`; timings recorded | Poll-only progress | |
 | SPIKE-4 | Record payment (method `PAYPAL`) partial → `PARTIALLY_PAID`, full → `PAID`; which app receives which invoicing webhook | Vendor token | Statuses as expected; event names recorded | Track balance only in AegisPay | |
@@ -1031,7 +1031,7 @@ Record each result in this table and update the affected sections.
 
 ## 19. Delivery plan (dated, 2 developers)
 
-Dev A = backend, PayPal, agents. Dev B = frontend, AG Studio, video.
+Dev A = backend, PayPal, agents. Dev B = full stack (frontend + backend), AG Studio, video.
 
 | Dates | Dev A | Dev B | Exit criterion |
 |---|---|---|---|

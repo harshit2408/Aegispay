@@ -27,7 +27,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits
 - [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
-- [ ] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) (WIP A)
+- [x] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) — PASS, see PRD §18 SPIKE-1
 - [ ] **P0-08** @A SPIKE-2 Can Treasury credentials read an invoice addressed to the treasury?
 - [ ] **P0-09** @A SPIKE-3 Payout Treasury → supplier: status transitions + webhook latency measured
 - [ ] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event
