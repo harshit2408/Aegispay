@@ -28,3 +28,9 @@ Written by `/handoff` (memory-keeper agent) or by hand. Template:
 **Next (B):** P1-01 → P1-02 first, because A's P1-03+ need the skeleton and models. Then P0-02 LICENSE, P0-03 CI.
 **Blocked / needs the other dev:** A, please confirm the split. If you've already started any of the moved items locally, say so and we'll swap one back.
 **Gotchas:** On Windows, install Node before opening Claude Code, or every hook errors out.
+
+## 2026-10-22 IST · Dev B (PRD v2.1 security review)
+**Done:** PRD v2.1: four-way security review ("Swiss cheese" pass). Every CRITICAL, HIGH and MEDIUM finding is closed in the spec. New §4.0 threat model + field provenance, rules R15–R25, ADR-007/008, schema changes (§8), gate G11–G14, settlement write-ahead (§11.4), API roles (§13), SPIKE-10/11. Summary table in PRD §0 rows 17–34. Checklist: P0-19/20, P1-19..24, P2-22..26, P3-13..16 added; P2-04 eval raised to ≥ 50 PDFs.
+**Decisions (contract changes, A please review):** Q1 = pay by `PAYPAL_ID` (pending SPIKE-10). Q2 = `HIGH_RISK` approvable only with 2 distinct eligible humans, neither the uploader. Five roles (controller, cfo, receiver, vendor_admin, admin); mandate activator ≠ author (activation moves to cfo). Settlement runs as a separate Render worker holding the Treasury secret. Status enum adds `PAYOUT_SENDING`, `NEEDS_MANUAL_REVIEW`. Resume payload is an `approval_id`, not a dict.
+**Next (B):** P1-01 → P1-02 with the v2.1 schema, then P1-19, P1-20.
+**Blocked / needs the other dev:** A, please review §4 (R5, R6, R10, R19, R20), §9.3 and §11 — these change your P1-07..P1-09. The new items put about 10 more on A and 6 more on B; let's rebalance if needed.

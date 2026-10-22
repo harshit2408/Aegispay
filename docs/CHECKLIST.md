@@ -39,6 +39,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md`
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections
 - [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7
+- [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1)
+- [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19)
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
@@ -52,7 +54,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P1-08** @A `settlement/reconciler.py` item-status state machine (PRD §9.3) + 15 s / 30 min poll fallback (R6)
 - [ ] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe
 - [ ] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix
-- [ ] **P1-11** @B `audit/events.py` hash chain + verification
+- [ ] **P1-11** @B `audit/events.py` hash chain + verification (HMAC form lands in P2-26)
 - [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox
 - [ ] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router)
 - [ ] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI
@@ -60,13 +62,19 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P1-16** @B Three 15-min AP/finance conversations → `docs/USER_RESEARCH.md` (due Oct 27)
 - [ ] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base
 - [ ] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config?
+- [ ] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22)
+- [ ] **P1-20** @B `vendor_master` v2.1 (payer ID, version, onboarding evidence) + append-only `vendor_master_changes` with immutability trigger (PRD §8, R15)
+- [ ] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17)
+- [ ] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19)
+- [ ] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20)
+- [ ] **P1-24** @B Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007)
 
 ## P2 — Decision engine + core UI (Oct 28 – Nov 2) · exit: **headless S1–S4 pass**; first `docs/EVAL.md` numbers
 
 - [ ] **P2-01** @A A2 Invoice Extractor: zero tools, delimited input, schema-validated, low confidence → `FREEZE` (R14)
 - [ ] **P2-02** @A Forensics `pdf_structure.py`: colour-match, tiny font, off-page, invisible/covered, annotation/metadata
 - [ ] **P2-03** @A Forensics `ocr_diff.py` (cut-order item 5 — keep PDF-structure checks if cut)
-- [ ] **P2-04** @A Eval set ≥ 12 labelled PDFs incl. false-positive traps in `tests/fixtures/eval/`
+- [ ] **P2-04** @A Eval set ≥ 50 labelled PDFs (held-out split, adaptive + A4 memo-injection cases, 5 runs, Wilson intervals) incl. false-positive traps in `tests/fixtures/eval/`
 - [ ] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport`
 - [ ] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9)
 - [ ] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed
@@ -84,6 +92,11 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required
 - [ ] **P2-20** @B Mandate studio: compile → diff → activate
 - [ ] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s
+- [ ] **P2-22** @A `routers/vendors.py`: payee change request → second approver → cooling → effective; alerts (R15)
+- [ ] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16)
+- [ ] **P2-24** @A Gate G11–G14, approvals bound to `gate_hash`, resume by `approval_id` only, distinct-human count inside the gate (R11)
+- [ ] **P2-25** @A `SETTLEMENT_HALT`, velocity breaker, `ops/alerts.py` (R23)
+- [ ] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21)
 
 ## P3 — Agents, auth, deploy (Nov 3–6) · exit: **hosted S1–S4 green on Render**; rough-cut video Nov 5
 
@@ -99,6 +112,10 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-10** @B Custom dark theme shared by Studio and the app
 - [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework
 - [ ] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance)
+- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25)
+- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22)
+- [ ] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24)
+- [ ] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6)
 
 ## P4 — Hardening (Nov 7–8) · exit: **feature freeze Nov 8 EOD**
 
