@@ -22,8 +22,8 @@ The [[PLAN]] explains the why; this file is the state.
 ## P0 — Setup and spikes (Oct 21–22) · exit: spike table filled, go/no-go per assumption
 
 - [x] **P0-01** @AB Claude harness: CLAUDE.md, plan, checklist, hooks, routing, ponytail/caveman/obsidian, ECC memory
-- [ ] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it (WIP B)
-- [ ] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push (WIP B)
+- [x] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it — 2062c25
+- [x] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push — 16cf6f9
 - [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits
 - [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
@@ -44,7 +44,7 @@ The [[PLAN]] explains the why; this file is the state.
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
-- [ ] **P1-01** @B Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0) (WIP B)
+- [x] **P1-01** @B Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0) — 16cf6f9
 - [ ] **P1-02** @B ORM models + migration for PRD §8, incl. partial unique indexes (R9) and `one_active_mandate`
 - [ ] **P1-03** @A `paypal/client.py`: OAuth cache per app, mandatory `request_id` on POST, `paypal-debug-id` logging, retry with same Request-Id (R5)
 - [ ] **P1-04** @A `paypal/payouts.py` (Treasury) + import-boundary test: importable only from `settlement/` (R2)
