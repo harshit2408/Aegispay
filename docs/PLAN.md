@@ -12,9 +12,9 @@ Spec: [[PRD_SRS]] (single source of truth). State: [[CHECKLIST]]. Daily log: [[S
 
 | | Dev A | Dev B |
 |---|---|---|
-| Area | Backend, PayPal (both apps), LangGraph + agents, settlement, evals | Frontend, AG Studio cockpit + widgets, vendor portal, CI/Render, user research, video |
-| Main thread agent | `claude --agent ponytail-backend` or `ponytail-ai` | `claude --agent ponytail-frontend` |
-| Owns dirs | `backend/`, `docs/adr/`, `docs/EVAL.md`, `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md` | `frontend/`, `.github/`, `render.yaml`, `docs/USER_RESEARCH.md` |
+| Area | PayPal (both apps), settlement + spend ledger + reconciler, webhooks, LangGraph + AI agents, forensics, policy gate, auth, evals | Full stack + data: backend skeleton, DB schema + migrations, seeder, audit chain, match + duplicates (R9), docker-compose, Render deploy; frontend, AG Studio cockpit + widgets, vendor portal, CI, user research, video |
+| Main thread agent | `claude --agent ponytail-backend` or `ponytail-ai` | `claude --agent ponytail-frontend` or `ponytail-backend` (data items) |
+| Owns dirs | `backend/app/{paypal,settlement,decision,forensics,agents,routers}/`, `docs/adr/`, `docs/EVAL.md`, `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md` | `frontend/`, `backend/app/{models,db.py,config.py,audit,demo}/`, `backend/migrations/`, `docker-compose.yml`, `.github/`, `render.yaml`, `docs/USER_RESEARCH.md` |
 | Shared | `docs/CHECKLIST.md`, `docs/SESSION_LOG.md`, `docs/PRD_SRS.md`, `CLAUDE.md`, `.claude/` | same |
 
 Touching the other developer's directory: allowed for small fixes, but say so in the commit message and the session log.

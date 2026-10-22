@@ -1038,7 +1038,7 @@ Record each result in this table and update the affected sections.
 
 ## 19. Delivery plan (dated, 2 developers)
 
-Dev A = backend, PayPal, agents. Dev B = full stack (frontend + backend), AG Studio, video.
+Dev A = PayPal, settlement, webhooks, agents, forensics, auth. Dev B = full stack + data: DB schema/migrations, seeder, audit chain, match + duplicates, docker/Render, frontend, AG Studio, video. Rebalanced 2026-10-22 to 35 open checklist items each.
 
 | Dates | Dev A | Dev B | Exit criterion |
 |---|---|---|---|

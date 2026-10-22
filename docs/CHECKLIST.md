@@ -15,7 +15,7 @@ The [[PLAN]] explains the why; this file is the state.
 - **Finish**: change `[ ]` to `[x]`, drop the WIP tag, add the short commit SHA at the end: ` — a1b2c3d`.
 - **Blocked**: append ` (BLOCKED: reason)` and log it in [[SESSION_LOG]].
 - New work discovered mid-phase gets a new ID at the end of its phase; never renumber.
-- Dev A = backend, PayPal, agents. Dev B = full stack (frontend + backend), AG Studio, video (PRD §19).
+- Dev A = PayPal clients, settlement + money movement, webhooks, LangGraph + AI agents, forensics, auth. Dev B = full stack + data: DB schema/migrations, seeder, audit chain, match + duplicates, docker/Render, frontend + AG Studio, video (PRD §19).
 
 ---
 
@@ -38,12 +38,12 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart
 - [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md`
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections
-- [ ] **P0-18** @A `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7
+- [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
-- [ ] **P1-01** @A Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0)
-- [ ] **P1-02** @A ORM models + migration for PRD §8, incl. partial unique indexes (R9) and `one_active_mandate`
+- [ ] **P1-01** @B Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0)
+- [ ] **P1-02** @B ORM models + migration for PRD §8, incl. partial unique indexes (R9) and `one_active_mandate`
 - [ ] **P1-03** @A `paypal/client.py`: OAuth cache per app, mandatory `request_id` on POST, `paypal-debug-id` logging, retry with same Request-Id (R5)
 - [ ] **P1-04** @A `paypal/payouts.py` (Treasury) + import-boundary test: importable only from `settlement/` (R2)
 - [ ] **P1-05** @A `paypal/invoicing.py` + `vendor_sim/gateway.py`: create, send, get, record payment (R7)
@@ -51,8 +51,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P1-07** @A `settlement/service.py` `execute(execution_id)` only (R1) + outbox worker (`SKIP LOCKED`, 2 s poll)
 - [ ] **P1-08** @A `settlement/reconciler.py` item-status state machine (PRD §9.3) + 15 s / 30 min poll fallback (R6)
 - [ ] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe
-- [ ] **P1-10** @A `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix
-- [ ] **P1-11** @A `audit/events.py` hash chain + verification
+- [ ] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix
+- [ ] **P1-11** @B `audit/events.py` hash chain + verification
 - [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox
 - [ ] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router)
 - [ ] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI
@@ -68,7 +68,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-03** @A Forensics `ocr_diff.py` (cut-order item 5 — keep PDF-structure checks if cut)
 - [ ] **P2-04** @A Eval set ≥ 12 labelled PDFs incl. false-positive traps in `tests/fixtures/eval/`
 - [ ] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport`
-- [ ] **P2-06** @A `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9)
+- [ ] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9)
 - [ ] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed
 - [ ] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00)
 - [ ] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests
@@ -76,7 +76,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-11** @A Property tests (hypothesis): receiver ∈ vendor master; paid ≤ accepted value; Σ reservations ≤ cap
 - [ ] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13)
 - [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream
-- [ ] **P2-14** @A S4 duplicate blocked in < 1 s with link to original execution
+- [ ] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution
 - [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md`
 - [ ] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case)
 - [ ] **P2-17** @B Widget: Mandate gauge (committed vs daily cap)
@@ -90,7 +90,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2)
 - [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow
 - [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only
-- [ ] **P3-04** @A `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health`
+- [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health`
 - [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag
 - [ ] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order)
 - [ ] **P3-07** @B Widget: Settlement timeline with PayPal IDs, verified / simulated badges
