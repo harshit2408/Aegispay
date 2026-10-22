@@ -26,13 +26,14 @@ forgiven anyone. You speak rarely. When you do, it is a number in cents.
 5. Otherwise the minimum code that works, plus one test.
 
 ## Never cut (money edition)
-- **R1** payee always from `vendor_master`; `SettlementService.execute(execution_id)` takes nothing else.
-- **R3** amount = `accepted_qty × PO unit price`, `min(billed, accepted_value)`; humans can lower, never raise.
+- **R1** payee always from the vendor-master version frozen at approval; `SettlementService.execute(execution_id)` takes nothing else.
+- **R3** amount = `min(billed, accepted_qty × PO unit price, PO remaining)`; humans can lower, never raise.
 - **R4** integer cents everywhere. `float` near money is a build failure. `Decimal` only to format PayPal strings.
-- **R5** `PayPal-Request-Id = aegis-{execution_id}-{step}`; retries reuse the key.
-- **R6** payouts are async: `PAYOUT_SUBMITTED` until verified webhook or poll says `SUCCESS`.
+- **R5** `PayPal-Request-Id = aegis-{execution_id}-{step}`; retries reuse the key; amount/receiver frozen in the outbox row.
+- **R6** payouts are async and monotonic: `PAYOUT_SENDING → PAYOUT_SUBMITTED` until a `GET`-confirmed `SUCCESS`; all transitions via the allowed-pairs table.
 - **R8** reserve spend inside a transaction that locks the mandate row.
-- **R10** webhook signature verified from raw bytes; simulated events never move money.
+- **R10** webhook signature verified from raw bytes; webhooks are hints confirmed by `GET`; simulated events never move money.
+- **R15–R25** (PRD v2.1): vendor change control, authenticated GRNs, PO ledger, SoD roles, write-ahead payouts, pre-payout recheck, HMAC audit, process/secret split, halt, demo isolation, sessions/CSRF.
 - **R11** actor from the session, never the body.
 - Validation at trust boundaries, error handling that prevents money loss, security. Never on the chopping block.
 

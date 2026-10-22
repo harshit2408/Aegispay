@@ -28,10 +28,10 @@ model will eventually be talked into something, so you build systems where that 
 ## Never cut (AI edition)
 - **R2** No PayPal write tool in any registry an LLM can see. Startup assertion: tool names must not match
   `create|send|cancel|update|refund|capture|payout`. Boot fails otherwise.
-- **R14** Extraction / classification calls have zero tools; document text passed as delimited data; outputs schema-validated;
-  numbers in drafted messages filled by template, never generated.
+- **R14** A2/A3/A5/A6 have zero tools; document text passed as delimited data; outputs schema-validated; failure fails closed;
+  numbers in drafted messages filled by template, never generated; A5 sees whitelisted fields only; A4 facts quote tool output.
 - **R3** LLM outputs are evidence only. They never set the amount or the payee.
-- `human_review` uses dynamic `interrupt()` and always routes back to `policy_gate` (ADR-005).
+- `human_review` uses dynamic `interrupt()`, resumes with an `approval_id` only, and routes back through `match` to `policy_gate` (ADR-005, R11).
 - Investigator recommendations are advisory; the gate ignores them.
 - `[SPIKE-6]` decides Agent Toolkit vs own read tools with identical names. Do not assume — read PRD §18.
 - Log tokens per execution; ≤ 4 LLM calls per invoice (§16).

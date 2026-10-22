@@ -1,6 +1,6 @@
 ---
 tags: [aegispay, plan]
-source: "[[PRD_SRS]] §19"
+source: "[[PRD_SRS]] v2.1 §19"
 ---
 # AegisPay — Delivery Plan
 
@@ -14,7 +14,7 @@ Spec: [[PRD_SRS]] (single source of truth). State: [[CHECKLIST]]. Daily log: [[S
 |---|---|---|
 | Area | PayPal (both apps), settlement + spend ledger + reconciler, webhooks, LangGraph + AI agents, forensics, policy gate, auth, evals | Full stack + data: backend skeleton, DB schema + migrations, seeder, audit chain, match + duplicates (R9), docker-compose, Render deploy; frontend, AG Studio cockpit + widgets, vendor portal, CI, user research, video |
 | Main thread agent | `claude --agent ponytail-backend` or `ponytail-ai` | `claude --agent ponytail-frontend` or `ponytail-backend` (data items) |
-| Owns dirs | `backend/app/{paypal,settlement,decision,forensics,agents,routers}/`, `docs/adr/`, `docs/EVAL.md`, `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md` | `frontend/`, `backend/app/{models,db.py,config.py,audit,demo}/`, `backend/migrations/`, `docker-compose.yml`, `.github/`, `render.yaml`, `docs/USER_RESEARCH.md` |
+| Owns dirs | `backend/app/{paypal,settlement,decision,forensics,agents,routers,ops}/`, `docs/adr/`, `docs/EVAL.md`, `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md` | `frontend/`, `backend/app/{models,db.py,config.py,audit,demo}/`, `backend/migrations/`, `docker-compose.yml`, `.github/`, `render.yaml`, `docs/USER_RESEARCH.md` |
 | Shared | `docs/CHECKLIST.md`, `docs/SESSION_LOG.md`, `docs/PRD_SRS.md`, `CLAUDE.md`, `.claude/` | same |
 
 Touching the other developer's directory: allowed for small fixes, but say so in the commit message and the session log.
@@ -23,11 +23,11 @@ Touching the other developer's directory: allowed for small fixes, but say so in
 
 | Phase | Dates | Exit criterion | Critical items |
 |---|---|---|---|
-| P0 Setup + spikes | Oct 21–22 | Spike table filled; go/no-go per assumption | SPIKE-1…9, LICENSE, CI, Render |
-| P1 Foundations | Oct 23–27 | **Headless S1**: CLI upload → sandbox payout → invoice `PAID` | PayPal clients, SettlementService, reconciler, webhooks; app shell |
-| P2 Decision engine | Oct 28 – Nov 2 | **Headless S1–S4 pass**; first EVAL numbers | forensics, match, risk, gate, graph, property tests; ledger/gauge/exposure widgets |
-| P3 Agents + deploy | Nov 3–6 | **Hosted S1–S4 green on Render**; rough cut Nov 5 | Investigator, auth, deploy by Nov 4; decision-path + settlement widgets |
-| P4 Hardening | Nov 7–8 | Feature freeze Nov 8 EOD | chaos + contract tests, Playwright |
+| P0 Setup + spikes | Oct 21–22 | Spike table filled; go/no-go per assumption | SPIKE-1…11 (10–11 added by PRD v2.1), LICENSE, CI, Render |
+| P1 Foundations | Oct 23–27 | **Headless S1**: CLI upload → sandbox payout → invoice fully paid (`MARKED_AS_PAID`) | v2.1 schema (operators, vendor changes, PO ledger), PayPal clients, write-ahead SettlementService in its own worker, transition table, reconciler, webhooks; app shell |
+| P2 Decision engine | Oct 28 – Nov 2 | **Headless S1–S4 pass**; first EVAL numbers | forensics, match, risk, gate G1–G14 with `gate_hash`-bound approvals, vendor change control, GRN route, halt + velocity, HMAC audit, property tests; ledger/gauge/exposure widgets |
+| P3 Agents + deploy | Nov 3–6 | **Hosted S1–S4 green on Render**; rough cut Nov 5 | Investigator, auth + sessions/CSRF, parser sandbox, demo isolation, deploy (api + settlement worker) by Nov 4; decision-path + settlement widgets, ops panel |
+| P4 Hardening | Nov 7–8 | Feature freeze Nov 8 EOD | crash-injection, webhook-forgery, SoD role-matrix, chaos + contract tests, Playwright |
 | P5 Ship | Nov 9–11 | Submitted | README, TOOLS, EVAL, video, clean-clone check |
 
 ## The interface contract between A and B
@@ -35,8 +35,9 @@ Touching the other developer's directory: allowed for small fixes, but say so in
 Dev B must never wait on Dev A, so the seam is fixed early and mocked:
 
 1. **OpenAPI** — PRD §13 routes. Dev A publishes `backend/openapi.json` by end of Oct 24 (stubs are fine). Dev B generates `frontend/src/lib/api.ts` from it and builds against a mock until P2.
-2. **SSE event schema** — `{type: "node"|"settlement"|"webhook", execution_id, name, status, ts, payload}`. Agree by Oct 27; any change is a commit touching both sides plus a team memory entry.
-3. **Execution status enum** — exactly PRD §8 `invoice_executions.status`. No new statuses without updating PRD §8.
+2. **SSE event schema** — `{type: "node"|"settlement"|"webhook", execution_id, name, status, ts}`. No evidence content on the stream (R25); the UI fetches details over REST. Settlement events arrive via Postgres `LISTEN/NOTIFY` (ADR-007). Agree by Oct 27; any change is a commit touching both sides plus a team memory entry.
+3. **Execution status enum** — exactly PRD §8 `invoice_executions.status`, which v2.1 extends with `PAYOUT_SENDING` and `NEEDS_MANUAL_REVIEW`; allowed transitions are the PRD §8 table. No new statuses without updating PRD §8.
+4. **Decision contract** — `POST /api/executions/{id}/decisions` takes `{action, reason}` plus the `gate_hash` the UI displayed; a stale hash returns 409 and the case view reloads (R11). Roles are the five in PRD §13 / R18.
 
 A change to any of these three = write an ADR or memory `decision` and tell the other dev in [[SESSION_LOG]].
 
@@ -53,14 +54,14 @@ A change to any of these three = write an ADR or memory `decision` and tell the 
 ## Cut order if behind (PRD §19)
 1. P1 negotiation agent → 2. Studio Agent Framework agent (keep custom widgets) → 3. S5 → 4. React Flow → stepper → 5. OCR-diff detector.
 
-**Never cut:** payee lock, async settlement, duplicate check, operator auth, LICENSE + README + judge guide, the video.
+**Never cut:** payee lock, async settlement, duplicate check, operator auth, LICENSE + README + judge guide, the video, and the v2.1 controls listed in PRD §19 (R5, R11, R13, R15–R20, R24, R25). R21 anchor, R22 parser limits and R23 alert webhook may degrade only with the gap stated in the README.
 
 ## Open questions (PRD §23)
 
 | ID | Question | Owner | Decide by | Checklist |
 |---|---|---|---|---|
-| Q1 | Pay by `PAYPAL_ID` instead of `EMAIL`? | A | after SPIKE-3 | P0-09 |
-| Q2 | `HIGH_RISK` approvable in demo, or reject-only? | A+B | Oct 27 | P1-18 |
+| Q1 | ~~Pay by `PAYPAL_ID` instead of `EMAIL`?~~ Decided (PRD v2.1): yes, confirm in SPIKE-10 | A | SPIKE-10 | P0-19 |
+| Q2 | ~~`HIGH_RISK` approvable in demo?~~ Decided (PRD v2.1): only by 2 distinct eligible humans, not the uploader. A to confirm | A+B | Oct 27 | P1-18 |
 | Q3 | Which LLM provider + per-run cost cap? | A | Oct 22 | P0-16 |
 | Q4 | Terminal aesthetic vs AG Studio theme base? | B | Oct 23 | P1-17 |
 
@@ -71,3 +72,4 @@ Record each answer as an ECC team memory (`kind: decision`) and in the PRD.
 - AG Studio licence expiring during judging → SPIKE-7, ask AG Grid for a key to Dec 15.
 - Scope overrun → weekly exit-criteria check, cut order above.
 - Secrets leaked in a public repo → `.env` ignored, gitleaks in CI.
+- Payee swap / insider / crash mid-payout (PRD v2.1 review) → R15–R20 never cut; crash and SoD tests in P4. Threat model: PRD §4.0.

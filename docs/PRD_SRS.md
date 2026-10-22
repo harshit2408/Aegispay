@@ -251,7 +251,7 @@ DECIDE and EXECUTE are **separate processes** (R22): `api` (FastAPI + LangGraph)
 *Context:* Only one sponsor prize can be won. *Decision:* invest in AG Studio custom widgets, theming and a Studio Agent Framework agent; use Render and APIMatic without building for them. *Negative:* AG Studio learning curve and licence-term risk (SPIKE-7).
 
 **ADR-005 — Dynamic interrupts + durable checkpointer.**
-*Decision:* `interrupt()` inside `human_review` and `Command(resume=…)` on decision; `human_review` always routes back to `policy_gate`. Static `interrupt_before` is not used.
+*Decision:* `interrupt()` inside `human_review` and `Command(resume=approval_id)` on decision; `human_review` always routes back through `match` to `policy_gate`, so the gate re-runs on fresh DB facts (v2.1, R11). Static `interrupt_before` is not used.
 
 **ADR-006 — Integer cents.**
 *Decision:* `BIGINT` cents in DB, `int` in Pydantic, `Decimal` only for PayPal string formatting.
