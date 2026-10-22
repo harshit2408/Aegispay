@@ -15,7 +15,7 @@ The [[PLAN]] explains the why; this file is the state.
 - **Finish**: change `[ ]` to `[x]`, drop the WIP tag, add the short commit SHA at the end: ` — a1b2c3d`.
 - **Blocked**: append ` (BLOCKED: reason)` and log it in [[SESSION_LOG]].
 - New work discovered mid-phase gets a new ID at the end of its phase; never renumber.
-- Dev A = backend, PayPal, agents. Dev B = frontend, AG Studio, video (PRD §19).
+- Dev A = backend, PayPal, agents. Dev B = full stack (frontend + backend), AG Studio, video (PRD §19).
 
 ---
 
@@ -25,8 +25,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it
 - [ ] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push
 - [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits
-- [ ] **P0-05** @B Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md`
-- [ ] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md`
+- [ ] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` (WIP A)
+- [ ] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` (WIP A)
 - [ ] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account)
 - [ ] **P0-08** @A SPIKE-2 Can Treasury credentials read an invoice addressed to the treasury?
 - [ ] **P0-09** @A SPIKE-3 Payout Treasury → supplier: status transitions + webhook latency measured
