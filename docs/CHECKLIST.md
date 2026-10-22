@@ -22,8 +22,8 @@ The [[PLAN]] explains the why; this file is the state.
 ## P0 — Setup and spikes (Oct 21–22) · exit: spike table filled, go/no-go per assumption
 
 - [x] **P0-01** @AB Claude harness: CLAUDE.md, plan, checklist, hooks, routing, ponytail/caveman/obsidian, ECC memory
-- [ ] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it
-- [ ] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push
+- [ ] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it (WIP B)
+- [ ] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push (WIP B)
 - [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits
 - [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
@@ -38,13 +38,13 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart
 - [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md`
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections
-- [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7
+- [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7 (WIP B)
 - [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1)
 - [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19)
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
-- [ ] **P1-01** @B Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0)
+- [ ] **P1-01** @B Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0) (WIP B)
 - [ ] **P1-02** @B ORM models + migration for PRD §8, incl. partial unique indexes (R9) and `one_active_mandate`
 - [ ] **P1-03** @A `paypal/client.py`: OAuth cache per app, mandatory `request_id` on POST, `paypal-debug-id` logging, retry with same Request-Id (R5)
 - [ ] **P1-04** @A `paypal/payouts.py` (Treasury) + import-boundary test: importable only from `settlement/` (R2)
