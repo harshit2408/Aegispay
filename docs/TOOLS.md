@@ -17,4 +17,5 @@ source: "[[PRD_SRS]] §1 note 5, §21"
 Pending P0-16.
 
 ## PayPal APIs / Agent Toolkit / AG Studio / Render
-Pending (P5-02).
+Pending (P5-02). Notes so far:
+- Agent Toolkit: `paypal-agent-toolkit` 1.1.0 (1.11.0 not installable, pins `crewai-tools==0.13.2`). Read-only config exposes `get_invoice`, `list_invoices` only (SPIKE-6). It has no `list_transactions`, so the Treasury read tool is our own with the same name.

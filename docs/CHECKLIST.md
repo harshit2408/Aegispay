@@ -28,11 +28,11 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
 - [x] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) — PASS, see PRD §18 SPIKE-1 — 1774589
-- [ ] **P0-08** @A SPIKE-2 Can Treasury credentials read an invoice addressed to the treasury? (WIP A)
-- [ ] **P0-09** @A SPIKE-3 Payout Treasury → supplier: status transitions + webhook latency measured (WIP A)
-- [ ] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event (WIP A)
-- [ ] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works (WIP A)
-- [ ] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config (WIP A)
+- [x] **P0-08** @A SPIKE-2 Can Treasury credentials read an invoice addressed to the treasury? — RESULT: 403 on treasury token (inconclusive), vendor-gateway fallback; PRD §18 SPIKE-2
+- [x] **P0-09** @A SPIKE-3 Payout Treasury → supplier: status transitions + webhook latency measured — PASS poll-only (item SUCCESS ~18s); webhook latency deferred to P0-14; PRD §18 SPIKE-3
+- [x] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event — PARTIAL: full payment gives MARKED_AS_PAID, not PAID; webhook events deferred to P0-14; PRD §18 SPIKE-4
+- [x] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works — PARTIAL: UNCLAIMED confirmed, cancel fails (500); PRD §18 SPIKE-5
+- [x] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config — PASS: read-only config exposes get_invoice/list_invoices; no list_transactions; PRD §18 SPIKE-6
 - [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15
 - [ ] **P0-14** @A SPIKE-8 Webhook self-verification for real + simulator events (needs webhook IDs + public host; P0-06 left them empty)
 - [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart
