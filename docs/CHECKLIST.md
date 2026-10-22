@@ -25,16 +25,16 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it
 - [ ] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push
 - [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits
-- [ ] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` (WIP A)
-- [ ] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` (WIP A)
-- [ ] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account)
+- [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
+- [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
+- [ ] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) (WIP A)
 - [ ] **P0-08** @A SPIKE-2 Can Treasury credentials read an invoice addressed to the treasury?
 - [ ] **P0-09** @A SPIKE-3 Payout Treasury → supplier: status transitions + webhook latency measured
 - [ ] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event
 - [ ] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works
 - [ ] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config
 - [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15
-- [ ] **P0-14** @A SPIKE-8 Webhook self-verification for real + simulator events
+- [ ] **P0-14** @A SPIKE-8 Webhook self-verification for real + simulator events (needs webhook IDs + public host; P0-06 left them empty)
 - [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart
 - [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md`
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections
@@ -125,6 +125,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **SUB-01** @AB Hosted demo verified from a clean browser; stays up through 2026-12-15
 - [ ] **SUB-02** @B AG Studio licence valid through 2026-12-15
 - [ ] **SUB-03** @A Rotate sandbox credentials after judging
+- [ ] **SUB-04** @A Submit APIMatic subscription claim form (public repo URL + usage summary from `docs/TOOLS.md`; claim only real plugin usage)
 
 ## Never cut (PRD §19)
 Payee lock · async settlement · duplicate check · operator auth · LICENSE + README + judge guide · the video.
