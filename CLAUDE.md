@@ -23,6 +23,7 @@ The `SessionStart` hook pulls the remote and injects a brief of 1, 2 and 4. `/st
 - **R3** Amount = `min(billed, accepted_qty × PO unit price)`; humans may lower, never raise.
 - **R4** Integer cents. `float` near money is a build failure.
 - **R5–R11** idempotency keys from `execution_id`, async payouts, atomic spend cap, duplicate indexes, raw-byte webhook verification, session-derived actor.
+- **R15–R25** (PRD v2.1): vendor-master change control (2nd approver, cooling), receiver-recorded GRNs, PO consumption ledger, five roles + SoD, write-ahead payouts, pre-payout recheck, HMAC audit + anchor, settlement in its own process, halt + velocity, `DEMO_ENABLED` isolation, sessions/CSRF.
 - **[SPIKE-n]** = unverified PayPal behaviour. Stub + test until PRD §18 records the result. Never fill it in from memory.
 - Never commit `.env`, keys, sandbox credentials or the AG licence key.
 
