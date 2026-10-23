@@ -31,7 +31,7 @@ Then tell the hooks who you are — create `.claude/settings.local.json` (git-ig
 ```json
 { "env": { "AEGIS_DEV": "A" } }
 ```
-`A` = backend/PayPal/agents, `B` = frontend/AG Studio/video. Optional: `"AEGIS_AUTOPUSH": "0"` for pull-only syncing.
+`A` = backend/PayPal/agents, `B` = full stack (frontend + backend)/AG Studio/video. Optional: `"AEGIS_AUTOPUSH": "0"` for pull-only syncing.
 
 Check: start `claude`, you should see `AegisPay: … checklist n/86 · Dev A`. Run `/standup`.
 
@@ -79,7 +79,7 @@ Routes today (see the JSON for full lists):
 | Kind | How to call it | Examples |
 |---|---|---|
 | Agents | ask for it by name, or `@agent-<name>` in the prompt | `@agent-ecc:planner plan P1-07`, `@agent-ponytail-backend` |
-| Main-thread persona | start Claude as that agent | `claude --agent ponytail-backend` (Dev A), `claude --agent ponytail-frontend` (Dev B) |
+| Main-thread persona | start Claude as that agent | `claude --agent ponytail-backend` (Dev A), `claude --agent ponytail-frontend` or `ponytail-backend` (Dev B) |
 | Skills | `/<plugin>:<skill>` or let routing load them | `/ecc:tdd-workflow`, `/ecc:fastapi-patterns`, `/obsidian:json-canvas` |
 | Commands | slash commands | `/ecc:plan`, `/ecc:code-review`, `/ecc:security-scan`, `/ecc:test-coverage`, `/ecc:save-session`, `/ecc:resume-session`, `/ecc:harness-audit` |
 | Project skills | slash commands | `/standup`, `/handoff` |

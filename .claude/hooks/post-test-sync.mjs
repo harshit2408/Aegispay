@@ -5,7 +5,7 @@
 //   tests passed -> git pull --rebase --autostash, push any local commits,
 //                   and tell Claude to commit + tick docs/CHECKLIST.md if the tree is dirty.
 // Set AEGIS_AUTOPUSH=0 in .claude/settings.local.json to pull-only.
-import { readStdin, emit, projectDir, tryGit, pullRebase, repoBusy } from './lib.mjs';
+import { readStdin, emit, projectDir, tryGit, pullRebase, repoBusy, behindTrunk, TRUNK } from './lib.mjs';
 
 // A test runner at the start of any `&&` / `;` / `|` segment (optionally after env vars or a runner prefix).
 const TEST_RUNNER =
@@ -42,17 +42,24 @@ if (repoBusy(cwd)) {
   );
   process.exit(0);
 }
-const upstream = tryGit(cwd, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}');
+const branch = tryGit(cwd, 'branch', '--show-current').out || 'HEAD';
+const onTrunk = branch === TRUNK;
+let upstream = tryGit(cwd, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}');
 if (!upstream.ok) {
-  const branch = tryGit(cwd, 'branch', '--show-current').out || 'HEAD';
-  say(
-    `team-sync: tests passed; branch "${branch}" has no upstream.`,
-    `Tests passed but "${branch}" tracks no remote branch. After committing, run: git push -u origin ${branch}`
-  );
-  process.exit(0);
+  const canPush = !onTrunk && branch !== 'HEAD' && process.env.AEGIS_AUTOPUSH !== '0';
+  if (!canPush || !tryGit(cwd, 'push', '-u', 'origin', branch).ok) {
+    say(
+      `team-sync: tests passed; branch "${branch}" has no upstream.`,
+      `Tests passed but "${branch}" tracks no remote branch. After committing, run: git push -u origin ${branch}`
+    );
+    process.exit(0);
+  }
+  upstream = tryGit(cwd, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}');
 }
 
 const notes = [];
+const behind = behindTrunk(cwd);
+if (behind > 0) notes.push(`branch is ${behind} commit(s) behind origin/${TRUNK}`);
 const pull = pullRebase(cwd);
 if (!pull.ok) {
   say(
@@ -72,10 +79,14 @@ if (ahead > 0 && process.env.AEGIS_AUTOPUSH !== '0') {
 }
 
 const dirty = tryGit(cwd, 'status', '--porcelain').out;
+const trunkRule = onTrunk
+  ? `You are on ${TRUNK}: only checklist claims and docs go here. Code goes on a feature branch — run git switch -c <a|b>/<ID>-<slug> BEFORE committing, then open a PR.`
+  : `Open a PR into ${TRUNK} when the item is done (gh pr create); the other dev reviews, squash-merge.`;
+const mergeRule = behind > 0 ? ` Branch is behind origin/${TRUNK}: run git merge origin/${TRUNK} (never force-push), re-run tests.` : '';
 const context = dirty
   ? 'Tests passed and the tree has uncommitted work. Now: (1) tick finished items in docs/CHECKLIST.md, ' +
     '(2) commit with a conventional message (feat|fix|test|docs: ... — reference checklist IDs), ' +
-    '(3) run git push so the other developer gets it. Do not commit .env or secrets.'
-  : 'Tests passed; working tree is clean and in sync with the remote.';
+    `(3) run git push so the other developer gets it. Do not commit .env or secrets. ${trunkRule}${mergeRule}`
+  : `Tests passed; working tree is clean and in sync with the remote. ${trunkRule}${mergeRule}`;
 
 say(`team-sync: tests passed — ${notes.join('; ')}${dirty ? '; uncommitted changes remain' : ''}.`, context);
