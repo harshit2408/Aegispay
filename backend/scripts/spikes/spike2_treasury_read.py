@@ -1,6 +1,7 @@
 """SPIKE-2 (PRD §18): can Treasury credentials read an invoice addressed to the treasury?
 Creates a fresh vendor invoice, reads it with both tokens. 403 with no `invoicing` scope on the treasury
 token is INCONCLUSIVE (Invoicing not enabled on that app), not a no. Run: python spike2_treasury_read.py"""
+
 import sys
 
 from common import Sandbox
@@ -18,7 +19,11 @@ def main() -> int:
     if status == 200:
         print("SPIKE-2 PASS: treasury can read; PRD §3 boundary can narrow")
         return 0
-    verdict = "INCONCLUSIVE (enable Invoicing on the treasury app, rerun)" if not has_scope else "FAIL (use Vendor gateway)"
+    verdict = (
+        "INCONCLUSIVE (enable Invoicing on the treasury app, rerun)"
+        if not has_scope
+        else "FAIL (use Vendor gateway)"
+    )
     print("SPIKE-2", verdict)
     return 1
 

@@ -27,7 +27,11 @@ def test_load_env_strips_quotes_comments_and_blank_lines(tmp_path):
 
 def test_new_invoice_sends_amounts_as_strings_and_vendor_as_invoicer(monkeypatch):
     sandbox = common.Sandbox(
-        {"PAYPAL_BASE_URL": "https://x", "VENDOR_ACCOUNT_EMAIL": "v@x", "TREASURY_ACCOUNT_EMAIL": "t@x"}
+        {
+            "PAYPAL_BASE_URL": "https://x",
+            "VENDOR_ACCOUNT_EMAIL": "v@x",
+            "TREASURY_ACCOUNT_EMAIL": "t@x",
+        }
     )
     sent = []
 
