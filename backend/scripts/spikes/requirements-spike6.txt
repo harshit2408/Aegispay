@@ -1,0 +1,4 @@
+# Spike-only. 1.11.0 pins crewai-tools==0.13.2 which does not install (see PRD §18 SPIKE-6).
+paypal-agent-toolkit==1.1.0
+langchain
+langgraph

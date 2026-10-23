@@ -37,7 +37,7 @@ Each persona = ponytail's ladder + a domain "never cut" list taken from PRD §4 
 ```bash
 claude --agent ponytail-backend      # Dev A: whole session as Ledger
 claude --agent ponytail-ai           # Dev A: LangGraph / evals day
-claude --agent ponytail-frontend     # Dev B: whole session as Pixel
+claude --agent ponytail-frontend     # Dev B: whole session as Pixel (or ponytail-backend for backend work)
 ```
 Inside any session:
 
