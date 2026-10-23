@@ -39,8 +39,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md`
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections
 - [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7 (WIP B)
-- [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1)
-- [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19)
+- [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1) (WIP A)
+- [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) (WIP A)
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
