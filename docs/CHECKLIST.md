@@ -34,13 +34,13 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works — PARTIAL: UNCLAIMED confirmed, cancel fails (500); PRD §18 SPIKE-5 — be2c466
 - [x] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config — PASS: read-only config exposes get_invoice/list_invoices; no list_transactions; PRD §18 SPIKE-6 — be2c466
 - [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15
-- [ ] **P0-14** @A SPIKE-8 Webhook self-verification for real + simulator events (needs webhook IDs + public host; P0-06 left them empty)
-- [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart
-- [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md`
-- [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections
+- [ ] **P0-14** @A SPIKE-8 Webhook self-verification for real + simulator events (needs webhook IDs + public host; P0-06 left them empty) — deferred until P0-04 Render host exists (decided 2026-10-23)
+- [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart (WIP A)
+- [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md` — cost cap decided $1.00/run (2026-10-23); provider still open
+- [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections — SPIKE-1..6 probes in PR #1, SPIKE-10/11 in PR #2; SPIKE-7/8/9 pending
 - [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7 (WIP B)
-- [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1) (WIP A)
-- [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) (WIP A)
+- [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1) — PASS: payer ID via order `payee.merchant_id` (userinfo has none); PAYPAL_ID payout item SUCCESS ~19s; only GETs echo receiver + amount; PR #2 (needs B review)
+- [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) — PASS via 400 `SENDER_BATCH_ID` error body (batch id in `details[].link`); Request-Id not replayed; lookups 404/403; PR #2 (needs B review)
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
