@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -235,7 +235,7 @@ docs/.obsidian/
 .trash/
 
 # Node / Next.js / Playwright
-# (the Python template's `lib/` rule above would hide frontend/src/lib/api.ts and sse.ts)
+# (Python template's lib/ is anchored to /lib/ above; this negation is belt-and-braces for frontend/src/lib/)
 !frontend/src/lib/
 node_modules/
 .next/

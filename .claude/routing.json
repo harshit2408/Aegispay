@@ -17,7 +17,7 @@
       "review": ["ecc:security-reviewer", "ecc:python-reviewer"],
       "skills": ["ecc:tdd-workflow", "ecc:python-testing", "ecc:api-design"],
       "rules": ["money-safety", "backend"],
-      "note": "Touches money. R1-R10 apply. Property test required (§17)."
+      "note": "Touches money. R1-R11 and R15-R25 apply (PRD 4). Property test required (§17)."
     },
     {
       "id": "ai-decision",

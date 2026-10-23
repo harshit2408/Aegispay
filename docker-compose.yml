@@ -1,0 +1,54 @@
+# Local dev stack (PRD §6, §7).
+#   docker compose up                      -> postgres + api
+#   docker compose --profile frontend up   -> also the Next.js frontend (once ./frontend exists)
+
+services:
+  postgres:
+    image: postgres:16
+    # shortcut: single DB user for local dev; api/settlement role split (R22) lands in P1-19/P1-24.
+    environment:
+      POSTGRES_USER: aegis_api
+      POSTGRES_PASSWORD: aegis
+      POSTGRES_DB: aegis
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis_api -d aegis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Override the localhost URLs from .env with the compose host.
+      DATABASE_URL: postgresql+asyncpg://aegis_api:aegis@postgres:5432/aegis
+      CHECKPOINT_DB_URL: postgresql://aegis_api:aegis@postgres:5432/aegis
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    profiles: ["frontend"]
+    build:
+      context: ./frontend
+      args:
+        # NEXT_PUBLIC_* is inlined at build time; the browser reaches the api on the host port.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    # [frontend] vars only (R22): no env_file here.
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
