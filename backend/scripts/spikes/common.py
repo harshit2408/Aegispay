@@ -15,6 +15,7 @@ from pathlib import Path
 
 DEFAULT_ENV = Path(__file__).resolve().parents[3] / ".env"
 RETRIES = 3
+SPIKE_AMOUNT = "1.00"  # USD string (R4); every money-moving probe sends this
 TIMEOUT_S = 60
 
 

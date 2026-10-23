@@ -7,7 +7,7 @@ Run: python spike10_payer_id.py"""
 import json
 import sys
 
-from common import Sandbox
+from common import SPIKE_AMOUNT, Sandbox
 
 TERMINAL_ITEM = {"SUCCESS", "FAILED", "DENIED", "RETURNED", "BLOCKED", "UNCLAIMED"}
 
@@ -39,14 +39,17 @@ def read_payer_id(sandbox):
             token=token,
             body={
                 "intent": "CAPTURE",
-                "purchase_units": [{"amount": {"currency_code": "USD", "value": "1.00"}}],
+                "purchase_units": [{"amount": {"currency_code": "USD", "value": SPIKE_AMOUNT}}],
             },
             request_id=f"aegis-spike-s10-order-{sandbox.run}",
         ),
     )
-    if status < 400:
-        _, _, order = sandbox.call("GET", f"/v2/checkout/orders/{order['id']}", token=token)
-        payee = order["purchase_units"][0].get("payee", {})
+    if status < 400 and order.get("id"):
+        status, _, order = sandbox.brief(
+            "GET order", sandbox.call("GET", f"/v2/checkout/orders/{order['id']}", token=token)
+        )
+    if status == 200:
+        payee = (order.get("purchase_units") or [{}])[0].get("payee", {})
         print(
             "  order payee merchant_id:",
             payee.get("merchant_id"),
@@ -66,7 +69,8 @@ def echo(label, item, payer_id):
     print(f"  {label} item fields: {json.dumps(fields)}")
     print(
         f"  {label} receiver == payer_id: {item.get('receiver') == payer_id}"
-        f" | amount == 1.00 USD: {item.get('amount') == {'value': '1.00', 'currency': 'USD'}}"
+        f" | amount == {SPIKE_AMOUNT} USD:"
+        f" {item.get('amount') == {'value': SPIKE_AMOUNT, 'currency': 'USD'}}"
     )
 
 
@@ -77,7 +81,7 @@ def main() -> int:
         print("SPIKE-10 FAIL: no payer id")
         return 1
     token, _ = sandbox.token("TREASURY")
-    body = sandbox.payout_body(payer_id, "1.00", "s10", recipient_type="PAYPAL_ID")
+    body = sandbox.payout_body(payer_id, SPIKE_AMOUNT, "s10", recipient_type="PAYPAL_ID")
     status, _, resp = sandbox.brief(
         "create payout PAYPAL_ID",
         sandbox.call(
@@ -104,9 +108,12 @@ def main() -> int:
     batch_item = (batch.get("items") or [{}])[0]
     print("  GET batch item keys:", sorted(batch_item))
     echo("GET batch", batch_item.get("payout_item", {}), payer_id)
-    _, _, item = sandbox.call("GET", f"/v1/payments/payouts-item/{item_id}", token=token)
-    echo("GET item", item.get("payout_item", {}), payer_id)
-    print("  GET item payout_item_fee:", item.get("payout_item_fee"))
+    if item_id:
+        _, _, item = sandbox.call("GET", f"/v1/payments/payouts-item/{item_id}", token=token)
+        echo("GET item", item.get("payout_item", {}), payer_id)
+        print("  GET item payout_item_fee:", item.get("payout_item_fee"))
+    else:
+        print("  no payout_item_id seen while polling; GET item skipped")
     ok = last is not None and last[1] == "SUCCESS"
     print("SPIKE-10", "PASS" if ok else "FAIL", "| final (batch, item):", last)
     return 0 if ok else 1

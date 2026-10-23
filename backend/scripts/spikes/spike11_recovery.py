@@ -4,7 +4,8 @@
 3. Re-POST the same sender_batch_id with a NEW request id R2: record the full error body; does it carry
    the existing payout_batch_id?
 4. Try lookups by sender_batch_id: list payouts, Transaction Search.
-Pass: the existing batch id is obtainable from step 2, 3 or 4. Moves 1.00 USD (2.00 if PayPal accepts a
+Pass: the existing batch id is obtainable from step 2, 3, 4a or 4b. Transaction Search (4c) is printed
+only: it can lag ~3h, so a fresh batch is not expected there and PASS never depends on it. Moves 1.00 USD (2.00 if PayPal accepts a
 duplicate, which would itself be a finding). Run: python spike11_recovery.py"""
 
 import json
@@ -12,13 +13,13 @@ import sys
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
-from common import Sandbox
+from common import SPIKE_AMOUNT, Sandbox
 
 
 def main() -> int:
     sandbox = Sandbox()
     token, _ = sandbox.token("TREASURY")
-    body = sandbox.payout_body(sandbox.env["VENDOR_ACCOUNT_EMAIL"], "1.00", "s11")
+    body = sandbox.payout_body(sandbox.env["VENDOR_ACCOUNT_EMAIL"], SPIKE_AMOUNT, "s11")
     sender_batch_id = body["sender_batch_header"]["sender_batch_id"]
     r1, r2 = f"aegis-spike-s11-{sandbox.run}", f"aegis-spike-s11-{sandbox.run}-new"
     print("sender_batch_id:", sender_batch_id)
@@ -81,7 +82,7 @@ def main() -> int:
         "| contains batch_id:",
         batch_id in text,
     )
-    found["4c transaction search"] = status == 200 and (sender_batch_id in text or batch_id in text)
+    print("  note: Transaction Search can lag ~3h; informational only, not part of PASS")
 
     print("paths that yield the existing batch id:", json.dumps(found))
     ok = any(found.values())
