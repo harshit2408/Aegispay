@@ -3,7 +3,8 @@ Process 1 runs a minimal graph to the interrupt and hard-exits (os._exit, no cle
 process, reads the frozen thread, resumes with Command(resume=approval_id) and completes. Each node writes a
 side-effect row (with its pid) to Postgres, so the script records exactly what re-runs on resume.
 Needs: pip install -r requirements-spike9.txt (separate venv) and Postgres (docker compose up -d postgres).
-Run: SPIKE9_DB_URL=postgresql://user:pass@localhost:5432/db python spike9_checkpoint.py   (exit 0 on pass)"""
+Run (password from env, not argv; values from the compose postgres service, localhost only):
+  PGPASSWORD=... SPIKE9_DB_URL=postgresql://aegis_api@localhost:5432/aegis python spike9_checkpoint.py  (exit 0 on pass)"""
 
 import asyncio
 import os
@@ -17,10 +18,14 @@ try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from langgraph.graph import END, START, StateGraph
     from langgraph.types import Command, interrupt
+    from psycopg.conninfo import conninfo_to_dict
 except ImportError as exc:
     sys.exit(f"missing dependency ({exc}); pip install -r requirements-spike9.txt")
 
-DSN = os.environ.get("SPIKE9_DB_URL") or os.environ.get("CHECKPOINT_DB_URL") or ""
+DSN = os.environ.get("SPIKE9_DB_URL", "")
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+ROLES = ("p1", "p2")
+SPAWN_TIMEOUT_S = 60
 PAYABLE_CENTS = 1234
 APPROVAL_ID = "appr_spike9"
 # Expected side effects: (node, phase) -> list of process roles that ran it.
@@ -98,18 +103,28 @@ async def process_2(thread_id: str) -> None:
         snap = await graph.aget_state(config)
         pending = [i.value for t in snap.tasks for i in t.interrupts]
         print(f"p2 pid={os.getpid()} next={snap.next} values={snap.values} pending={pending}")
-        assert snap.next == ("review",), snap.next
-        assert snap.values.get("payable_cents") == PAYABLE_CENTS, snap.values
-        assert pending and pending[0]["execution_id"] == thread_id, pending
+        if snap.next != ("review",) or snap.values.get("payable_cents") != PAYABLE_CENTS:
+            raise RuntimeError(f"frozen thread not restored: next={snap.next} values={snap.values}")
+        if not pending or pending[0]["execution_id"] != thread_id:
+            raise RuntimeError(f"interrupt payload lost: {pending}")
         out = await graph.ainvoke(Command(resume=APPROVAL_ID), config)
         print(f"p2 final={out}")
-        assert out.get("done") is True and out.get("approval_id") == APPROVAL_ID, out
-        assert out.get("payable_cents") == PAYABLE_CENTS, out
-        assert (await graph.aget_state(config)).next == (), "thread should be finished"
+        if not (out.get("done") is True and out.get("approval_id") == APPROVAL_ID):
+            raise RuntimeError(f"resume did not complete: {out}")
+        if out.get("payable_cents") != PAYABLE_CENTS:
+            raise RuntimeError(f"state changed across resume: {out}")
+        if (await graph.aget_state(config)).next != ():
+            raise RuntimeError("thread should be finished")
 
 
 def spawn(role: str, thread_id: str) -> int:
-    r = subprocess.run([sys.executable, __file__, role, thread_id], check=False)
+    try:
+        r = subprocess.run(
+            [sys.executable, __file__, role, thread_id], check=False, timeout=SPAWN_TIMEOUT_S
+        )
+    except subprocess.TimeoutExpired:
+        print(f"FAIL: {role} timed out after {SPAWN_TIMEOUT_S}s")
+        return 124
     return r.returncode
 
 
@@ -145,7 +160,12 @@ def orchestrate() -> int:
 def main() -> int:
     if not DSN:
         sys.exit("set SPIKE9_DB_URL (postgresql://...) for the compose postgres service")
+    host = conninfo_to_dict(DSN).get("host")
+    if host not in LOCAL_HOSTS:
+        sys.exit(f"refusing non-local database host {host!r}: this probe writes test rows")
     if len(sys.argv) == 3:
+        if sys.argv[1] not in ROLES:
+            sys.exit(f"role must be one of {ROLES}")
         step = process_1 if sys.argv[1] == "p1" else process_2
         # psycopg async cannot use the Windows default ProactorEventLoop
         asyncio.run(step(sys.argv[2]), loop_factory=asyncio.SelectorEventLoop)

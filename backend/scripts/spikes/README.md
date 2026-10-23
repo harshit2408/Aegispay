@@ -1,7 +1,7 @@
 # Spike probes (PRD §18)
 
 Live probes against the PayPal **sandbox**. Throwaway tooling: product code never imports this folder.
-SPIKE-9 reads only `SPIKE9_DB_URL` and needs `docker compose up -d postgres`; if a native Postgres already holds host port 5432, map another host port.
+SPIKE-9 reads only `SPIKE9_DB_URL` (localhost hosts only; keep the password in `PGPASSWORD`, not the URL) and needs `docker compose up -d postgres`; if a native Postgres already holds host port 5432, map another host port.
 The PayPal probes read `.env` at the repo root (git-ignored) and print statuses, ids and timings. They never print secrets.
 Each probe exits 0 on pass. Results are recorded in PRD §18; rerun after any change to the sandbox apps.
 
@@ -22,7 +22,7 @@ python backend/scripts/spikes/spike1_invoice.py        # same for the others
 python -m venv .spike6 && .spike6/Scripts/pip install -r backend/scripts/spikes/requirements-spike6.txt
 .spike6/Scripts/python backend/scripts/spikes/spike6_toolkit.py
 python -m venv .spike9 && .spike9/Scripts/pip install -r backend/scripts/spikes/requirements-spike9.txt
-SPIKE9_DB_URL=postgresql://<user>:<pass>@localhost:<port>/<db> .spike9/Scripts/python backend/scripts/spikes/spike9_checkpoint.py
+PGPASSWORD=<POSTGRES_PASSWORD from docker-compose.yml> SPIKE9_DB_URL=postgresql://aegis_api@localhost:5432/aegis .spike9/Scripts/python backend/scripts/spikes/spike9_checkpoint.py
 python -m pytest backend/tests/unit/test_spikes_common.py   # offline
 ```
 
