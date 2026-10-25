@@ -16,6 +16,30 @@ from pathlib import Path
 DEFAULT_ENV = Path(__file__).resolve().parents[3] / ".env"
 RETRIES = 3
 TIMEOUT_S = 60
+# The probes send OAuth credentials and can create payouts: only ever talk to the PayPal sandbox.
+SANDBOX_BASE_URLS = frozenset(
+    {"https://api-m.sandbox.paypal.com", "https://api.sandbox.paypal.com"}
+)
+
+
+def sandbox_base_url(url):
+    """Return the sandbox base URL or exit. Exact HTTPS allowlist: no live, plain HTTP or lookalike hosts."""
+    base = str(url or "").strip().rstrip("/")
+    if base not in SANDBOX_BASE_URLS:
+        sys.exit(
+            f"refusing PAYPAL_BASE_URL {base!r}: spikes run only against {sorted(SANDBOX_BASE_URLS)}"
+        )
+    return base
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A redirect could carry credentials off the allowlisted host; surface it as an HTTPError instead."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
 
 
 def load_env(path=DEFAULT_ENV):
@@ -32,7 +56,7 @@ def load_env(path=DEFAULT_ENV):
 class Sandbox:
     def __init__(self, env=None):
         self.env = env or load_env()
-        self.base = self.env["PAYPAL_BASE_URL"].rstrip("/")
+        self.base = sandbox_base_url(self.env.get("PAYPAL_BASE_URL"))
         self.run = secrets.token_hex(3)  # makes ids unique per run
 
     def call(self, method, path, token=None, basic=None, body=None, form=None, request_id=None):
@@ -54,7 +78,7 @@ class Sandbox:
         req = urllib.request.Request(self.base + path, data=data, headers=headers, method=method)
         for attempt in range(RETRIES):
             try:
-                with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+                with _OPENER.open(req, timeout=TIMEOUT_S) as resp:
                     raw = resp.read().decode()
                     return (
                         resp.status,
