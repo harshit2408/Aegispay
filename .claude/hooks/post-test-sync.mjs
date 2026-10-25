@@ -12,7 +12,8 @@ const TEST_RUNNER =
   /^(\w+=\S*\s+)*((uv|poetry) run |python3? -m |npx |pnpm exec |bunx )?(pytest|py\.test|vitest|jest|playwright test|(npm|pnpm|yarn|bun) (run )?test[\w:-]*|make test)\b/i;
 const isTestCommand = (cmd) => cmd.split(/&&|\|\||;|\|/).some((seg) => TEST_RUNNER.test(seg.trim()));
 // Belt and braces: some runners exit 0 with failures in the summary.
-const FAIL_TEXT = /\b[1-9]\d* (failed|errors?)\b|^FAILED |✗ [1-9]\d* failed/im;
+const FAIL_TEXT =
+  /\b[1-9]\d* (failed|errors?)\b|^FAILED |✗ [1-9]\d* failed|^ERROR: |\berror: unrecognized arguments\b|\bno tests ran\b|^usage: /im;
 
 const input = await readStdin();
 const event = input.hook_event_name || 'PostToolUse';
@@ -21,7 +22,16 @@ if (!isTestCommand(cmd)) process.exit(0);
 
 const resp = input.tool_response ?? {};
 const output = [resp.stdout, resp.stderr, resp.output, input.error].filter(Boolean).join('\n');
-const passed = event === 'PostToolUse' && !FAIL_TEXT.test(output);
+// Any reported exit status must be exactly 0. Interrupted or backgrounded runs have no final result yet.
+const exitCode = [resp.exit_code, resp.exitCode, resp.returnCode, resp.code].find((c) => c !== undefined && c !== null);
+const completed = !resp.interrupted && !resp.backgroundTaskId && !resp.backgroundedByUser;
+const passed =
+  event === 'PostToolUse' &&
+  completed &&
+  (exitCode === undefined || Number(exitCode) === 0) &&
+  !FAIL_TEXT.test(output);
+// Publishing a new remote branch is a bigger step than syncing one: only on an explicit exit status of 0.
+const exitedZero = exitCode !== undefined && Number(exitCode) === 0;
 
 const say = (systemMessage, additionalContext) =>
   emit({ systemMessage, hookSpecificOutput: { hookEventName: event, additionalContext } });
@@ -46,7 +56,7 @@ const branch = tryGit(cwd, 'branch', '--show-current').out || 'HEAD';
 const onTrunk = branch === TRUNK;
 let upstream = tryGit(cwd, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}');
 if (!upstream.ok) {
-  const canPush = !onTrunk && branch !== 'HEAD' && process.env.AEGIS_AUTOPUSH !== '0';
+  const canPush = exitedZero && !onTrunk && branch !== 'HEAD' && process.env.AEGIS_AUTOPUSH !== '0';
   if (!canPush || !tryGit(cwd, 'push', '-u', 'origin', branch).ok) {
     say(
       `team-sync: tests passed; branch "${branch}" has no upstream.`,
