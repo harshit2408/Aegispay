@@ -65,6 +65,16 @@ export function pullRebase(cwd) {
   return pull;
 }
 
+export const TRUNK = 'main';
+
+// On a feature branch: fetch and count commits on origin/main this branch lacks. 0 on main / no remote.
+export function behindTrunk(cwd) {
+  const branch = tryGit(cwd, 'branch', '--show-current').out;
+  if (!branch || branch === TRUNK) return 0;
+  if (!tryGit(cwd, 'fetch', 'origin', TRUNK).ok) return 0;
+  return Number(tryGit(cwd, 'rev-list', '--count', `HEAD..origin/${TRUNK}`).out || 0);
+}
+
 export function readText(dir, rel) {
   const p = join(dir, rel);
   return existsSync(p) ? readFileSync(p, 'utf8') : '';
