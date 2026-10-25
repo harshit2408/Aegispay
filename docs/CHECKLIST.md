@@ -24,7 +24,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-01** @AB Claude harness: CLAUDE.md, plan, checklist, hooks, routing, ponytail/caveman/obsidian, ECC memory
 - [x] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it — 2062c25
 - [x] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push — 16cf6f9
-- [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits (WIP B)
+- [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits (WIP B) (BLOCKED: owner sign-in and credit redemption/resource evidence pending; see RENDER_SETUP.md)
 - [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
 - [x] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) — PASS, see PRD §18 SPIKE-1 — 1774589
@@ -45,6 +45,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-21** @B Codex harness for Dev B: shared context/rules/memory, native configuration and standup/handoff workflows — 4b71712
 - [x] **P0-22** @B Port all `.claude/agents/` and `.claude/skills/` definitions to native Codex agents and skills, preserving complete instructions — b0901d8
 - [x] **P0-23** @B Mirror every project `.claude/` file into `.codex/`, activate native rules/routing/hooks/plugins, configure Obsidian for Claude — 20693c8
+- [x] **P0-24** @B Resolve harness review findings: narrow PreToolUse, strengthen/document secret-path guard, make mirror drift remediation explicit — 7f3e4f3
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
