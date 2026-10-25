@@ -22,8 +22,9 @@ try:
 except ImportError as exc:
     sys.exit(f"missing dependency ({exc}); pip install -r requirements-spike9.txt")
 
+from common import nonlocal_pg_target
+
 DSN = os.environ.get("SPIKE9_DB_URL", "")
-LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 ROLES = ("p1", "p2")
 SPAWN_TIMEOUT_S = 60
 PAYABLE_CENTS = 1234
@@ -160,9 +161,9 @@ def orchestrate() -> int:
 def main() -> int:
     if not DSN:
         sys.exit("set SPIKE9_DB_URL (postgresql://...) for the compose postgres service")
-    host = conninfo_to_dict(DSN).get("host")
-    if host not in LOCAL_HOSTS:
-        sys.exit(f"refusing non-local database host {host!r}: this probe writes test rows")
+    reason = nonlocal_pg_target(conninfo_to_dict(DSN), os.environ)
+    if reason:
+        sys.exit(f"refusing {reason}: this probe writes test rows to a local database only")
     if len(sys.argv) == 3:
         if sys.argv[1] not in ROLES:
             sys.exit(f"role must be one of {ROLES}")

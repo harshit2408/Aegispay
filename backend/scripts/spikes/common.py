@@ -33,6 +33,28 @@ def sandbox_base_url(url):
     return base
 
 
+LOCAL_PG_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+LOCAL_PG_ADDRS = frozenset({"127.0.0.1", "::1"})
+
+
+def nonlocal_pg_target(params, environ):
+    """Why a libpq connection would leave this machine, or None if it can only reach loopback.
+
+    params: parsed conninfo (psycopg.conninfo.conninfo_to_dict). libpq connects to hostaddr when
+    set (host is then only a name for TLS/auth), and fills unset keys from PGHOST/PGHOSTADDR and
+    from a service file, so all of those are checked."""
+    if params.get("service") or environ.get("PGSERVICE") or environ.get("PGSERVICEFILE"):
+        return "a pg service file can redirect the connection"
+    host = params.get("host") or environ.get("PGHOST") or ""
+    hosts = [h.strip() for h in host.split(",")]
+    if not all(h in LOCAL_PG_HOSTS for h in hosts):
+        return f"non-local database host {host!r}"
+    hostaddr = params.get("hostaddr") or environ.get("PGHOSTADDR") or ""
+    if hostaddr and not all(a.strip() in LOCAL_PG_ADDRS for a in hostaddr.split(",")):
+        return f"non-local database hostaddr {hostaddr!r}"
+    return None
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """A redirect could carry credentials off the allowlisted host; surface it as an HTTPError instead."""
 
