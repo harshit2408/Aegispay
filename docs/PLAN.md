@@ -75,3 +75,7 @@ Record each answer as an ECC team memory (`kind: decision`) and in the PRD.
 - Scope overrun → weekly exit-criteria check, cut order above.
 - Secrets leaked in a public repo → `.env` ignored, gitleaks in CI.
 - Payee swap / insider / crash mid-payout (PRD v2.1 review) → R15–R20 never cut; crash and SoD tests in P4. Threat model: PRD §4.0.
+
+## P0 closeout delegation — 2026-10-25
+
+User authorized Dev B and task-specific subagents to finish all remaining P0 work today. Checklist ownership/claims are the task state. P0-15, P0-16, P0-19 and P0-20 are temporarily assigned to Dev B for closeout; Dev A retains the P1+ application responsibilities. Agents use isolated branches/worktrees and report verification evidence. Existing pull requests keep their review and merge gates.
