@@ -1,0 +1,10 @@
+# Project configuration for Dev B. Personal model/auth/trust settings stay outside the repo.
+[shell_environment_policy.set]
+AEGIS_DEV = "B"
+ECC_MEMORY_HARNESS = "codex"
+PONYTAIL_DEFAULT_MODE = "full"
+
+# Equivalent to the existing .mcp.json; Python must have mcp-server-fetch installed.
+[mcp_servers.fetch]
+command = "python"
+args = ["-m", "mcp_server_fetch"]
