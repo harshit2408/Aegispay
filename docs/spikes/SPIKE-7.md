@@ -39,9 +39,9 @@ Build/lint/unit and root checks repeated on 2026-10-26 after resuming; browser o
 | Browser network resource origins | Local origin only; no PayPal or LLM request |
 | Licence diagnostics | Expected vendor `AG Studio Pro with AI License / License Key Not Found`; evaluation unlocks features with watermark. No warning suppression or licence workaround |
 | Root Ruff / backend pytest | PASS / 6 passed |
-| Root Node harness | Resume validation PASS, 11/11; earlier interrupted session had an isolated 10s subprocess timeout |
+| Root Node harness | Resume validation PASS, 12/12 after merging current main; earlier interrupted session had an isolated 10s subprocess timeout |
 | Complete Claude/Codex mirror check | PASS after regenerating fresh-checkout CRLF ports locally; no harness source or semantic mirror changes |
-| Container runtime | Not tested locally: parent reports Docker Linux engine unavailable. P0-18 coordinates Linux CI smoke |
+| Container runtime | Not run by this worker. Parent reports Docker now responds and coordinates the combined P0-18 stack smoke |
 
 React/TypeScript review disciplines applied locally because the named ECC reviewer agents are not exposed as selectable tools here. Checked registry typing, no runtime `any`/casts, stable widget/harness definitions, labelled controls, focus style, no credentials or provider proxy, no payment calls and no client money logic.
 
