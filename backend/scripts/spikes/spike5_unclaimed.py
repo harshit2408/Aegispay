@@ -23,7 +23,12 @@ def main() -> int:
         return 1
     status, _, _ = sandbox.brief(
         "cancel item",
-        sandbox.call("POST", f"/v1/payments/payouts-item/{item_id}/cancel", token=token),
+        sandbox.call(
+            "POST",
+            f"/v1/payments/payouts-item/{item_id}/cancel",
+            token=token,
+            request_id=f"aegis-spike-s5-{sandbox.run}-cancel",
+        ),
     )
     _, _, item = sandbox.call("GET", f"/v1/payments/payouts-item/{item_id}", token=token)
     print("item after cancel attempt:", item.get("transaction_status"))

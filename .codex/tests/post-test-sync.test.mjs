@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -70,6 +70,21 @@ test('publishes a new feature branch only after an explicit exit status of 0', (
   try {
     const out = runHook(work, { hook_event_name: 'PostToolUse', tool_response: { exit_code: 0, stdout: '3 passed' } });
     assert.equal(published(remote), true, JSON.stringify(out));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('does not pull or push an existing branch after an unknown exit status', () => {
+  const { root, remote, work } = scratchRepo();
+  try {
+    git(work, 'push', '-qu', 'origin', 'a/P0-99-feature');
+    const previous = git(remote, 'rev-parse', 'refs/heads/a/P0-99-feature');
+    writeFileSync(join(work, 'a.txt'), 'changed\n');
+    git(work, 'commit', '-qam', 'local change');
+    runHook(work, NO_PUSH['unknown exit status']);
+    assert.equal(git(remote, 'rev-parse', 'refs/heads/a/P0-99-feature'), previous);
+    assert.equal(existsSync(join(work, '.git', 'FETCH_HEAD')), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

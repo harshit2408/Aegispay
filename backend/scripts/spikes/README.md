@@ -27,7 +27,7 @@ python -m pytest backend/tests/unit/test_spikes_common.py   # offline
 ```
 
 Run them without `python -I` (they import `common.py` from their own folder).
-Still open: webhook latency and event names (SPIKE-3/4, P0-14), SPIKE-2 retest once Invoicing is enabled on the treasury app.
+Webhook observations and event shapes are now recorded in SPIKE-8 below. SPIKE-2 remains inconclusive until Invoicing is enabled on the Treasury app; use the VendorGateway fallback. The cross-spike decisions and evidence limits are indexed in `docs/spikes/README.md`.
 
 # SPIKE-8: sandbox webhook verification
 

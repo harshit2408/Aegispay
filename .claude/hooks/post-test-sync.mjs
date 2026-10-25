@@ -28,7 +28,7 @@ const completed = !resp.interrupted && !resp.backgroundTaskId && !resp.backgroun
 const passed =
   event === 'PostToolUse' &&
   completed &&
-  (exitCode === undefined || Number(exitCode) === 0) &&
+  exitCode !== undefined && Number(exitCode) === 0 &&
   !FAIL_TEXT.test(output);
 // Publishing a new remote branch is a bigger step than syncing one: only on an explicit exit status of 0.
 const exitedZero = exitCode !== undefined && Number(exitCode) === 0;
