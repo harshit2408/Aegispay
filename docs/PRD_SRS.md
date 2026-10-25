@@ -351,11 +351,11 @@ VENDOR_CLIENT_SECRET=
 VENDOR_WEBHOOK_ID=
 VENDOR_ACCOUNT_EMAIL=supplier@aegispay-demo.example       # MUST equal invoicer.email_address
 
-# --- LLM (pick ONE provider; record exact model IDs in docs/TOOLS.md) [api only] ---
-LLM_PROVIDER=
+# --- LLM (Q3 decided 2026-10-26; exact IDs + pricing in docs/TOOLS.md) [api only] ---
+LLM_PROVIDER=openai
 LLM_API_KEY=
-LLM_MODEL_EXTRACT=          # vision-capable
-LLM_MODEL_REASON=
+LLM_MODEL_EXTRACT=gpt-6.1-sol          # vision-capable
+LLM_MODEL_REASON=gpt-6.1-sol
 
 # --- Database (one DB, two roles, R22) ---
 DATABASE_URL=postgresql+asyncpg://aegis_api:aegis@localhost:5432/aegis          # [api]
@@ -1261,7 +1261,7 @@ Daily cap check: S1 $480.00 + S2 $425.00 = $905.00 ≤ $2,000.00 org-wide and �
 | Observability | Structured JSON logs with `execution_id`, node name, PayPal `paypal-debug-id`; no PII, tokens, invoice text or mandate prompts in logs; alerts per R23; `/api/health` covers DB, both tokens, both webhooks, distinct accounts, halt, last anchor age. |
 | Resilience | PayPal 5xx/timeouts → retry with the **same** Request-Id (exponential backoff, max 3) after the R19 lookup; reconciler poll guarantees settlement progress without webhooks; deploy overlap cannot double-run settlement (advisory lock). |
 | Honesty | `DEMO_REPLAY_MODE` (requires `DEMO_ENABLED`, sandbox only) serves recorded sandbox responses only when the sandbox is unavailable, with a persistent **REPLAY** banner; replayed executions are tagged `replayed=true` and never touch ledgers (R24). README states the threat model and what is simulated (§4.0, §3). |
-| Cost | LLM calls per invoice ≤ 4 (A2, A3, optional A4, optional A5); log tokens per execution. |
+| Cost | LLM calls per invoice execution ≤ 4 (A2, A3, optional A4, optional A5), including retries and tool-loop continuations. Q3: **$1.00 USD total per invoice execution**, OpenAI `gpt-6.1-sol` for extraction and reasoning. Reserve a conservative maximum billable cost before each request; insufficient budget fails closed. Count image input, reasoning/output, cache writes and applicable premiums; reconcile actual tokens/cost per execution. See `docs/TOOLS.md` for dated pricing and implementation limits. |
 
 ---
 
@@ -1383,5 +1383,5 @@ v2.1 adds work to existing checklist items rather than new phases: schema (P1-02
 |---|---|---|---|
 | Q1 | ~~Pay by `PAYPAL_ID` instead of `EMAIL`?~~ **Decided 2026-10-22 (v2.1): yes**, payer ID is the primary binding (R1, R15); confirmed by SPIKE-10 PASS 2026-10-23. | Dev A | SPIKE-10 |
 | Q2 | ~~Should `HIGH_RISK` cases be approvable?~~ **Decided 2026-10-22 (v2.1):** approvable only with 2 distinct eligible humans, neither the uploader (G3); payment still goes only to the vendor-master payee. | Both | Done |
-| Q3 | Which single LLM provider, and per-run cost cap? | Dev A | Oct 22 |
+| Q3 | ~~Which single LLM provider, and per-run cost cap?~~ **Decided 2026-10-26 (Dev B, user-delegated closeout): OpenAI; `gpt-6.1-sol` for both extraction and reasoning; $1.00 USD per invoice execution** (cap agreed 2026-10-23), ≤4 requests including retries. Selection rationale, exact IDs and dated prices in `docs/TOOLS.md`; enforcement and accuracy still require implementation/eval. | Dev B (P0 closeout); Dev A implementation | Decided |
 | Q4 | Keep the dark "terminal" aesthetic or adopt the AG Studio theme as the base? | Dev B | Oct 23 |

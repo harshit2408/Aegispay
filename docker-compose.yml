@@ -1,17 +1,15 @@
-# Local dev stack (PRD §6, §7).
-#   docker compose up                      -> postgres + api
-#   docker compose --profile frontend up   -> also the Next.js frontend (once ./frontend exists)
-
+# Local dev stack (PRD §6, §7): default postgres + api, optional frontend profile.
+# Settlement worker and DB grants land in P1-24/P1-19; they are not provisioned here.
 services:
   postgres:
     image: postgres:16
-    # shortcut: single DB user for local dev; api/settlement role split (R22) lands in P1-19/P1-24.
+    # shortcut: one local DB owner; least-privilege api/settlement grants land in P1-19.
     environment:
       POSTGRES_USER: aegis_api
       POSTGRES_PASSWORD: aegis
       POSTGRES_DB: aegis
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,33 +20,63 @@ services:
 
   api:
     build: ./backend
-    env_file:
-      - path: .env
-        required: false
     environment:
-      # Override the localhost URLs from .env with the compose host.
+      # Explicit PRD §7 allowlist (R22). Never forward or mount the whole env file.
+      # Container DB URLs use the service hostname; template URLs are for host tools.
       DATABASE_URL: postgresql+asyncpg://aegis_api:aegis@postgres:5432/aegis
       CHECKPOINT_DB_URL: postgresql://aegis_api:aegis@postgres:5432/aegis
+      PAYPAL_BASE_URL: ${PAYPAL_BASE_URL:-https://api-m.sandbox.paypal.com}
+      TREASURY_WEBHOOK_ID: ${TREASURY_WEBHOOK_ID:-}
+      VENDOR_CLIENT_ID: ${VENDOR_CLIENT_ID:-}
+      VENDOR_CLIENT_SECRET: ${VENDOR_CLIENT_SECRET:-}
+      VENDOR_WEBHOOK_ID: ${VENDOR_WEBHOOK_ID:-}
+      VENDOR_ACCOUNT_EMAIL: ${VENDOR_ACCOUNT_EMAIL:-supplier@aegispay-demo.example}
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL_EXTRACT: ${LLM_MODEL_EXTRACT:-}
+      LLM_MODEL_REASON: ${LLM_MODEL_REASON:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      OPERATOR_SEED_FILE: ${OPERATOR_SEED_FILE:-}
+      ORG_HARD_MAX_SINGLE_CENTS: ${ORG_HARD_MAX_SINGLE_CENTS:-100000}
+      ORG_HARD_DAILY_CAP_CENTS: ${ORG_HARD_DAILY_CAP_CENTS:-500000}
+      ORG_HARD_VENDOR_DAILY_CAP_CENTS: ${ORG_HARD_VENDOR_DAILY_CAP_CENTS:-150000}
+      ORG_HARD_VENDOR_30D_CAP_CENTS: ${ORG_HARD_VENDOR_30D_CAP_CENTS:-1000000}
+      ORG_HARD_MAX_INVOICES_PER_VENDOR_PER_DAY: ${ORG_HARD_MAX_INVOICES_PER_VENDOR_PER_DAY:-5}
+      ORG_HARD_MAX_PRICE_VARIANCE_BPS: ${ORG_HARD_MAX_PRICE_VARIANCE_BPS:-200}
+      ORG_HARD_MAX_SHORT_PAY_DELTA_CENTS: ${ORG_HARD_MAX_SHORT_PAY_DELTA_CENTS:-20000}
+      ORG_HARD_MAX_DUAL_APPROVAL_THRESHOLD: ${ORG_HARD_MAX_DUAL_APPROVAL_THRESHOLD:-80}
+      ORG_ALLOWED_TIMEZONES: ${ORG_ALLOWED_TIMEZONES:-UTC,America/Los_Angeles,Asia/Kolkata}
+      PAYEE_COOLING_HOURS: ${PAYEE_COOLING_HOURS:-72}
+      VENDOR_NEW_DAYS: ${VENDOR_NEW_DAYS:-7}
+      DEMO_ENABLED: ${DEMO_ENABLED:-false}
+      FORENSICS_DETECTOR_ENABLED: ${FORENSICS_DETECTOR_ENABLED:-true}
+      DEMO_REPLAY_MODE: ${DEMO_REPLAY_MODE:-false}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   frontend:
     profiles: ["frontend"]
     build:
       context: ./frontend
       args:
-        # NEXT_PUBLIC_* is inlined at build time; the browser reaches the api on the host port.
-        NEXT_PUBLIC_API_URL: http://localhost:8000
-    # [frontend] vars only (R22): no env_file here.
+        # Browser URL, inlined at build time. AG licence stays in Render build env only.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:
