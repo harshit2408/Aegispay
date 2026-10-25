@@ -44,6 +44,7 @@ The [[PLAN]] explains the why; this file is the state.
 
 - [x] **P0-21** @B Codex harness for Dev B: shared context/rules/memory, native configuration and standup/handoff workflows — 4b71712
 - [x] **P0-22** @B Port all `.claude/agents/` and `.claude/skills/` definitions to native Codex agents and skills, preserving complete instructions — b0901d8
+- [ ] **P0-23** @B Mirror every project `.claude/` file into `.codex/`, activate native rules/routing/hooks/plugins, configure Obsidian for Claude (WIP B)
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
