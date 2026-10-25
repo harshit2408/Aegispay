@@ -47,6 +47,7 @@ Out of scope and stated plainly: a compromised host, database owner role or secr
 | `.github/workflows/ci.yml` | present | ruff, pytest, gitleaks; frontend build once it exists |
 | `docs/` | present | PRD, plan, checklist, session log, sandbox setup, tools, harness notes |
 | `.claude/` | present | Project agents, hooks, rules and routing for Claude Code |
+| `.codex/`, `.agents/skills/` | present | Complete Claude setup mirror plus native Codex agents, skills, rules and lifecycle adapters |
 | `frontend/` | not yet created | Next.js and AG Studio cockpit (checklist items as scheduled) |
 | `render.yaml` | target | Render services: api, settlement worker, frontend, Postgres |
 
@@ -114,7 +115,7 @@ Git rules (PRD §6.1):
 ### Claude Code harness
 
 Dev A uses Claude Code. Dev B uses Codex; its project setup, shared rules/memory and
-`$aegis-standup` / `$aegis-handoff` workflows are documented in [the Codex guide](docs/harness/CODEX.md).
+`$standup` / `$handoff` workflows and all four native project agents are documented in [the Codex guide](docs/harness/CODEX.md).
 
 The project enables four plugins in `.claude/settings.json`: ecc, ponytail, caveman and obsidian. Plugins are not installed automatically on each machine, so do this once per machine:
 

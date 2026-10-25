@@ -1,8 +1,8 @@
 // Read-only Codex adapters. Claude's rules, routing and checklist remain shared sources.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseChecklist } from '../../.claude/hooks/lib.mjs';
+import { parseChecklist } from './lib.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
@@ -10,6 +10,21 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8');
 export function selectRoutes(prompt, routes) {
   if (!prompt.trim() || /^\s*[/$]/.test(prompt) || /(^|\s)@agent-[\w:-]+/i.test(prompt)) return [];
   return routes.filter((route) => new RegExp(route.match, 'i').test(prompt.slice(0, 4000))).slice(0, 3);
+}
+
+export function routeContext(hits) {
+  return [
+    'Shared routes (delegate to the matching native project agent):',
+    ...hits.map((hit) => {
+      const native = hit.agent && existsSync(resolve(root, '.codex/agents', `${hit.agent}.toml`));
+      return `[${hit.id}] ${native ? `agent=${hit.agent} (.codex/agents/${hit.agent}.toml)` : `discipline=${hit.agent ?? 'documentation'}`}; ` +
+        `review: ${hit.review.join(', ') || 'task checks'}; ` +
+        `read rules: ${hit.rules.map((rule) => `.codex/rules/${rule}.md`).join(', ') || 'AGENTS.md'}; ${hit.note}`;
+    }),
+    'Project agents preserve their complete Claude definitions. Use $standup/$handoff for memory workflows. ' +
+      'If custom roles are unavailable, pass the full developer_instructions to a worker. ' +
+      'External ecc:* tools require an actual installation; otherwise perform the named review discipline.',
+  ].join('\n');
 }
 
 export function brief(checklist, log) {
@@ -21,7 +36,7 @@ export function brief(checklist, log) {
     'Dev B open work (claims/blockers preserved; choose dependencies first):',
     ...mine.slice(0, 8).map((item) => `${item.id} @${item.owner} ${item.title}`),
     'Latest handoff:', log.split(/^## /m).at(-1).trim(),
-    'No Git sync performed. Inspect git status; sync explicitly before claiming work. Use $aegis-standup.',
+    'No Git sync performed. Inspect git status; sync explicitly before claiming work. Use $standup.',
   ].join('\n');
 }
 
@@ -43,14 +58,9 @@ async function main() {
   if (mode === 'brief') {
     emit('SessionStart', brief(read('docs/CHECKLIST.md'), read('docs/SESSION_LOG.md')));
   } else if (mode === 'route') {
-    const hits = selectRoutes(String(process.argv[3] ?? input.prompt ?? ''), JSON.parse(read('.claude/routing.json')).routes);
+    const hits = selectRoutes(String(process.argv[3] ?? input.prompt ?? ''), JSON.parse(read('.codex/routing.json')).routes);
     if (!hits.length) return;
-    emit('UserPromptSubmit', [
-      'Shared routes (apply disciplines in this thread; Claude plugins are not installed Codex tools):',
-      ...hits.map((hit) => `[${hit.id}] ${hit.agent ?? 'documentation'}; review: ${hit.review.join(', ') || 'task checks'}; ` +
-        `read rules: ${hit.rules.map((rule) => `.claude/rules/${rule}.md`).join(', ') || 'AGENTS.md'}; ${hit.note}`),
-      'Use matching ponytail persona as domain guidance. Do not invoke unavailable ecc:* agents/skills. Follow AGENTS.md.',
-    ].join('\n'));
+    emit('UserPromptSubmit', routeContext(hits));
   } else if (mode === 'check') {
     // Reminder only: shell responses and asynchronous completion differ across Codex surfaces.
     // Never treat a missing exit code, a session id, or absence of failure text as a passing test.

@@ -1,0 +1,8 @@
+# Generated from .claude/settings.json permissions.allow; managed policy still applies.
+prefix_rule(pattern = ["git", "status"], decision = "allow")
+prefix_rule(pattern = ["git", "log"], decision = "allow")
+prefix_rule(pattern = ["git", "diff"], decision = "allow")
+prefix_rule(pattern = ["git", "pull"], decision = "allow")
+prefix_rule(pattern = ["git", "fetch"], decision = "allow")
+prefix_rule(pattern = ["ecc", "memory", "search"], decision = "allow")
+prefix_rule(pattern = ["ecc", "memory", "read"], decision = "allow")
