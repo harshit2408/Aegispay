@@ -760,6 +760,8 @@ Full amount → `MARKED_AS_PAID` (SPIKE-4; `PAID` when paid natively — treat b
 ```
 `recipient_type=PAYPAL_ID` with the vendor's payer ID is [SPIKE-10]; SPIKE-10 passed (item `SUCCESS`), so no `EMAIL` fallback. Response is asynchronous: HTTP 201 with only `batch_header` (`PENDING`) and `links`, no items → execution `PAYOUT_SUBMITTED` (from `PAYOUT_SENDING`, R19). Item `recipient_type`, receiver and amount are asserted against the outbox command (R5) from the first `GET /v1/payments/payouts/{payout_batch_id}`, which echoes all three.
 
+SPIKE-10 probe review (2026-10-26): PASS also requires successful batch and item GETs with item `SUCCESS` and exact recipient type, receiver and USD amount; a failed lookup, missing item ID or mismatch fails the probe. Historical sandbox evidence and offline regression limits are in [SPIKE-10](spikes/SPIKE-10.md). These probe checks do not implement the settlement controls above.
+
 **Crash recovery (R19)** — a `PAYOUT_SENDING` execution without a `payout_batch_id` is resolved by re-POSTing with the **same** keys (SPIKE-11: there is no list/search by `sender_batch_id`, Transaction Search is not enabled on the Treasury app, and a same-`PayPal-Request-Id` retry is **not** replayed as the original 201). Each recovery attempt:
 1. Within `PAYOUT_RECOVERY_TTL_MIN` of entering `PAYOUT_SENDING`, `SETTLEMENT_HALT` off, R20 recheck passes; else `NEEDS_MANUAL_REVIEW`.
 2. Re-POST with the same keys. HTTP 201 → the first POST never landed; continue as a normal create.
