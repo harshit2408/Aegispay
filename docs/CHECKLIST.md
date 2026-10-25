@@ -42,7 +42,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1) — PASS: payer ID via order `payee.merchant_id` (userinfo has none); PAYPAL_ID payout item SUCCESS ~19s; only GETs echo receiver + amount; PR #2 (needs B review)
 - [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) — PASS via 400 `SENDER_BATCH_ID` error body (batch id in `details[].link`); Request-Id not replayed; lookups 404/403; PR #2 (needs B review)
 
-- [ ] **P0-21** @B Codex harness for Dev B: shared context/rules/memory, native configuration and standup/handoff workflows (WIP B)
+- [x] **P0-21** @B Codex harness for Dev B: shared context/rules/memory, native configuration and standup/handoff workflows — 4b71712
+- [ ] **P0-22** @B Port installed Ponytail 5.3.2 and Caveman 4.0.1 packages to Codex with original skills and lifecycle behavior (WIP B)
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 

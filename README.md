@@ -113,6 +113,9 @@ Git rules (PRD §6.1):
 
 ### Claude Code harness
 
+Dev A uses Claude Code. Dev B uses Codex; its project setup, shared rules/memory and
+`$aegis-standup` / `$aegis-handoff` workflows are documented in [the Codex guide](docs/harness/CODEX.md).
+
 The project enables four plugins in `.claude/settings.json`: ecc, ponytail, caveman and obsidian. Plugins are not installed automatically on each machine, so do this once per machine:
 
 1. Install Node.js before opening Claude Code. The hooks need it.
