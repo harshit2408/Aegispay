@@ -1,0 +1,131 @@
+{
+  "_doc": "Deterministic routing table read by .claude/hooks/route-hint.mjs on every prompt. First 3 matching routes are injected into context and shown to the human. Edit this file (not the AI) to change who handles what. Patterns are case-insensitive JS regex.",
+  "routes": [
+    {
+      "id": "paypal-sdk",
+      "match": "apimatic|server.?sdk|paypal.?sdk|oauth|access.?token|token.?(cache|refresh)|debug.?id|paypal.?(client|auth|error|retry|timeout|fixture)|transaction.?search|list_transactions|\\borders?\\b.*paypal|paypal.*\\b(orders?|vault|subscriptions?)\\b",
+      "agent": "ponytail-backend",
+      "review": ["ecc:security-reviewer", "ecc:python-reviewer"],
+      "skills": ["paypal:python-authentication", "paypal:python-calling-endpoints", "paypal:python-error-handling", "paypal:python-configuration-resilience", "paypal:python-testing"],
+      "rules": ["money-safety", "backend"],
+      "note": "APIMatic skills teach paypal-server-sdk (Orders/Payments/Subscriptions/Transaction Search/Vault/OAuth). NO Payouts or Invoicing in it: those stay hand-written httpx, use the skills as patterns only. Log real use in docs/TOOLS.md. TS/other-language paypal skills are not routed: the browser never calls PayPal."
+    },
+    {
+      "id": "money-paypal",
+      "match": "paypal|payout|settle|spend.?ledger|idempoten|request.?id|reconcil|record.?payment|cents|outbox|vendor.?gateway|webhook",
+      "agent": "ponytail-backend",
+      "review": ["ecc:security-reviewer", "ecc:python-reviewer"],
+      "skills": ["ecc:tdd-workflow", "ecc:python-testing", "ecc:api-design"],
+      "rules": ["money-safety", "backend"],
+      "note": "Touches money. R1-R11 and R15-R25 apply (PRD 4). Property test required (§17)."
+    },
+    {
+      "id": "ai-decision",
+      "match": "langgraph|agent.?toolkit|investigat|extract|classifier|inject|forensic|hidden.?text|\\beval\\b|prompt|llm|mandate.?compil|notice.?draft|negotiat|interrupt\\(|checkpoint",
+      "agent": "ponytail-ai",
+      "review": ["ecc:security-reviewer", "ecc:python-reviewer"],
+      "skills": ["ecc:eval-harness", "ecc:ai-regression-testing", "ecc:python-testing"],
+      "rules": ["ai-agents", "money-safety"],
+      "note": "LLMs get zero write tools (R2, R14). Eval numbers go to docs/EVAL.md."
+    },
+    {
+      "id": "database",
+      "match": "postgres|migration|alembic|schema|unique.?index|sqlalchemy|for update|skip locked|hash.?chain",
+      "agent": "ponytail-backend",
+      "review": ["ecc:database-reviewer"],
+      "skills": ["ecc:postgres-patterns", "ecc:database-migrations"],
+      "rules": ["backend", "money-safety"],
+      "note": "Schema is PRD §8. Money columns are BIGINT cents."
+    },
+    {
+      "id": "api",
+      "match": "fastapi|router|endpoint|\\bsse\\b|operator.?session|login|rate.?limit|cors|openapi|/api/",
+      "agent": "ponytail-backend",
+      "review": ["ecc:fastapi-reviewer", "ecc:security-reviewer"],
+      "skills": ["ecc:fastapi-patterns", "ecc:api-design"],
+      "rules": ["backend"],
+      "note": "Contracts are PRD §13. Actor always from session (R11)."
+    },
+    {
+      "id": "frontend",
+      "match": "next\\.?js|react|component|widget|ag.?studio|ag.?grid|cockpit|case.?view|vendor.?portal|mandate.?studio|theme|\\.tsx|css|tailwind|\\bui\\b",
+      "agent": "ponytail-frontend",
+      "review": ["ecc:react-reviewer", "ecc:typescript-reviewer"],
+      "skills": ["ecc:frontend-patterns", "ecc:react-patterns", "ecc:frontend-a11y"],
+      "rules": ["frontend"],
+      "note": "IA is PRD §14. AG Studio custom widgets are the sponsor target."
+    },
+    {
+      "id": "e2e",
+      "match": "playwright|\\be2e\\b|end.to.end|scenario s[1-5]|replay.?mode",
+      "agent": "ecc:e2e-runner",
+      "review": [],
+      "skills": ["ecc:e2e-testing"],
+      "rules": ["frontend", "backend"],
+      "note": "S1-S4 must pass in replay mode in CI (§17)."
+    },
+    {
+      "id": "build-broken",
+      "match": "build (fail|error|broken)|type.?error|\\btsc\\b|cannot find module|modulenotfound|importerror|compile error",
+      "agent": "ecc:build-error-resolver",
+      "review": [],
+      "skills": [],
+      "rules": [],
+      "note": "Frontend build: ecc:react-build-resolver. Minimal diff, no refactors."
+    },
+    {
+      "id": "plan-design",
+      "match": "\\bplan\\b|design|architect|\\badr\\b|trade.?off|should we|which approach|spike",
+      "agent": "ecc:planner",
+      "review": ["ecc:architect"],
+      "skills": ["ecc:architecture-decision-records", "ecc:council"],
+      "rules": [],
+      "note": "Record decisions in docs/adr/ and the ECC team memory vault."
+    },
+    {
+      "id": "review-commit",
+      "match": "review|before (commit|merge|push)|\\bpr\\b|pull request|ready to ship",
+      "agent": "ecc:code-reviewer",
+      "review": ["ecc:security-reviewer"],
+      "skills": ["ponytail:ponytail-review", "ecc:verification-loop"],
+      "rules": [],
+      "note": "Run /ponytail-review on the diff, then ecc:security-reviewer for money/auth/webhook code."
+    },
+    {
+      "id": "memory-sync",
+      "match": "remember|handoff|hand off|end of (day|session)|wrap up|resume|standup|where are we|what'?s next",
+      "agent": "memory-keeper",
+      "review": [],
+      "skills": ["standup", "handoff", "ecc:unified-memory"],
+      "rules": [],
+      "note": "Start of session: /standup. End of session: /handoff."
+    },
+    {
+      "id": "docs-submission",
+      "match": "readme|tools\\.md|eval\\.md|sandbox_setup|judge guide|submission|devpost|video|storyboard|license",
+      "agent": "ecc:doc-updater",
+      "review": [],
+      "skills": [],
+      "rules": [],
+      "note": "Submission checklist is PRD §21; docs/CHECKLIST.md phase SUB."
+    },
+    {
+      "id": "mindmap",
+      "match": "mind.?map|canvas|obsidian|diagram|wikilink",
+      "agent": null,
+      "review": [],
+      "skills": ["obsidian:json-canvas", "obsidian:obsidian-markdown"],
+      "rules": [],
+      "note": "Vault is docs/. Main map: docs/maps/AegisPay.canvas."
+    },
+    {
+      "id": "security",
+      "match": "secret|gitleaks|\\bxss\\b|csrf|auth bypass|credential|vulnerab|owasp",
+      "agent": "ecc:security-reviewer",
+      "review": [],
+      "skills": ["ecc:security-review"],
+      "rules": ["money-safety"],
+      "note": "Secrets live only in .env / Render env. Never commit them."
+    }
+  ]
+}

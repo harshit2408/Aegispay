@@ -3,8 +3,22 @@
 AEGIS_DEV = "B"
 ECC_MEMORY_HARNESS = "codex"
 PONYTAIL_DEFAULT_MODE = "full"
+CAVEMAN_DEFAULT_MODE = "caveman"
 
 # Equivalent to the existing .mcp.json; Python must have mcp-server-fetch installed.
 [mcp_servers.fetch]
 command = "python"
 args = ["-m", "mcp_server_fetch"]
+
+# Same plugin identities as .claude/settings.json; installations are machine-local.
+[plugins."ecc@ecc"]
+enabled = true
+
+[plugins."ponytail@ponytail"]
+enabled = true
+
+[plugins."caveman@caveman"]
+enabled = true
+
+[plugins."obsidian@obsidian-skills"]
+enabled = true
