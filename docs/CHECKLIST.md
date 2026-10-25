@@ -34,7 +34,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works — PARTIAL: UNCLAIMED confirmed, cancel fails (500); PRD §18 SPIKE-5 — be2c466
 - [x] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config — PASS: read-only config exposes get_invoice/list_invoices; no list_transactions; PRD §18 SPIKE-6 — be2c466
 - [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15
-- [ ] **P0-14** @B SPIKE-8 Webhook self-verification for real + simulator events; Dev B takeover authorized 2026-10-25; register both sandbox apps and record verification evidence (WIP B)
+- [x] **P0-14** @B SPIKE-8 Webhook self-verification for real + simulator events; Dev B takeover authorized 2026-10-25; both sandbox apps registered and verification evidence in `docs/spikes/SPIKE-8.md` — a3d89ae
 - [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart — PASS (4 local runs): state survives hard exit, resume completes; interrupted node re-runs from top on resume; R11 resume rules + `approvals.consumed_at` added to PRD; PR #3 (needs B review)
 - [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md` — cost cap decided $1.00/run (2026-10-23); provider still open
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections — SPIKE-1..6 probes in PR #1, SPIKE-10/11 in PR #2, SPIKE-9 in PR #3; SPIKE-8 recorded by B (2026-10-25, docs/spikes/SPIKE-8.md); SPIKE-7 (B) pending
