@@ -24,7 +24,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-01** @AB Claude harness: CLAUDE.md, plan, checklist, hooks, routing, ponytail/caveman/obsidian, ECC memory
 - [x] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it — 2062c25
 - [x] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push — 16cf6f9
-- [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits
+- [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits (WIP B)
 - [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
 - [x] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) — PASS, see PRD §18 SPIKE-1 — 1774589
@@ -33,17 +33,18 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event — PARTIAL: full payment gives MARKED_AS_PAID, not PAID; webhook events deferred to P0-14; PRD §18 SPIKE-4 — be2c466
 - [x] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works — PARTIAL: UNCLAIMED confirmed, cancel fails (500); PRD §18 SPIKE-5 — be2c466
 - [x] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config — PASS: read-only config exposes get_invoice/list_invoices; no list_transactions; PRD §18 SPIKE-6 — be2c466
-- [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15
+- [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15 (WIP B)
 - [ ] **P0-14** @B SPIKE-8 Webhook self-verification for real + simulator events; Dev B takeover authorized 2026-10-25; register both sandbox apps and record verification evidence (WIP B)
-- [ ] **P0-15** @A SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart — PASS (4 local runs): state survives hard exit, resume completes; interrupted node re-runs from top on resume; R11 resume rules + `approvals.consumed_at` added to PRD; PR #3 (needs B review)
-- [ ] **P0-16** @A Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md` — cost cap decided $1.00/run (2026-10-23); provider still open
-- [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections — SPIKE-1..6 probes in PR #1, SPIKE-10/11 in PR #2, SPIKE-9 in PR #3; SPIKE-7 (B) and SPIKE-8 (P0-14) pending
+- [ ] **P0-15** @B SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart — PASS (4 local runs): state survives hard exit, resume completes; interrupted node re-runs from top on resume; R11 resume rules + `approvals.consumed_at` added to PRD; PR #3 (needs B review) (WIP B)
+- [ ] **P0-16** @B Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md` — cost cap decided $1.00/run (2026-10-23); provider still open (WIP B)
+- [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections — SPIKE-1..6 probes in PR #1, SPIKE-10/11 in PR #2, SPIKE-9 in PR #3; SPIKE-7 (B) and SPIKE-8 (P0-14) pending (WIP B)
 - [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7 (WIP B)
-- [ ] **P0-19** @A SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1) — PASS: payer ID via order `payee.merchant_id` (userinfo has none); PAYPAL_ID payout item SUCCESS ~19s; only GETs echo receiver + amount; PR #2 (needs B review)
-- [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) — PASS via 400 `SENDER_BATCH_ID` error body (batch id in `details[].link`); Request-Id not replayed; lookups 404/403; PR #2 (needs B review)
+- [ ] **P0-19** @B SPIKE-10 payout by `PAYPAL_ID` to the supplier payer ID; how to read the payer ID; does the response echo receiver + amount (PRD §18, R1) — PASS: payer ID via order `payee.merchant_id` (userinfo has none); PAYPAL_ID payout item SUCCESS ~19s; only GETs echo receiver + amount; PR #2 (needs B review) (WIP B)
+- [ ] **P0-20** @B SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) — PASS via 400 `SENDER_BATCH_ID` error body (batch id in `details[].link`); Request-Id not replayed; lookups 404/403; PR #2 (needs B review) (WIP B)
 
 - [x] **P0-21** @B Codex harness for Dev B: shared context/rules/memory, native configuration and standup/handoff workflows — 4b71712
-- [ ] **P0-22** @B Port installed Ponytail 5.3.2 and Caveman 4.0.1 packages to Codex with original skills and lifecycle behavior (WIP B)
+- [x] **P0-22** @B Port all `.claude/agents/` and `.claude/skills/` definitions to native Codex agents and skills, preserving complete instructions — b0901d8
+- [x] **P0-23** @B Mirror every project `.claude/` file into `.codex/`, activate native rules/routing/hooks/plugins, configure Obsidian for Claude — 20693c8
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 

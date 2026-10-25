@@ -1,0 +1,18 @@
+{
+  "agents/memory-keeper.md": "0017a87c074767d27251fa8a7cd93e6fcb2137b4b424db354d270d0b3e7f3c6a",
+  "agents/ponytail-ai.md": "7147258be5b094bffe504754cac5ad49c49206bafbad3b3baf2dd16eeb12cc9a",
+  "agents/ponytail-backend.md": "9f328d06e09559c229977fcd5ba72bc219a9e016bfb00ed2e7fcd50cadf4e37d",
+  "agents/ponytail-frontend.md": "4730fba5638506c901422e109b573a74ab33382d144a22fc4055f23fd0f2920c",
+  "hooks/lib.mjs": "38e4f5fac038094e32bb2a7b1eeaf3525ac10c80141635fdfabcdb21ca949d2b",
+  "hooks/post-test-sync.mjs": "55fdebc86be8e2ddcc2ce863f363dc8f9d5b03b675445d1ceaeef687dd4ea957",
+  "hooks/route-hint.mjs": "16d73d5b51723dd8b23113661600c80f3dbc50cb0a58abb64afcdc09fc67b77a",
+  "hooks/session-start.mjs": "f4fd01825c3eecac3622694197e494178b38f67803a5a4aa99127abfc4a832eb",
+  "routing.json": "949cf634151fc02297a9407247b35b2a32b8392cdfa17136b9c8d71da87a256b",
+  "rules/ai-agents.md": "89c2ada404278936bf5ac0e300ef928745c1e8b8c5a9109545ef0c1a1e8a7fa0",
+  "rules/backend.md": "6dcfa4bd268195a8cd2123415f04dd60b4809716376623d5030453579ec435b2",
+  "rules/frontend.md": "225e36095f2c9157a1f02f55c058efa850b844e6bf44dc9d4b305ffdd6ed0638",
+  "rules/money-safety.md": "62db7fcdc429d46bba0cf8b92e043f78c8a3edb607664bb0f20b2cc2b1efff93",
+  "settings.json": "2c1386740ecf1da239fd9a8509e21852033430ce5df49f84a35bca0900c1b0b4",
+  "skills/handoff/SKILL.md": "50da48e24ef91b2fd66c84efef78c8f6d5cfcb387b9c9330239340c3d9f94db3",
+  "skills/standup/SKILL.md": "0651d4681952b6ac4bb7c8da7ff25b6b4d6e7c178103aa0817bd727931d27387"
+}
