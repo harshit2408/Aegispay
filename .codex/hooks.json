@@ -1,14 +1,14 @@
 {
-  "description": "AegisPay Dev B context and routing; all hooks are read-only.",
+  "description": "Complete Claude project workflow mapped to Codex lifecycle events.",
   "hooks": {
     "SessionStart": [{
       "matcher": "startup|resume|clear|compact|fork",
       "hooks": [{
         "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" brief",
-        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" brief",
-        "timeout": 10,
-        "statusMessage": "AegisPay: loading Dev B checklist and handoff"
+        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" session",
+        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" session",
+        "timeout": 90,
+        "statusMessage": "AegisPay: syncing Dev B and loading checklist/handoff"
       }]
     }],
     "UserPromptSubmit": [{
@@ -23,8 +23,17 @@
       "matcher": "Bash|exec_command|write_stdin",
       "hooks": [{
         "type": "command",
-        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" check",
-        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" check",
+        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" test",
+        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" test",
+        "timeout": 120
+      }]
+    }],
+    "PreToolUse": [{
+      "matcher": "Bash|exec_command|write_stdin|apply_patch",
+      "hooks": [{
+        "type": "command",
+        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" rules",
+        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" rules",
         "timeout": 10
       }]
     }]

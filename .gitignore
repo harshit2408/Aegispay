@@ -226,6 +226,7 @@ __marimo__/
 
 # Per-developer Claude settings (AEGIS_DEV, personal overrides)
 .claude/settings.local.json
+.codex/settings.local.json
 .claude/worktrees/
 CLAUDE.local.md
 
