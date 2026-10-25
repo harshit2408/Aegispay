@@ -26,7 +26,7 @@ const output = [resp.stdout, resp.stderr, resp.output, input.error].filter(Boole
 const exitCode = [resp.exit_code, resp.exitCode, resp.returnCode, resp.code].find((c) => c !== undefined && c !== null);
 const completed = !resp.interrupted && !resp.backgroundTaskId && !resp.backgroundedByUser;
 // Every git mutation (pull --rebase, push) needs an explicit exit status of 0; a missing status is unknown, not success.
-const exitedZero = exitCode !== undefined && Number(exitCode) === 0;
+const exitedZero = exitCode === 0 || exitCode === '0';
 const passed = event === 'PostToolUse' && completed && exitedZero && !FAIL_TEXT.test(output);
 
 const say = (systemMessage, additionalContext) =>
