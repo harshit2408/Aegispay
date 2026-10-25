@@ -29,4 +29,6 @@ def test_cancel_post_carries_a_stable_request_id(monkeypatch):
     monkeypatch.setattr(sandbox, "call", fake_call)
 
     assert spike5_unclaimed.main() == 0
-    assert posts == [("/v1/payments/payouts-item/ITEM-1/cancel", f"aegis-spike-s5-cancel-{sandbox.run}")]
+    assert posts == [
+        ("/v1/payments/payouts-item/ITEM-1/cancel", f"aegis-spike-s5-cancel-{sandbox.run}")
+    ]

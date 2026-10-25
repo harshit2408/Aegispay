@@ -79,8 +79,7 @@ test('does not pull or push an existing-upstream branch without an explicit exit
   const { root, remote, work } = scratchRepo();
   try {
     git(work, 'push', '-q', '-u', 'origin', 'a/P0-99-feature');
-    writeFileSync(join(work, 'b.txt'), 'b
-');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
     git(work, 'add', '.');
     git(work, 'commit', '-qm', 'local work');
     runHook(work, { hook_event_name: 'PostToolUse', tool_response: { stdout: '3 passed' } });
@@ -94,8 +93,7 @@ test('pushes an existing-upstream branch on an explicit exit status of 0', () =>
   const { root, remote, work } = scratchRepo();
   try {
     git(work, 'push', '-q', '-u', 'origin', 'a/P0-99-feature');
-    writeFileSync(join(work, 'b.txt'), 'b
-');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
     git(work, 'add', '.');
     git(work, 'commit', '-qm', 'local work');
     runHook(work, { hook_event_name: 'PostToolUse', tool_response: { exit_code: 0, stdout: '3 passed' } });
