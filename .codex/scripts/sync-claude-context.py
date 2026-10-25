@@ -159,6 +159,11 @@ def main():
             local_target.write_bytes(local_source.read_bytes())
     if stale:
         print("Claude/Codex ports are stale: " + ", ".join(stale), file=sys.stderr)
+        print(
+            "Regenerate in this branch, then commit the generated files: "
+            f'"{sys.executable}" .codex/scripts/sync-claude-context.py',
+            file=sys.stderr,
+        )
         return 1
     print(
         "Claude/Codex agent and skill ports " + ("match." if args.check else "updated.")
