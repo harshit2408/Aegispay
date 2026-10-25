@@ -15,6 +15,7 @@ from pathlib import Path
 
 DEFAULT_ENV = Path(__file__).resolve().parents[3] / ".env"
 RETRIES = 3
+SPIKE_AMOUNT = "1.00"  # USD string (R4); every money-moving probe sends this
 TIMEOUT_S = 60
 # The probes send OAuth credentials and can create payouts: only ever talk to the PayPal sandbox.
 SANDBOX_BASE_URLS = frozenset(
@@ -30,6 +31,28 @@ def sandbox_base_url(url):
             f"refusing PAYPAL_BASE_URL {base!r}: spikes run only against {sorted(SANDBOX_BASE_URLS)}"
         )
     return base
+
+
+LOCAL_PG_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+LOCAL_PG_ADDRS = frozenset({"127.0.0.1", "::1"})
+
+
+def nonlocal_pg_target(params, environ):
+    """Why a libpq connection would leave this machine, or None if it can only reach loopback.
+
+    params: parsed conninfo (psycopg.conninfo.conninfo_to_dict). libpq connects to hostaddr when
+    set (host is then only a name for TLS/auth), and fills unset keys from PGHOST/PGHOSTADDR and
+    from a service file, so all of those are checked."""
+    if params.get("service") or environ.get("PGSERVICE") or environ.get("PGSERVICEFILE"):
+        return "a pg service file can redirect the connection"
+    host = params.get("host") or environ.get("PGHOST") or ""
+    hosts = [h.strip() for h in host.split(",")]
+    if not all(h in LOCAL_PG_HOSTS for h in hosts):
+        return f"non-local database host {host!r}"
+    hostaddr = params.get("hostaddr") or environ.get("PGHOSTADDR") or ""
+    if hostaddr and not all(a.strip() in LOCAL_PG_ADDRS for a in hostaddr.split(",")):
+        return f"non-local database hostaddr {hostaddr!r}"
+    return None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -189,16 +212,16 @@ class Sandbox:
         )
         return status, body
 
-    def payout(self, token, receiver, value, tag):
-        """Create a one-item USD payout. Returns batch id."""
-        body = {
+    def payout_body(self, receiver, value, tag, recipient_type="EMAIL"):
+        """One-item USD payout body; sender_batch_id is fixed per (tag, run)."""
+        return {
             "sender_batch_header": {
                 "sender_batch_id": f"AEGIS-SPIKE-{tag}-{self.run}",
                 "email_subject": f"AegisPay spike {tag}",
             },
             "items": [
                 {
-                    "recipient_type": "EMAIL",
+                    "recipient_type": recipient_type,
                     "receiver": receiver,
                     "amount": {"value": value, "currency": "USD"},
                     "sender_item_id": f"spike-{tag}-{self.run}-1",
@@ -206,6 +229,10 @@ class Sandbox:
                 }
             ],
         }
+
+    def payout(self, token, receiver, value, tag, recipient_type="EMAIL"):
+        """Create a one-item USD payout. Returns batch id."""
+        body = self.payout_body(receiver, value, tag, recipient_type)
         status, _, resp = self.brief(
             "create payout",
             self.call(

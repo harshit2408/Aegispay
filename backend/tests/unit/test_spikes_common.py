@@ -53,6 +53,30 @@ def test_new_invoice_sends_amounts_as_strings_and_vendor_as_invoicer(monkeypatch
     assert sent[1][1].endswith("/send") and sent[1][2]["body"]["send_to_recipient"] is False
 
 
+def test_payout_body_amount_string_and_recipient_type():
+    sandbox = common.Sandbox({"PAYPAL_BASE_URL": "https://api-m.sandbox.paypal.com"})
+    body = sandbox.payout_body("PAYERID123", "1.00", "s10", recipient_type="PAYPAL_ID")
+    item = body["items"][0]
+    assert item["recipient_type"] == "PAYPAL_ID" and item["receiver"] == "PAYERID123"
+    assert item["amount"] == {"value": "1.00", "currency": "USD"}
+    assert body["sender_batch_header"]["sender_batch_id"] == f"AEGIS-SPIKE-s10-{sandbox.run}"
+    assert sandbox.payout_body("v@x", "1.00", "s3")["items"][0]["recipient_type"] == "EMAIL"
+
+
+def test_payout_posts_with_request_id_and_returns_batch_id(monkeypatch):
+    sandbox = common.Sandbox({"PAYPAL_BASE_URL": "https://api-m.sandbox.paypal.com"})
+    sent = []
+
+    def fake_call(method, path, **kw):
+        sent.append((method, path, kw))
+        return 201, "dbg", {"batch_header": {"payout_batch_id": "B1", "batch_status": "PENDING"}}
+
+    monkeypatch.setattr(sandbox, "call", fake_call)
+    assert sandbox.payout("tok", "v@x", "1.00", "s3") == "B1"
+    assert sent[0][:2] == ("POST", "/v1/payments/payouts")
+    assert sent[0][2]["request_id"] == f"aegis-spike-s3-{sandbox.run}"
+
+
 @pytest.mark.parametrize(
     "url",
     [
@@ -98,3 +122,37 @@ def test_call_returns_redirect_as_error_instead_of_following(monkeypatch):
     status, _, _ = sandbox.call("POST", "/v1/oauth2/token", basic="id:secret", form="x")
     assert status == 302
     assert seen == ["https://api-m.sandbox.paypal.com/v1/oauth2/token"]
+
+
+@pytest.mark.parametrize(
+    "params,environ",
+    [
+        ({"host": "localhost", "dbname": "aegis"}, {}),
+        ({"host": "127.0.0.1", "hostaddr": "127.0.0.1"}, {}),
+        ({"host": "::1"}, {"PGHOSTADDR": "::1"}),
+        ({}, {"PGHOST": "localhost"}),
+    ],
+)
+def test_pg_guard_accepts_loopback_only_targets(params, environ):
+    assert common.nonlocal_pg_target(params, environ) is None
+
+
+@pytest.mark.parametrize(
+    "params,environ",
+    [
+        ({"host": "db.example.com"}, {}),
+        (
+            {"host": "localhost", "hostaddr": "203.0.113.42", "dbname": "review"},
+            {},
+        ),  # libpq uses hostaddr
+        ({"host": "localhost"}, {"PGHOSTADDR": "203.0.113.42"}),
+        ({}, {"PGHOST": "db.example.com"}),
+        ({"host": "localhost,db.example.com"}, {}),
+        ({"host": "localhost", "hostaddr": "127.0.0.1,203.0.113.42"}, {}),
+        ({"host": "localhost", "service": "prod"}, {}),
+        ({"host": "localhost"}, {"PGSERVICE": "prod"}),
+        ({}, {}),  # no host: unix socket default, not the compose service
+    ],
+)
+def test_pg_guard_rejects_any_non_loopback_target(params, environ):
+    assert common.nonlocal_pg_target(params, environ)
