@@ -1,18 +1,19 @@
 {
-  "agents/memory-keeper.md": "0017a87c074767d27251fa8a7cd93e6fcb2137b4b424db354d270d0b3e7f3c6a",
+  "agents/memory-keeper.md": "4c229e83d5bee27567a1a92459349b352d10048fa29d2a98aeaaf0848cfa4f6b",
   "agents/ponytail-ai.md": "7147258be5b094bffe504754cac5ad49c49206bafbad3b3baf2dd16eeb12cc9a",
   "agents/ponytail-backend.md": "9f328d06e09559c229977fcd5ba72bc219a9e016bfb00ed2e7fcd50cadf4e37d",
   "agents/ponytail-frontend.md": "4730fba5638506c901422e109b573a74ab33382d144a22fc4055f23fd0f2920c",
-  "hooks/lib.mjs": "38e4f5fac038094e32bb2a7b1eeaf3525ac10c80141635fdfabcdb21ca949d2b",
-  "hooks/post-test-sync.mjs": "55fdebc86be8e2ddcc2ce863f363dc8f9d5b03b675445d1ceaeef687dd4ea957",
+  "hooks/lib.mjs": "92c1f860100474b9a533779c127926760cd8c9a428733dc68b7afb8b83bd048a",
+  "hooks/post-test-sync.mjs": "8310c784f6f972855cc3576506205b0273ec4ca01e5921fd0f782e2be898a943",
   "hooks/route-hint.mjs": "16d73d5b51723dd8b23113661600c80f3dbc50cb0a58abb64afcdc09fc67b77a",
-  "hooks/session-start.mjs": "f4fd01825c3eecac3622694197e494178b38f67803a5a4aa99127abfc4a832eb",
-  "routing.json": "949cf634151fc02297a9407247b35b2a32b8392cdfa17136b9c8d71da87a256b",
+  "hooks/session-start.mjs": "93eae75aeab32a75843ea019952c9c9345c01fdb3acbfb9e5c385e59f3ffbfaa",
+  "routing.json": "2835983e468212969bf3b2c12c991c4a59e1bec47f4d46120b55a229cae9b905",
   "rules/ai-agents.md": "89c2ada404278936bf5ac0e300ef928745c1e8b8c5a9109545ef0c1a1e8a7fa0",
-  "rules/backend.md": "6dcfa4bd268195a8cd2123415f04dd60b4809716376623d5030453579ec435b2",
+  "rules/backend.md": "ff2d83eb0b2f18557c74d8898e7bcb3c151687162647d6d707f1bc4a3aae6e21",
   "rules/frontend.md": "225e36095f2c9157a1f02f55c058efa850b844e6bf44dc9d4b305ffdd6ed0638",
   "rules/money-safety.md": "62db7fcdc429d46bba0cf8b92e043f78c8a3edb607664bb0f20b2cc2b1efff93",
   "settings.json": "2c1386740ecf1da239fd9a8509e21852033430ce5df49f84a35bca0900c1b0b4",
-  "skills/handoff/SKILL.md": "50da48e24ef91b2fd66c84efef78c8f6d5cfcb387b9c9330239340c3d9f94db3",
-  "skills/standup/SKILL.md": "0651d4681952b6ac4bb7c8da7ff25b6b4d6e7c178103aa0817bd727931d27387"
+  "skills/handoff/SKILL.md": "81e54a4ac86a055f71b480cccdc26b33bfa9d6f16274b4778f162253f698932b",
+  "skills/standup/SKILL.md": "44244abb33661646e070f2651001125de4b43c4ee2565ae15d8602ebfc497b3b",
+  "tests/post-test-sync.test.mjs": "1fc60512f18936ef3f046c851da4716a55bc353950042a3638fa5feaf6f11b6e"
 }

@@ -11,7 +11,8 @@ Pass the summary yourself — the agent cannot see this conversation. Include:
 - checklist IDs touched and their state,
 - every decision or spike result (with the evidence: status codes, timings, error text),
 - gotchas that cost time,
-- anything the other developer must do or know first.
+- anything the other developer must do or know first,
+- current branch name and PR number/state (open, needs review, merged), plus any unmerged branch.
 
 After the agent returns, show the user the session-log entry it wrote and the push result.
 If tests have not been run since the last code change, run them first (the post-test hook syncs git).
