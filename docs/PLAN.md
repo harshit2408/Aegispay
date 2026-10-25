@@ -13,9 +13,9 @@ Spec: [[PRD_SRS]] (single source of truth). State: [[CHECKLIST]]. Daily log: [[S
 | | Dev A | Dev B |
 |---|---|---|
 | Area | PayPal (both apps), settlement + spend ledger + reconciler, webhooks, LangGraph + AI agents, forensics, policy gate, auth, evals | Full stack + data: backend skeleton, DB schema + migrations, seeder, audit chain, match + duplicates (R9), docker-compose, Render deploy; frontend, AG Studio cockpit + widgets, vendor portal, CI, user research, video |
-| Main thread agent | `claude --agent ponytail-backend` or `ponytail-ai` | `claude --agent ponytail-frontend` or `ponytail-backend` (data items) |
+| Main thread agent | Claude Code: `claude --agent ponytail-backend` or `ponytail-ai` | Codex: `AGENTS.md`; frontend/backend ponytail guidance by task (see `harness/CODEX.md`) |
 | Owns dirs | `backend/app/{paypal,settlement,decision,forensics,agents,routers,ops}/`, `docs/adr/`, `docs/EVAL.md`, `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md` | `frontend/`, `backend/app/{models,db.py,config.py,audit,demo}/`, `backend/migrations/`, `docker-compose.yml`, `.github/`, `render.yaml`, `docs/USER_RESEARCH.md` |
-| Shared | `docs/CHECKLIST.md`, `docs/SESSION_LOG.md`, `docs/PRD_SRS.md`, `CLAUDE.md`, `.claude/` | same |
+| Shared | `docs/CHECKLIST.md`, `docs/SESSION_LOG.md`, `docs/PRD_SRS.md`, `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.codex/`, `.agents/`, `.ecc/memory/team/` | same |
 
 Touching the other developer's directory: allowed for small fixes, but say so in the commit message and the session log.
 
@@ -73,3 +73,7 @@ Record each answer as an ECC team memory (`kind: decision`) and in the PRD.
 - Scope overrun → weekly exit-criteria check, cut order above.
 - Secrets leaked in a public repo → `.env` ignored, gitleaks in CI.
 - Payee swap / insider / crash mid-payout (PRD v2.1 review) → R15–R20 never cut; crash and SoD tests in P4. Threat model: PRD §4.0.
+
+## P0 closeout delegation — 2026-10-25
+
+User authorized Dev B and task-specific subagents to finish all remaining P0 work today. Checklist ownership/claims are the task state. P0-15, P0-16, P0-19 and P0-20 are temporarily assigned to Dev B for closeout; Dev A retains the P1+ application responsibilities. Agents use isolated branches/worktrees and report verification evidence. Existing pull requests keep their review and merge gates.

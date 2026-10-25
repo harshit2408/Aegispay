@@ -3,6 +3,9 @@ tags: [harness]
 ---
 # AegisPay Claude harness — how it all fits
 
+Dev A uses this Claude setup. Dev B uses [the Codex harness](CODEX.md), sharing the same
+rules, routing, PRD, checklist and team memories. Claude hooks/plugins below apply to Claude only.
+
 Everything here is committed, so both developers (and their agents) get the same setup on `git pull`.
 Companion docs: [[PONYTAIL]] · [[CAVEMAN]] · [[OBSIDIAN]] · [[MEMORY]].
 
