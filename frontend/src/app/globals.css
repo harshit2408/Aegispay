@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/* Starter theme tokens shared by the app and Studio; dark values for this spike. */
+:root {
+  color-scheme: dark;
+  --pp-navy: #c7ddff;
+  --pp-blue: #83baff;
+  --pp-blue-dark: #afceff;
+  --pp-sky: #81d9ff;
+  --pp-highlight: #23354e;
+  --pp-canvas: #0c1420;
+  --pp-surface: #152031;
+  --pp-border: #41516a;
+  --pp-gridline: #34435a;
+  --pp-ink: #f0f5ff;
+  --pp-muted: #b7c4d9;
+  --pp-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --pp-chart-1: #83baff;
+  --pp-chart-2: #c7ddff;
+  --pp-chart-3: #72e2cd;
+  --pp-chart-4: #ffc873;
+  --pp-chart-5: #bda5ff;
+  --pp-chart-6: #ff9b96;
+  --pp-chart-7: #81d9ff;
+  --pp-chart-8: #93dfa6;
+  --pp-chart-9: #e5b1ee;
+  --pp-chart-10: #c2cad8;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--pp-canvas); color: var(--pp-ink); font-family: var(--pp-font); }
+button, a { font: inherit; }
+button { border: 1px solid var(--pp-border); border-radius: 6px; padding: 8px 14px; background: var(--pp-surface); color: var(--pp-ink); cursor: pointer; }
+button:hover { background: var(--pp-highlight); }
+:focus-visible { outline: 3px solid var(--pp-blue); outline-offset: 3px; }
+header { padding: 22px 32px 10px; }
+h1 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin: 5px 0 10px; }
+p { line-height: 1.6; }
+.eyebrow { font-size: 12px; letter-spacing: 0.1em; color: var(--pp-blue); }
+.replay-banner { position: sticky; top: 0; z-index: 10; padding: 9px 20px; background: #ffe1a3; color: #29200b; font-weight: 700; text-align: center; }
+.licence-status { color: var(--pp-muted); font-size: 14px; }
+.studio-toolbar { padding: 8px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.studio-container { height: 720px; min-height: 500px; width: 100%; }
+.react-probe { height: 100%; padding: 18px; overflow: auto; }
+.react-probe h2 { margin: 0 0 12px; font-size: 20px; }
+.react-probe output { display: block; margin-top: 10px; color: var(--pp-blue); }
+@media (max-width: 680px) {
+  header { padding: 18px 16px 8px; }
+  .studio-toolbar { padding: 8px 16px; }
+  .studio-container { height: 900px; min-width: 340px; }
+}
