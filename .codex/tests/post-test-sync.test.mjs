@@ -3,11 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-<<<<<<< HEAD
 import { existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-=======
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
->>>>>>> origin/b/P0-19-payer-closeout
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,7 +74,6 @@ test('publishes a new feature branch only after an explicit exit status of 0', (
     rmSync(root, { recursive: true, force: true });
   }
 });
-<<<<<<< HEAD
 
 test('does not pull or push an existing branch after an unknown exit status', () => {
   const { root, remote, work } = scratchRepo();
@@ -94,5 +89,3 @@ test('does not pull or push an existing branch after an unknown exit status', ()
     rmSync(root, { recursive: true, force: true });
   }
 });
-=======
->>>>>>> origin/b/P0-19-payer-closeout
