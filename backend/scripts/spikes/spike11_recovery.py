@@ -4,7 +4,8 @@
 3. Re-POST the same sender_batch_id with a NEW request id R2: record the full error body; does it carry
    the existing payout_batch_id?
 4. Try lookups by sender_batch_id: list payouts, Transaction Search.
-Pass: the existing batch id is obtainable from step 2, 3, 4a or 4b. Transaction Search (4c) is printed
+Pass: the existing batch id is obtainable from step 2, 3, 4a or 4b, AND neither retry created a different
+batch (a second batch is an unconditional FAIL: finding the original does not undo a double payout). Transaction Search (4c) is printed
 only: it can lag ~3h, so a fresh batch is not expected there and PASS never depends on it. Moves 1.00 USD (2.00 if PayPal accepts a
 duplicate, which would itself be a finding). Run: python spike11_recovery.py"""
 
@@ -38,17 +39,22 @@ def main() -> int:
     batch_id = resp["batch_header"]["payout_batch_id"]
     print("  batch_id:", batch_id)
     found = {}
+    second_batches = []  # any successful re-POST that returned a batch id other than the original
 
     status, _, resp = post("2 re-POST same request id (R1)", r1)
     replay_id = resp.get("batch_header", {}).get("payout_batch_id")
     print("  replayed batch_id:", replay_id, "| same:", replay_id == batch_id)
     found["same request id replay"] = replay_id == batch_id
+    if status < 400 and replay_id != batch_id:
+        second_batches.append(replay_id)
 
     status, _, resp = post("3 re-POST same sender_batch_id, new request id (R2)", r2)
     print("  full body:", json.dumps(resp))
     dup_id = resp.get("batch_header", {}).get("payout_batch_id")
     if status < 400:
         print("  DUPLICATE ACCEPTED, new batch_id:", dup_id, "| same:", dup_id == batch_id)
+        if dup_id != batch_id:
+            second_batches.append(dup_id)
     found["duplicate error body"] = status >= 400 and batch_id in json.dumps(resp)
 
     for label, path in [
@@ -85,7 +91,9 @@ def main() -> int:
     print("  note: Transaction Search can lag ~3h; informational only, not part of PASS")
 
     print("paths that yield the existing batch id:", json.dumps(found))
-    ok = any(found.values())
+    if second_batches:
+        print("  SECOND BATCH CREATED by a retry:", second_batches)
+    ok = any(found.values()) and not second_batches
     print("SPIKE-11", "PASS" if ok else "FAIL (fallback NEEDS_MANUAL_REVIEW)")
     return 0 if ok else 1
 
