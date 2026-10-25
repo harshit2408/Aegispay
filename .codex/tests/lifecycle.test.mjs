@@ -39,11 +39,17 @@ test('path rules cover normalized patches and unknown shell paths conservatively
 });
 
 test('copied secret-file deny applies to quoted paths, while templates remain accessible', () => {
-  for (const command of ['Get-Content .env', 'Get-Content ".env"', "cat '.env.local'", 'cat D:/project/.env', 'cat .env.example.local']) {
+  for (const command of ['Get-Content .env', 'Get-Content ".env"', "cat '.env.local'", 'cat D:/project/.env', 'cat .env.example.local', 'cat $(echo .e)nv']) {
     assert.equal(secretPath(packet(command, {})), true, command);
   }
   assert.equal(secretPath({ tool_input: { file_path: '.env.local' } }), true);
   assert.equal(secretPath(packet('Get-Content .env.example', {})), false);
+});
+
+test('PreToolUse rules only run for local shell commands and patch edits', async () => {
+  const { readFileSync } = await import('node:fs');
+  const hooks = JSON.parse(readFileSync(join(root, '.codex/hooks.json'), 'utf8'));
+  assert.equal(hooks.hooks.PreToolUse[0].matcher, 'Bash|apply_patch');
 });
 
 test('sync pushes verified clean committed work but leaves dirty work untouched', () => {
