@@ -43,7 +43,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-20** @A SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) — PASS via 400 `SENDER_BATCH_ID` error body (batch id in `details[].link`); Request-Id not replayed; lookups 404/403; PR #2 (needs B review)
 
 - [x] **P0-21** @B Codex harness for Dev B: shared context/rules/memory, native configuration and standup/handoff workflows — 4b71712
-- [ ] **P0-22** @B Port all `.claude/agents/` and `.claude/skills/` definitions to native Codex agents and skills, preserving complete instructions (WIP B)
+- [x] **P0-22** @B Port all `.claude/agents/` and `.claude/skills/` definitions to native Codex agents and skills, preserving complete instructions — b0901d8
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
