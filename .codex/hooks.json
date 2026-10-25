@@ -29,7 +29,7 @@
       }]
     }],
     "PreToolUse": [{
-      "matcher": "Bash|apply_patch",
+      "matcher": "Bash|exec_command|write_stdin|apply_patch",
       "hooks": [{
         "type": "command",
         "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/lifecycle.mjs\" rules",

@@ -46,10 +46,13 @@ test('copied secret-file deny applies to quoted paths, while templates remain ac
   assert.equal(secretPath(packet('Get-Content .env.example', {})), false);
 });
 
-test('PreToolUse rules only run for local shell commands and patch edits', async () => {
+test('PreToolUse rules run for every shell tool PostToolUse sees, plus patch edits', async () => {
   const { readFileSync } = await import('node:fs');
   const hooks = JSON.parse(readFileSync(join(root, '.codex/hooks.json'), 'utf8'));
-  assert.equal(hooks.hooks.PreToolUse[0].matcher, 'Bash|apply_patch');
+  const pre = hooks.hooks.PreToolUse[0].matcher.split('|');
+  for (const tool of [...hooks.hooks.PostToolUse[0].matcher.split('|'), 'apply_patch']) {
+    assert.ok(pre.includes(tool), tool);
+  }
 });
 
 test('sync pushes verified clean committed work but leaves dirty work untouched', () => {
