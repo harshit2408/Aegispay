@@ -35,7 +35,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config — PASS: read-only config exposes get_invoice/list_invoices; no list_transactions; PRD §18 SPIKE-6 — be2c466
 - [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15 (WIP B)
 - [ ] **P0-14** @B SPIKE-8 Webhook self-verification for real + simulator events; Dev B takeover authorized 2026-10-25; register both sandbox apps and record verification evidence (WIP B)
-- [ ] **P0-15** @B SPIKE-9 `interrupt()` + `AsyncPostgresSaver` survives a process restart — PASS (4 local runs): state survives hard exit, resume completes; interrupted node re-runs from top on resume; R11 resume rules + `approvals.consumed_at` added to PRD; PR #3 (needs B review) (WIP B)
+- [x] **P0-15** @B SPIKE-9 durable interrupt + hard-exit/restart PASS; third process restores acceptance receipt without another resume; PRD §8/§11.3 consumption contract corrected (product recovery remains P1/P2) — b0dac94
 - [ ] **P0-16** @B Decide Q3: single LLM provider + per-run cost cap; record model IDs in `docs/TOOLS.md` — cost cap decided $1.00/run (2026-10-23); provider still open (WIP B)
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections — SPIKE-1..6 probes in PR #1, SPIKE-10/11 in PR #2, SPIKE-9 in PR #3; SPIKE-7 (B) and SPIKE-8 (P0-14) pending (WIP B)
 - [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7 (WIP B)
