@@ -1,0 +1,3 @@
+# Install backend[dev] first; these are probe/test dependencies, not production webhook code.
+cryptography>=45
+hypothesis>=6
