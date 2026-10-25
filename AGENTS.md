@@ -19,10 +19,14 @@ the checklist alone holds task state. Default to Dev B; no need to ask the devel
 See `docs/harness/CODEX.md` for setup and differences from Claude.
 
 At session start run `node .codex/hooks/context.mjs brief` if the SessionStart hook did not provide a brief.
-Use `$aegis-standup` for a full brief and `$aegis-handoff` before ending a session.
+Use `$standup` for a full brief and `$handoff` before ending a session.
+The previous `$aegis-standup` / `$aegis-handoff` names remain aliases.
 For each implementation request run `node .codex/hooks/context.mjs route "<task summary>"` if the prompt hook
-did not supply routes. It reads the shared `.claude/routing.json`; treat agent names as review disciplines,
-not installed Codex plugins. Work in the main thread unless delegation is explicitly requested.
+did not supply routes. It reads the shared `.claude/routing.json`. Delegate matching work to the
+native project agent in `.codex/agents/`: `ponytail-backend`, `ponytail-frontend`, `ponytail-ai`,
+or `memory-keeper`. This project instruction requests the same delegation as the Claude setup.
+If this client cannot select custom agents directly, pass the complete TOML `developer_instructions`
+to a worker. External `ecc:*` routes still require installed tools; otherwise apply their review disciplines.
 
 Before editing, read the applicable shared rule files (Codex does not auto-load Claude path rules):
 
@@ -33,8 +37,10 @@ Before editing, read the applicable shared rule files (Codex does not auto-load 
 | Money/payee/ledger/models/schema/webhooks and their tests | `.claude/rules/money-safety.md` |
 | LLM/forensics/decision/tools/evals | `.claude/rules/ai-agents.md` and money-safety |
 
-Use the corresponding `.claude/agents/ponytail-{frontend,backend,ai}.md` as domain guidance;
-their Claude tools, slash commands and automatic sync instructions do not apply to Codex.
+The native agents preserve the full `.claude/agents/*.md` bodies, with a Codex host mapping appended.
+The native `$standup`/`$handoff` skills preserve `.claude/skills/` and delegate to `memory-keeper`.
+After editing Claude sources run `.venv/Scripts/python.exe .codex/scripts/sync-claude-context.py`;
+CI runs `--check` to prevent incomplete or stale ports. Do not replace these definitions with summaries.
 Reuse existing code, platform features and dependencies before adding code. Preserve validation,
 error handling, security, accessibility and money tests. Keep chat concise; persisted prose stays normal.
 
@@ -44,6 +50,7 @@ Run from the repo root using the local virtual environment (PowerShell):
 .venv/Scripts/python.exe -m ruff check backend
 .venv/Scripts/python.exe -m pytest backend
 node --test .codex/tests/context.test.mjs
+.venv/Scripts/python.exe .codex/scripts/sync-claude-context.py --check
 # Once frontend/package.json exists, run its applicable tests and npm run build from frontend/.
 ```
 

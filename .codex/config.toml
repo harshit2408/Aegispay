@@ -3,6 +3,7 @@
 AEGIS_DEV = "B"
 ECC_MEMORY_HARNESS = "codex"
 PONYTAIL_DEFAULT_MODE = "full"
+CAVEMAN_DEFAULT_MODE = "caveman"
 
 # Equivalent to the existing .mcp.json; Python must have mcp-server-fetch installed.
 [mcp_servers.fetch]

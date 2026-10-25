@@ -39,12 +39,12 @@ until the CLI is available. Do not run Claude-specific global rule/plugin instal
 | SessionStart brief | `.codex/hooks.json` → read-only `context.mjs brief`; fallback: run it manually |
 | Prompt routing | Same routing JSON → `context.mjs route`; disciplines applied in the main thread |
 | Automatic path rules | AGENTS.md explicitly directs reading the existing `.claude/rules/` files |
-| Ponytail agents | Same persona files as domain guidance; no duplicated agent definitions |
-| `/standup` | `$aegis-standup` in `.agents/skills/` |
-| `/handoff` | `$aegis-handoff` in `.agents/skills/` |
+| Four `.claude/agents/*.md` definitions | Full bodies in native `.codex/agents/*.toml`: backend, frontend, AI and memory-keeper |
+| `/standup` | Full original skill at `.agents/skills/standup/SKILL.md`; invoke `$standup` |
+| `/handoff` | Full original skill at `.agents/skills/handoff/SKILL.md`; invoke `$handoff` |
 | Post-test automatic Git sync | Read-only reminder; Codex verifies completion, then explicitly commits/syncs/pushes |
 | ECC memory | Same portable team vault; new entries use `--source-harness codex` |
-| Ponytail/caveman | Smallest complete change and concise chat in AGENTS.md; normal persisted prose |
+| Ponytail/caveman plugins | Installed separately in this machine's native Codex plugin cache: Ponytail 5.3.2 and Caveman 4.0.1 |
 | Obsidian | Same `docs/` vault and canvas; preserve existing Markdown/JSON formats |
 
 Hooks use Git-root resolution so starting from a subdirectory works, including PowerShell on Windows.
@@ -52,12 +52,39 @@ They do not pull, push, inspect secrets, or conclude that an absent error means 
 PostToolUse responses may represent a still-running command; wait for the final result.
 If hooks are unavailable on a client, AGENTS.md and the two skills provide the explicit workflow.
 
-Claude marketplace plugins (`ecc:*`, ponytail, caveman, obsidian) are not installed Codex tools.
-Their automatic reviews, telemetry and learning hooks are not claimed here. Perform the relevant
-review disciplines directly and report actual evidence. Money-safety changes still need Dev A's review.
+The four repo agents and two repo skills are complete ports, not persona summaries. Their source
+instructions remain unchanged; an appended host mapping handles Codex tool names, native skill paths,
+Dev B defaults, memory attribution and explicit Git sync. The old `$aegis-*` names are aliases.
+The Claude-only `model: sonnet`, `tools` and `color` frontmatter cannot be copied into the Codex schema:
+all agents inherit the parent model/tools/permissions; color is omitted. No model is substituted.
+
+After editing `.claude/agents/` or `.claude/skills/`, run:
+
+```powershell
+.venv/Scripts/python.exe .codex/scripts/sync-claude-context.py
+.venv/Scripts/python.exe .codex/scripts/sync-claude-context.py --check
+```
+
+The generator uses PyYAML (included with the existing backend dev environment), preserves every original
+instruction, and validates emitted TOML. CI fails if a source edit has not been carried over.
+Routing now delegates to the actual project agents. Standup and handoff delegate to `memory-keeper`.
+Clients without custom-role selection can pass the complete definition to a worker.
+
+The separate Ponytail/Caveman plugins were installed from the machine's existing Claude caches with
+`codex plugin marketplace add <versioned-cache-root>` then `codex plugin add <name>@<name>`.
+All 33 Ponytail and 89 Caveman skill/command/hook files compared byte-for-byte equal to their installed
+Claude versions. This is machine-local installation, not vendored third-party source in the repo.
+Native plugin hook trust and UI activation still require the client's supported hook review/new-session
+flow; they were not exercised through the UI. The Caveman plugin's Bash launcher and Claude-specific
+usage reader are upstream host limitations; no Codex token savings are claimed.
+
+External `ecc:*` review agents and Obsidian plugin tools are not supplied by these four project agents.
+Perform their review disciplines directly unless installed, and report actual evidence.
+Money-safety changes still need Dev A's review.
 PRD §6.1 governs branches/PRs; never auto-merge or force-push.
 
 Official references used for this setup: [customization](https://learn.chatgpt.com/docs/customization/overview),
 [hooks](https://learn.chatgpt.com/docs/hooks), [project configuration](https://learn.chatgpt.com/docs/config-file/config-basic),
 [shell environment](https://learn.chatgpt.com/docs/config-file/config-advanced#shell-environment-policy),
 and [MCP](https://learn.chatgpt.com/docs/extend/mcp).
+Native custom-agent format: [subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { brief, selectRoutes } from '../hooks/context.mjs';
+import { brief, routeContext, selectRoutes } from '../hooks/context.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const routes = JSON.parse(readFileSync(resolve(root, '.claude/routing.json'), 'utf8')).routes;
@@ -21,6 +21,14 @@ test('explicit skill/agent overrides and empty prompts skip routing', () => {
   for (const prompt of ['', ' ', '$aegis-standup review', '/standup review', '@agent-ponytail-frontend review']) {
     assert.deepEqual(selectRoutes(prompt, routes), []);
   }
+});
+
+test('project routes delegate to native agents while external ECC stays a discipline', () => {
+  const context = routeContext(selectRoutes('React widget', routes));
+  assert.match(context, /agent=ponytail-frontend \(.codex\/agents\/ponytail-frontend.toml\)/);
+  assert.match(context, /full developer_instructions to a worker/);
+  assert.match(routeContext(selectRoutes('standup handoff', routes)), /agent=memory-keeper/);
+  assert.match(routeContext(selectRoutes('review', routes)), /discipline=ecc:code-reviewer/);
 });
 
 test('brief includes Dev B/shared work and latest handoff without losing WIP', () => {
