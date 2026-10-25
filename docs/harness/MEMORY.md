@@ -18,8 +18,9 @@ Two developers: Dev A uses Claude Code; Dev B uses Codex. Each kind of knowledge
 
 ## ECC Memory Vault (the shared brain)
 
-Codex uses the same vault with `--source-harness codex`. Its `$aegis-standup` and `$aegis-handoff`
-skills run in the main thread; the Claude memory-keeper and slash commands below remain Claude-specific.
+Codex uses the same vault with `--source-harness codex`. Its `$standup` and `$handoff` skills
+delegate to the native `memory-keeper` port in `.codex/agents/`; `$aegis-*` names remain aliases.
+The Claude files below remain the source for the full generated Codex definitions.
 Initialised with `ecc memory init --scope team` and `--scope project`. Documents are portable `ecc.memory.v1`
 Markdown, readable by Claude, Codex, Cursor and others. Writes are create-only and reject known credential shapes.
 
