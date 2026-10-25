@@ -79,11 +79,16 @@ class ContextPortTests(unittest.TestCase):
                     source.read_text(encoding="utf-8") + "Never expose secrets.\n",
                     encoding="utf-8",
                 )
+                error = io.StringIO()
                 with (
                     patch("sys.argv", ["sync", "--check"]),
-                    contextlib.redirect_stderr(io.StringIO()),
+                    contextlib.redirect_stderr(error),
                 ):
                     self.assertEqual(PORT.main(), 1)
+                self.assertIn(
+                    f'"{PORT.sys.executable}" .codex/scripts/sync-claude-context.py',
+                    error.getvalue(),
+                )
                 self.assertEqual(target.read_bytes(), original)
                 source.unlink()
                 with (

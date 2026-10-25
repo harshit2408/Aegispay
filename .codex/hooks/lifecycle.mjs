@@ -73,9 +73,13 @@ export function secretPath(input) {
   const strings = (value) => typeof value === 'string' ? [value]
     : value && typeof value === 'object' ? Object.values(value).flatMap(strings) : [];
   const text = strings(input.tool_input).join('\n').replaceAll('\\', '/');
-  // Mirrors the Claude deny rules for direct file operations/commands. Managed permissions remain authoritative.
-  return [...text.matchAll(/(?:^|[\s/"'])(\.env(?:\.[\w.-]+)?)(?=$|[\s"'])/g)]
+  const isSecretToken = (value) => [...value.matchAll(/(?:^|[\s/"'])(\.env(?:\.[\w.-]+)?)(?=$|[\s"'])/g)]
     .some((match) => match[1] !== '.env.example');
+  if (isSecretToken(text)) return true;
+  // Rejoin literal fragments around simple shell substitutions, e.g. $(echo .e)nv.
+  // This is a best-effort guard, not a shell parser or security boundary.
+  const expandedLiterals = text.replace(/\$\(([^()]*)\)|`([^`]*)`/g, (_match, command, backtick) => command ?? backtick);
+  return expandedLiterals !== text && isSecretToken(expandedLiterals);
 }
 
 export async function main() {

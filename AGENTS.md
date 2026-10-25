@@ -42,8 +42,9 @@ Every project `.claude/` file has an exact same-relative-path copy under `.codex
 rules, routing, hooks, Markdown agents and skills. Local settings are copied to an ignored local file.
 The native TOML agents additionally preserve full agent bodies with a Codex host mapping appended.
 The native `$standup`/`$handoff` skills preserve `.claude/skills/` and delegate to `memory-keeper`.
-After editing Claude sources run `.venv/Scripts/python.exe .codex/scripts/sync-claude-context.py`;
-CI runs `--check` to prevent incomplete or stale ports. Do not replace these definitions with summaries.
+When a PR changes Claude sources, regenerate and commit Codex mirrors in the same branch. Repeat
+after rebasing or incorporating another source-changing branch. CI runs `--check` to prevent
+incomplete or stale ports and prints the regeneration command. Do not replace definitions with summaries.
 Reuse existing code, platform features and dependencies before adding code. Preserve validation,
 error handling, security, accessibility and money tests. Keep chat concise; persisted prose stays normal.
 
