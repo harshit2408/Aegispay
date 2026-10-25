@@ -3,7 +3,7 @@ tags: [harness, memory]
 ---
 # Memory in AegisPay
 
-Two developers, two Claude sessions, many subagents. Each kind of knowledge has exactly one home:
+Two developers: Dev A uses Claude Code; Dev B uses Codex. Each kind of knowledge has exactly one home:
 
 | Knowledge | Home | Shared? | Who writes it |
 |---|---|---|---|
@@ -11,12 +11,15 @@ Two developers, two Claude sessions, many subagents. Each kind of knowledge has 
 | What happened this session, what's next | `docs/SESSION_LOG.md` | yes (git) | `/handoff` |
 | Decisions, spike results, facts, lessons, gotchas, runbooks | **ECC team vault** `.ecc/memory/team/` | yes (git) | `memory-keeper`, or `ecc memory save` |
 | Architecture trade-offs | `docs/adr/` | yes | dev + `ecc:architect` |
-| Repeated procedures | `.claude/skills/<name>/SKILL.md` | yes | `memory-keeper` spawns them |
+| Repeated procedures | `.claude/skills/<name>/SKILL.md` (Claude), `.agents/skills/<name>/SKILL.md` (Codex) | yes | the active harness |
 | Scratch / machine-local context | ECC project vault `.ecc/memory/project/` | no (git-ignored by ECC) | either |
 | One dev's personal preferences | Claude auto-memory (`~/.claude/projects/…/memory/`) | no | Claude |
 | ECC session snapshots / instincts | `~/.claude/session-data`, ECC homunculus | no | ECC hooks |
 
 ## ECC Memory Vault (the shared brain)
+
+Codex uses the same vault with `--source-harness codex`. Its `$aegis-standup` and `$aegis-handoff`
+skills run in the main thread; the Claude memory-keeper and slash commands below remain Claude-specific.
 Initialised with `ecc memory init --scope team` and `--scope project`. Documents are portable `ecc.memory.v1`
 Markdown, readable by Claude, Codex, Cursor and others. Writes are create-only and reject known credential shapes.
 

@@ -1,0 +1,32 @@
+{
+  "description": "AegisPay Dev B context and routing; all hooks are read-only.",
+  "hooks": {
+    "SessionStart": [{
+      "matcher": "startup|resume|clear|compact|fork",
+      "hooks": [{
+        "type": "command",
+        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" brief",
+        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" brief",
+        "timeout": 10,
+        "statusMessage": "AegisPay: loading Dev B checklist and handoff"
+      }]
+    }],
+    "UserPromptSubmit": [{
+      "hooks": [{
+        "type": "command",
+        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" route",
+        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" route",
+        "timeout": 10
+      }]
+    }],
+    "PostToolUse": [{
+      "matcher": "Bash|exec_command|write_stdin",
+      "hooks": [{
+        "type": "command",
+        "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" check",
+        "commandWindows": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/context.mjs\" check",
+        "timeout": 10
+      }]
+    }]
+  }
+}
