@@ -45,6 +45,31 @@ jobs:
       - name: Pytest
         run: pytest backend
 
+  compose:
+    name: compose (Postgres + API smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      COMPOSE_PROJECT_NAME: aegispay-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      POSTGRES_PORT: "15432"
+      API_PORT: "18000"
+      TREASURY_CLIENT_SECRET: test-must-not-reach-api
+      AUDIT_HMAC_KEY: test-must-not-reach-api
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start isolated stack
+        run: docker compose --env-file .env.example up --build --detach --wait --wait-timeout 90 postgres api
+      - name: Verify DB health and runtime secret isolation
+        run: |
+          curl --fail --silent http://127.0.0.1:18000/api/health | python -c 'import json,sys; assert json.load(sys.stdin) == {"status": "ok", "db": True}'
+          docker compose --env-file .env.example exec -T api python -c 'import os; assert "TREASURY_CLIENT_SECRET" not in os.environ; assert "AUDIT_HMAC_KEY" not in os.environ; assert os.getuid() != 0'
+      - name: Failure diagnostics
+        if: failure()
+        run: docker compose --env-file .env.example logs --tail 100
+      - name: Remove this test stack and its volumes
+        if: always()
+        run: docker compose --env-file .env.example down --volumes --remove-orphans
+
   secrets:
     name: secrets (gitleaks)
     runs-on: ubuntu-latest
