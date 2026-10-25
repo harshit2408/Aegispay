@@ -47,6 +47,7 @@ Out of scope and stated plainly: a compromised host, database owner role or secr
 | `.github/workflows/ci.yml` | present | ruff, pytest, gitleaks; frontend build once it exists |
 | `docs/` | present | PRD, plan, checklist, session log, sandbox setup, tools, harness notes |
 | `.claude/` | present | Project agents, hooks, rules and routing for Claude Code |
+| `.codex/`, `.agents/skills/` | present | Complete Claude setup mirror plus native Codex agents, skills, rules and lifecycle adapters |
 | `frontend/` | not yet created | Next.js and AG Studio cockpit (checklist items as scheduled) |
 | `render.yaml` | target | Render services: api, settlement worker, frontend, Postgres |
 

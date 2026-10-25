@@ -31,9 +31,10 @@ The original project instructions above are preserved in full. For Codex-specifi
   not Claude auto-memory. Shared knowledge still lives in the existing ECC team vault.
 - Read/Edit/Bash/Grep/Glob mean Codex file, shell and search tools, under inherited permissions.
   Use shell-appropriate syntax (PowerShell on Windows; body files instead of Bash heredocs).
-- Claude post-test hooks do not run in Codex. Inspect final exit codes, then explicitly run
-  the required commit/pull/push sequence. Preserve PRD 6.1 branches/PRs, never force-push,
-  and rerun checks if sync changes code. An unavailable upstream is a reported blocker.
+- Codex lifecycle adapters run the copied session and post-test sync workflow. Only confirmed
+  successful final test results may sync. Unknown/running/failed results never sync. Preserve
+  PRD 6.1 branches/PRs, never force-push, rerun checks if sync changes code. If hooks are
+  unavailable, explicitly perform the same commit/pull/push sequence after verified checks.
 - ecc:* agents/skills are not provided by these four project files. Use them only if actually
   installed; otherwise perform their named review discipline and disclose that limitation.
 - The original memory-keeper's model: sonnet has no Codex equivalent configured here.

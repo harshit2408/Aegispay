@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseChecklist } from '../../.claude/hooks/lib.mjs';
+import { parseChecklist } from './lib.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (path) => readFileSync(resolve(root, path), 'utf8');
@@ -19,7 +19,7 @@ export function routeContext(hits) {
       const native = hit.agent && existsSync(resolve(root, '.codex/agents', `${hit.agent}.toml`));
       return `[${hit.id}] ${native ? `agent=${hit.agent} (.codex/agents/${hit.agent}.toml)` : `discipline=${hit.agent ?? 'documentation'}`}; ` +
         `review: ${hit.review.join(', ') || 'task checks'}; ` +
-        `read rules: ${hit.rules.map((rule) => `.claude/rules/${rule}.md`).join(', ') || 'AGENTS.md'}; ${hit.note}`;
+        `read rules: ${hit.rules.map((rule) => `.codex/rules/${rule}.md`).join(', ') || 'AGENTS.md'}; ${hit.note}`;
     }),
     'Project agents preserve their complete Claude definitions. Use $standup/$handoff for memory workflows. ' +
       'If custom roles are unavailable, pass the full developer_instructions to a worker. ' +
@@ -58,7 +58,7 @@ async function main() {
   if (mode === 'brief') {
     emit('SessionStart', brief(read('docs/CHECKLIST.md'), read('docs/SESSION_LOG.md')));
   } else if (mode === 'route') {
-    const hits = selectRoutes(String(process.argv[3] ?? input.prompt ?? ''), JSON.parse(read('.claude/routing.json')).routes);
+    const hits = selectRoutes(String(process.argv[3] ?? input.prompt ?? ''), JSON.parse(read('.codex/routing.json')).routes);
     if (!hits.length) return;
     emit('UserPromptSubmit', routeContext(hits));
   } else if (mode === 'check') {

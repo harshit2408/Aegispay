@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { brief, routeContext, selectRoutes } from '../hooks/context.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const routes = JSON.parse(readFileSync(resolve(root, '.claude/routing.json'), 'utf8')).routes;
+const routes = JSON.parse(readFileSync(resolve(root, '.codex/routing.json'), 'utf8')).routes;
 const script = resolve(root, '.codex/hooks/context.mjs');
 
 test('routes reuse shared frontend, data and money rules', () => {
@@ -74,6 +75,8 @@ test('failed and asynchronous test results only remind; never announce passing t
 
 test('configured hook commands execute from a subdirectory on the current platform', () => {
   const config = JSON.parse(readFileSync(resolve(root, '.codex/hooks.json'), 'utf8'));
+  // Launch the configured script from backend/, but keep all sync work in a non-repository fixture.
+  const fixture = mkdtempSync(join(tmpdir(), 'aegis-hook-launch-'));
   for (const [event, groups] of Object.entries(config.hooks)) {
     const hook = groups[0].hooks[0];
     const windows = process.platform === 'win32';
@@ -81,7 +84,7 @@ test('configured hook commands execute from a subdirectory on the current platfo
     const result = spawnSync(windows ? 'powershell.exe' : '/bin/sh',
       windows ? ['-NoProfile', '-Command', command] : ['-c', command], {
         cwd: resolve(root, 'backend'), encoding: 'utf8', timeout: 10000,
-        input: JSON.stringify({ prompt: 'React widget', tool_input: { command: 'pytest' } }),
+        input: JSON.stringify({ cwd: fixture, prompt: 'React widget', tool_input: { command: 'pytest' } }),
       });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(JSON.parse(result.stdout).hookSpecificOutput.hookEventName, event);

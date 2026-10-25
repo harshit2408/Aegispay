@@ -18,6 +18,28 @@ SPEC.loader.exec_module(PORT)
 
 
 class ContextPortTests(unittest.TestCase):
+    def test_every_shared_claude_file_has_an_exact_native_directory_mirror(self):
+        generated = dict(PORT.generated_files())
+        for source in (ROOT / ".claude").rglob("*"):
+            if source.is_file() and source.name != "settings.local.json":
+                target = ROOT / ".codex" / source.relative_to(ROOT / ".claude")
+                self.assertEqual(generated[target], source.read_bytes())
+
+    def test_linked_or_escaped_outputs_are_rejected_without_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "repo"
+            root.mkdir()
+            with patch.object(PORT, "ROOT", root):
+                with self.assertRaises(ValueError):
+                    PORT.safe_target(root / ".." / "outside")
+                link = root / "linked"
+                try:
+                    link.symlink_to(Path(directory), target_is_directory=True)
+                except OSError:
+                    return  # Windows requires symlink privilege; escape coverage above still runs.
+                with self.assertRaises(ValueError):
+                    PORT.safe_target(link / "target")
+
     def test_all_source_agents_and_skills_preserve_full_bodies(self):
         generated = dict(PORT.generated_files())
         for source in (ROOT / ".claude/agents").glob("*.md"):

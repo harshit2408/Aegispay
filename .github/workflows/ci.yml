@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test .codex/tests/context.test.mjs
+      - run: node --test .codex/tests/*.test.mjs
 
   backend:
     name: backend (ruff, pytest)
@@ -37,7 +37,7 @@ jobs:
       - name: Install
         run: pip install -e "backend[dev]"
       - name: Ruff
-        run: ruff check backend
+        run: ruff check backend .codex/scripts .codex/tests
       - name: Verify complete Claude/Codex context ports
         run: python .codex/scripts/sync-claude-context.py --check
       - name: Test Claude/Codex context port

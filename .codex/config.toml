@@ -9,3 +9,16 @@ CAVEMAN_DEFAULT_MODE = "caveman"
 [mcp_servers.fetch]
 command = "python"
 args = ["-m", "mcp_server_fetch"]
+
+# Same plugin identities as .claude/settings.json; installations are machine-local.
+[plugins."ecc@ecc"]
+enabled = true
+
+[plugins."ponytail@ponytail"]
+enabled = true
+
+[plugins."caveman@caveman"]
+enabled = true
+
+[plugins."obsidian@obsidian-skills"]
+enabled = true
