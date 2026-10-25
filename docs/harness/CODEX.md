@@ -60,7 +60,7 @@ until the CLI is available. Do not run Claude-specific global rule/plugin instal
 | ECC memory | Same portable team vault; new entries use `--source-harness codex` |
 | Enabled plugins | Native Codex installations: ECC 2.2.3, Ponytail 5.3.2, Caveman 4.0.1, Obsidian 1.0.1 |
 | Command allow rules | Generated native prefix rules from Claude's seven `permissions.allow` entries |
-| Secret-file deny rules | PreToolUse rejects direct real `.env` access; `.env.example` stays usable; managed permissions remain authoritative |
+| Secret-file deny rules | PreToolUse rejects direct real `.env` access, including simple literal shell substitutions; `.env.example` stays usable; this is not a shell parser and managed permissions are the security boundary |
 | Obsidian | Installed for both harnesses; `docs/` registered as an Obsidian vault with live CLI verification |
 
 Hooks use Git-root resolution so starting from a subdirectory works, including PowerShell on Windows.
@@ -86,6 +86,16 @@ After editing any `.claude/` file, run:
 .venv/Scripts/python.exe .codex/scripts/sync-claude-context.py
 .venv/Scripts/python.exe .codex/scripts/sync-claude-context.py --check
 ```
+
+Every PR that changes `.claude/` must regenerate and commit its Codex mirrors in the same branch.
+After rebasing or incorporating another source-changing branch, regenerate again before merging.
+CI intentionally fails on stale copies so the second integration cannot silently leave Codex behind;
+the failure prints the exact regeneration command. This keeps merge order independent of which team
+branch lands first while preserving exact-copy parity.
+
+The lifecycle secret-path check handles direct paths and simple literal command substitutions only.
+Arbitrary shell expansion is undecidable here; treat this hook as defense in depth and rely on the
+managed permission policy for enforcement.
 
 The generator uses PyYAML (included with the existing backend dev environment), copies every shared
 source byte-for-byte, preserves every original instruction in the native ports, and validates TOML.
