@@ -2,6 +2,15 @@
   "_doc": "Deterministic routing table read by .claude/hooks/route-hint.mjs on every prompt. First 3 matching routes are injected into context and shown to the human. Edit this file (not the AI) to change who handles what. Patterns are case-insensitive JS regex.",
   "routes": [
     {
+      "id": "paypal-sdk",
+      "match": "apimatic|server.?sdk|paypal.?sdk|oauth|access.?token|token.?(cache|refresh)|debug.?id|paypal.?(client|auth|error|retry|timeout|fixture)|transaction.?search|list_transactions|\\borders?\\b.*paypal|paypal.*\\b(orders?|vault|subscriptions?)\\b",
+      "agent": "ponytail-backend",
+      "review": ["ecc:security-reviewer", "ecc:python-reviewer"],
+      "skills": ["paypal:python-authentication", "paypal:python-calling-endpoints", "paypal:python-error-handling", "paypal:python-configuration-resilience", "paypal:python-testing"],
+      "rules": ["money-safety", "backend"],
+      "note": "APIMatic skills teach paypal-server-sdk (Orders/Payments/Subscriptions/Transaction Search/Vault/OAuth). NO Payouts or Invoicing in it: those stay hand-written httpx, use the skills as patterns only. Log real use in docs/TOOLS.md. TS/other-language paypal skills are not routed: the browser never calls PayPal."
+    },
+    {
       "id": "money-paypal",
       "match": "paypal|payout|settle|spend.?ledger|idempoten|request.?id|reconcil|record.?payment|cents|outbox|vendor.?gateway|webhook",
       "agent": "ponytail-backend",

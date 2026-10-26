@@ -18,7 +18,7 @@ Written by `/handoff` (memory-keeper agent) or by hand. Template:
 
 ## 2026-10-22 02:45 IST · Setup (Claude harness)
 **Done:** P0-01 — CLAUDE.md, docs/PLAN.md, docs/CHECKLIST.md, hooks (session-start, post-test-sync, route-hint), `.claude/routing.json`, agents (ponytail-backend, ponytail-frontend, ponytail-ai, memory-keeper), path rules, skills (/standup, /handoff), plugins ponytail + caveman + obsidian at project scope, ECC team memory vault, Obsidian vault in `docs/` with `maps/AegisPay.canvas`.
-**Next:** each dev runs the one-time setup in `docs/harness/HARNESS.md` §1 and sets `AEGIS_DEV`. Dev A starts P0-06 (sandbox accounts) → spikes; Dev B starts P0-02 (LICENSE), P0-03 (CI), P0-13 (SPIKE-7).
+**Next:** each dev runs the one-time setup in `docs/harness/HARNESS.md` §1 and sets `AEGIS_DEV`. Dev A starts P0-06 (sandbox accounts) → spikes; Dev B (full stack) starts P0-02 (LICENSE), P0-03 (CI), P0-13 (SPIKE-7).
 **Blocked / needs the other dev:** none.
 **Decisions:** shared memory = ECC team vault `.ecc/memory/team/` (committed); routing = `.claude/routing.json` (edit the table, not prompts).
 
