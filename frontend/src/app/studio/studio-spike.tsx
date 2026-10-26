@@ -85,7 +85,7 @@ export function StudioSpike() {
         <span role="status">{ready ? "Studio ready" : "Loading Studio…"}</span>
         <span>Choose “Edit Studio layout”, then “Say hello (scripted)” in the AI panel.</span>
       </div>
-      <div className="studio-container" aria-label="AG Studio integration spike">
+      <div className="studio-container" role="region" aria-label="AG Studio integration preview; scroll horizontally on narrow screens" tabIndex={0}>
         <AgStudioProvider licenseKey={process.env.NEXT_PUBLIC_AG_LICENSE_KEY} modules={[AgStudioAiModule]}>
           <AgStudio<SpikeRegistry>
             style={{ height: "100%", width: "100%" }}
