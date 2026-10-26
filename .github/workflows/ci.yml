@@ -45,6 +45,38 @@ jobs:
       - name: Pytest
         run: pytest backend
 
+  compose:
+    name: compose (Postgres + API smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      COMPOSE_PROJECT_NAME: aegispay-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      POSTGRES_PORT: "15432"
+      API_PORT: "18000"
+      FRONTEND_PORT: "13000"
+      NEXT_PUBLIC_API_URL: http://localhost:18000
+      TREASURY_CLIENT_SECRET: test-must-not-reach-api
+      AUDIT_HMAC_KEY: test-must-not-reach-api
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start isolated stack
+        run: docker compose --env-file .env.example up --build --detach --wait --wait-timeout 90 postgres api
+      - name: Verify DB health and runtime secret isolation
+        run: |
+          curl --fail --silent http://127.0.0.1:18000/api/health | python -c 'import json,sys; assert json.load(sys.stdin) == {"status": "ok", "db": True}'
+          docker compose --env-file .env.example exec -T api python -c 'import os; assert "TREASURY_CLIENT_SECRET" not in os.environ; assert "AUDIT_HMAC_KEY" not in os.environ; assert os.getuid() != 0'
+      - name: Build and verify frontend profile when the P0-13 scaffold is present
+        if: hashFiles('frontend/Dockerfile') != '' && hashFiles('frontend/package.json') != ''
+        run: |
+          docker compose --env-file .env.example --profile frontend up --build --detach --wait --wait-timeout 90
+          curl --retry 10 --retry-connrefused --retry-delay 2 --fail --silent --output /dev/null http://127.0.0.1:13000/
+      - name: Failure diagnostics
+        if: failure()
+        run: docker compose --env-file .env.example --profile frontend logs --tail 100
+      - name: Remove this test stack and its volumes
+        if: always()
+        run: docker compose --env-file .env.example --profile frontend down --volumes --remove-orphans
+
   secrets:
     name: secrets (gitleaks)
     runs-on: ubuntu-latest
@@ -84,6 +116,12 @@ jobs:
         if: steps.detect.outputs.present == 'true'
         working-directory: frontend
         run: npm ci
+      - name: Frontend lint and unit tests
+        if: steps.detect.outputs.present == 'true'
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm test
       - name: Build
         if: steps.detect.outputs.present == 'true'
         working-directory: frontend
