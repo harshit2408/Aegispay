@@ -53,13 +53,13 @@ The [[PLAN]] explains the why; this file is the state.
 
 - [x] **P1-01** @B Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0) — 16cf6f9
 - [ ] **P1-02** @B ORM models + migration for PRD §8, incl. partial unique indexes (R9) and `one_active_mandate`
-- [ ] **P1-03** @A `paypal/client.py`: OAuth cache per app, mandatory `request_id` on POST, `paypal-debug-id` logging, retry with same Request-Id (R5)
-- [ ] **P1-04** @A `paypal/payouts.py` (Treasury) + import-boundary test: importable only from `settlement/` (R2)
-- [ ] **P1-05** @A `paypal/invoicing.py` + `vendor_sim/gateway.py`: create, send, get, record payment (R7)
-- [ ] **P1-06** @A `settlement/spend_ledger.py` reserve/release with `SELECT … FOR UPDATE` + concurrency test (R8)
-- [ ] **P1-07** @A `settlement/service.py` `execute(execution_id)` only (R1) + outbox worker (`SKIP LOCKED`, 2 s poll)
-- [ ] **P1-08** @A `settlement/reconciler.py` item-status state machine (PRD §9.3) + 15 s / 30 min poll fallback (R6)
-- [ ] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe
+- [ ] **P1-03** @A `paypal/client.py`: OAuth cache per app, mandatory `request_id` on POST, `paypal-debug-id` logging, retry with same Request-Id (R5) (WIP A)
+- [ ] **P1-04** @A `paypal/payouts.py` (Treasury) + import-boundary test: importable only from `settlement/` (R2) (WIP A)
+- [ ] **P1-05** @A `paypal/invoicing.py` + `vendor_sim/gateway.py`: create, send, get, record payment (R7) (WIP A)
+- [ ] **P1-06** @A `settlement/spend_ledger.py` reserve/release with `SELECT … FOR UPDATE` + concurrency test (R8) (WIP A)
+- [ ] **P1-07** @A `settlement/service.py` `execute(execution_id)` only (R1) + outbox worker (`SKIP LOCKED`, 2 s poll) (WIP A)
+- [ ] **P1-08** @A `settlement/reconciler.py` item-status state machine (PRD §9.3) + 15 s / 30 min poll fallback (R6) (WIP A)
+- [ ] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe (WIP A)
 - [ ] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix
 - [ ] **P1-11** @B `audit/events.py` hash chain + verification (HMAC form lands in P2-26)
 - [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox
