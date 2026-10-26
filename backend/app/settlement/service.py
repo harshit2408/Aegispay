@@ -100,6 +100,8 @@ class SettlementService:
                     )
                 except spend_ledger.OverCap:
                     reason = "OVER_CAP"
+                except spend_ledger.NoActiveMandate:
+                    reason = "NO_ACTIVE_MANDATE"
             if reason:
                 await transitions.apply(s, execution, "FROZEN")
                 await _set_outbox(s, command.execution_id, "FAILED", reason)
@@ -143,6 +145,10 @@ class SettlementService:
         self, command: PayoutCommand, known_batch_id: str | None = None
     ) -> str:
         batch_id = known_batch_id
+        if batch_id is None:  # halt can land between the write-ahead commit and the POST (R23)
+            async with self._sm() as s:
+                if await halt_flag.is_halted(s):
+                    return await self._manual_review(command, "HALTED_BEFORE_POST")
         try:
             if batch_id is None:
                 batch_id = (await self._payouts.create_or_adopt(command)).payout_batch_id
@@ -167,6 +173,8 @@ class SettlementService:
         item = batch.items[0]
         async with self._sm() as s, s.begin():
             execution = await _lock(s, command.execution_id)
+            if execution.status != "PAYOUT_SENDING":
+                return  # a concurrent worker (lease overlap) already submitted it
             payout = await _payout(s, command.execution_id)
             payout.payout_batch_id = batch.payout_batch_id
             payout.payout_item_id = item.payout_item_id
@@ -199,7 +207,8 @@ class SettlementService:
             payout = await _payout(s, command.execution_id)
             if payout is not None and batch_id and payout.payout_batch_id is None:
                 payout.payout_batch_id = batch_id
-            await transitions.apply(s, execution, "NEEDS_MANUAL_REVIEW")
+            if not await transitions.apply_or_ignore(s, execution, "NEEDS_MANUAL_REVIEW"):
+                return execution.status
             await _set_outbox(s, command.execution_id, "FAILED", reason)
             if halt:
                 await halt_flag.halt(s, reason + " execution_id=" + command.execution_id)

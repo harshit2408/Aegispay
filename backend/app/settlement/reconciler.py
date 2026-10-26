@@ -201,9 +201,12 @@ async def run_forever(
         if not (await lock_session.execute(query)).scalar():
             log.warning("another reconciler holds the advisory lock; exiting")
             return
-        while not stop.is_set():
-            await reconciler.run_once()
-            try:
-                await asyncio.wait_for(stop.wait(), timeout=poll_s)
-            except TimeoutError:
-                pass
+        try:
+            while not stop.is_set():
+                await reconciler.run_once()
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=poll_s)
+                except TimeoutError:
+                    pass
+        finally:  # the lock lives on a pooled connection: release it explicitly
+            await lock_session.execute(select(func.pg_advisory_unlock(LOCK_KEY)))

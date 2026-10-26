@@ -298,3 +298,29 @@ async def test_recovery_with_known_batch_only_verifies(env):
     await env.sql(f"update payouts set payout_batch_id = '{BATCH}'")
     assert await env.service.execute("e1") == "PAYOUT_SUBMITTED"
     assert env.post.call_count == env.baseline
+
+
+async def test_no_active_mandate_freezes_instead_of_retrying_forever(env):
+    await env.sql("update mandate_policies set is_active = false")
+    assert await env.service.execute("e1") == "FROZEN"
+    assert env.post.call_count == 0
+    assert (await env.rows(SettlementOutbox))[0].last_error == "NO_ACTIVE_MANDATE"
+
+
+async def test_halt_that_lands_after_write_ahead_stops_the_post(env, monkeypatch):
+    async def halted(_session):
+        return True
+
+    monkeypatch.setattr("app.settlement.halt.is_halted", halted)  # only the pre-POST check
+    assert await env.service.execute("e1") == "NEEDS_MANUAL_REVIEW"
+    assert env.post.call_count == 0
+    assert len(await env.rows(SpendLedger)) == 1  # reservation kept
+    assert (await env.rows(SettlementOutbox))[0].last_error == "HALTED_BEFORE_POST"
+
+
+async def test_lease_overlap_second_submit_is_a_no_op(env):
+    await env.service.execute("e1")
+    await env.sql("update invoice_executions set status = $$PAYOUT_SENDING$$")
+    # a second worker finishing the same payout must not raise or double-record
+    assert await env.service.execute("e1") == "PAYOUT_SUBMITTED"
+    assert len(await env.rows(SpendLedger)) == 1

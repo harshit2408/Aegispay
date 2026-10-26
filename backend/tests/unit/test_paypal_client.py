@@ -207,3 +207,18 @@ async def test_redirects_are_not_followed():
         with pytest.raises(PayPalError) as exc:
             await c.get("/v1/x")
     assert exc.value.status == 302
+
+
+@respx.mock
+async def test_401_after_two_5xx_still_refreshes_and_succeeds():
+    token_route(respx.mock)
+    respx.get(f"{BASE}/v1/x").mock(
+        side_effect=[
+            httpx.Response(500),
+            httpx.Response(500),
+            httpx.Response(401),
+            httpx.Response(200, json={"ok": 1}),
+        ]
+    )
+    async with make_client() as c:
+        assert (await c.get("/v1/x")).status == 200

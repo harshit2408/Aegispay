@@ -167,7 +167,9 @@ class PayPalClient:
         if not path.startswith("/") or path.startswith("//"):
             raise ValueError("path must be relative to the configured PayPal base URL")
         refreshed = False
-        for attempt in range(1, MAX_ATTEMPTS + 1):
+        attempt = 0
+        while attempt < MAX_ATTEMPTS:
+            attempt += 1
             headers = {
                 "Authorization": f"Bearer {await self._access_token()}",
                 "Accept": "application/json",
@@ -203,6 +205,7 @@ class PayPalClient:
             )
             if resp.status_code == 401 and not refreshed:
                 refreshed = True
+                attempt -= 1  # a token refresh is not a retry of the request
                 await self._access_token(force=True)
                 continue
             if resp.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:

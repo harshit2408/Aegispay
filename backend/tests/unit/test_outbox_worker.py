@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select, update
 
-from app.models.payables import SettlementControl, SettlementOutbox
+from app.models.payables import InvoiceExecution, SettlementControl, SettlementOutbox
 from app.settlement.outbox_worker import LEASE, MAX_ATTEMPTS, claim_next, tick
 from tests.seed import seed_approved, seed_world
 
@@ -106,3 +106,21 @@ async def test_failure_keeps_the_claim_for_lease_expiry_retry(sm):
     assert await tick(sm, service, NOW) is True
     row = await outbox(sm, "e0")
     assert (row.status, row.last_error, row.attempts) == ("CLAIMED", "RuntimeError", 1)
+
+
+async def test_give_up_on_a_stranded_payout_sending_goes_to_manual_review(sm):
+    async with sm() as s, s.begin():
+        await s.execute(
+            update(InvoiceExecution)
+            .where(InvoiceExecution.execution_id == "e0")
+            .values(status="PAYOUT_SENDING")
+        )
+        await s.execute(
+            update(SettlementOutbox)
+            .where(SettlementOutbox.execution_id == "e0")
+            .values(attempts=MAX_ATTEMPTS, status="CLAIMED", claimed_until=NOW)
+        )
+    async with sm() as s, s.begin():
+        await claim_next(s, NOW + timedelta(seconds=1))
+    async with sm() as s:
+        assert (await s.get(InvoiceExecution, "e0")).status == "NEEDS_MANUAL_REVIEW"

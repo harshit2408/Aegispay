@@ -74,7 +74,7 @@ async def reserve(
         await session.execute(
             select(MandatePolicy)
             .where(MandatePolicy.policy_id == policy_id, MandatePolicy.is_active)
-            .with_for_update()
+            .with_for_update(key_share=True)  # FOR NO KEY UPDATE: FK inserts stay unblocked
         )
     ).scalar_one_or_none()
     if mandate is None:

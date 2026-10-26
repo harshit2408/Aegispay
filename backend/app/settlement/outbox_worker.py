@@ -7,7 +7,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.payables import SettlementOutbox
+from app.models.payables import InvoiceExecution, SettlementOutbox
+from app.settlement import transitions
 from app.settlement.halt import is_halted
 from app.settlement.service import SettlementService
 
@@ -40,6 +41,13 @@ async def claim_next(session: AsyncSession, now: datetime) -> SettlementOutbox |
         row.status, row.claimed_until = "FAILED", None
         row.last_error = row.last_error or "MAX_ATTEMPTS"
         log.error("outbox command gave up execution_id=%s", row.execution_id)
+        stuck = select(InvoiceExecution).where(
+            InvoiceExecution.execution_id == row.execution_id,
+            InvoiceExecution.status == "PAYOUT_SENDING",
+        )
+        execution = (await session.execute(stuck.with_for_update())).scalar_one_or_none()
+        if execution is not None:  # money may have moved: a human decides, reservation kept (R19)
+            await transitions.apply(session, execution, "NEEDS_MANUAL_REVIEW")
         await session.flush()
     return None
 

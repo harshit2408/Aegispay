@@ -65,6 +65,8 @@ class InvoiceDocument(Base):
 class InvoiceExecution(Base):
     __tablename__ = "invoice_executions"
     __table_args__ = (
+        Index("ix_exec_status", "status"),
+        Index("ix_exec_paypal_invoice", "paypal_invoice_id"),
         ForeignKeyConstraint(
             ["policy_id", "policy_version"],
             ["mandate_policies.policy_id", "mandate_policies.version"],
@@ -161,6 +163,7 @@ class SpendLedger(Base):
         CheckConstraint("amount_cents > 0", name="ck_spend_amount"),
         CheckConstraint("(kind = 'RELEASE') = (reserve_entry_id IS NOT NULL)", name="ck_spend_ref"),
         Index("ix_spend_policy_date", "policy_id", "business_date"),
+        Index("ix_spend_execution", "execution_id"),
         UniqueConstraint("reserve_entry_id", name="uq_spend_one_release_per_reserve"),
     )
 
@@ -202,6 +205,11 @@ class SettlementOutbox(Base):
     __tablename__ = "settlement_outbox"
     __table_args__ = (
         CheckConstraint("amount_cents > 0", name="ck_outbox_amount"),
+        Index(
+            "ix_outbox_ready",
+            "created_at",
+            postgresql_where=text("status IN ('PENDING','CLAIMED')"),
+        ),
         CheckConstraint(
             _in("status", ("PENDING", "CLAIMED", "DONE", "FAILED")), name="ck_outbox_status"
         ),
@@ -300,7 +308,12 @@ class AuditAnchor(Base):
 
 class WebhookEvent(Base):
     __tablename__ = "webhook_events"
-    __table_args__ = (CheckConstraint(_in("app", ("TREASURY", "VENDOR")), name="ck_webhook_app"),)
+    __table_args__ = (
+        CheckConstraint(_in("app", ("TREASURY", "VENDOR")), name="ck_webhook_app"),
+        Index(
+            "ix_webhook_unprocessed", "received_at", postgresql_where=text("processed_at IS NULL")
+        ),
+    )
 
     event_id: Mapped[str] = mapped_column(Text, primary_key=True)  # PayPal event id: natural dedupe
     app: Mapped[str] = mapped_column(Text)
