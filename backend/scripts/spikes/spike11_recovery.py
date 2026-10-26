@@ -2,19 +2,75 @@
 1. Create a 1.00 USD batch (request id R1).
 2. Re-POST the same body with the SAME request id R1 (crash retry per R5): does PayPal replay the batch?
 3. Re-POST the same sender_batch_id with a NEW request id R2: record the full error body; does it carry
-   the existing payout_batch_id?
+   the existing payout_batch_id in a valid sandbox recovery link?
 4. Try lookups by sender_batch_id: list payouts, Transaction Search.
 Pass: the existing batch id is obtainable from step 2, 3, 4a or 4b, AND neither retry created a different
-batch (a second batch is an unconditional FAIL: finding the original does not undo a double payout). Transaction Search (4c) is printed
+batch, and a GET on the configured base confirms the original single-item command. A second batch is
+an unconditional FAIL: finding the original does not undo a double payout. Transaction Search (4c) is printed
 only: it can lag ~3h, so a fresh batch is not expected there and PASS never depends on it. Moves 1.00 USD (2.00 if PayPal accepts a
 duplicate, which would itself be a finding). Run: python spike11_recovery.py"""
 
 import json
+import re
 import sys
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 from common import SPIKE_AMOUNT, Sandbox
+
+
+def duplicate_batch_id(response):
+    """Extract only the measured duplicate-error link; never request its URL."""
+    if not isinstance(response, dict) or response.get("name") != "USER_BUSINESS_ERROR":
+        return None
+    details = response.get("details")
+    if not isinstance(details, list):
+        return None
+    batch_ids = set()
+    for detail in details:
+        if not isinstance(detail, dict) or detail.get("field") != "SENDER_BATCH_ID":
+            continue
+        links = detail.get("link")
+        if not isinstance(links, list):
+            continue
+        for link in links:
+            if (
+                not isinstance(link, dict)
+                or link.get("rel") != "self"
+                or link.get("method") != "GET"
+            ):
+                continue
+            href = link.get("href")
+            if isinstance(href, str) and (
+                match := re.fullmatch(
+                    r"https://(?:api-m|api)\.sandbox\.paypal\.com/v1/payments/payouts/([A-Z0-9]+)",
+                    href,
+                )
+            ):
+                batch_ids.add(match[1])
+    return batch_ids.pop() if len(batch_ids) == 1 else None
+
+
+def batch_matches_command(response, command, batch_id):
+    """R5/R19: GET must identify the original single-item command before PASS."""
+    try:
+        header = response["batch_header"]
+        items = response["items"]
+        item = items[0]["payout_item"]
+        expected = command["items"][0]
+        return (
+            header["payout_batch_id"] == batch_id
+            and header["sender_batch_header"]["sender_batch_id"]
+            == command["sender_batch_header"]["sender_batch_id"]
+            and isinstance(items, list)
+            and len(items) == 1
+            and all(
+                item[key] == expected[key]
+                for key in ("sender_item_id", "recipient_type", "receiver", "amount")
+            )
+        )
+    except (KeyError, IndexError, TypeError):
+        return False
 
 
 def main() -> int:
@@ -44,7 +100,7 @@ def main() -> int:
     status, _, resp = post("2 re-POST same request id (R1)", r1)
     replay_id = resp.get("batch_header", {}).get("payout_batch_id")
     print("  replayed batch_id:", replay_id, "| same:", replay_id == batch_id)
-    found["same request id replay"] = replay_id == batch_id
+    found["same request id replay"] = status < 400 and replay_id == batch_id
     if status < 400 and replay_id != batch_id:
         second_batches.append(replay_id)
 
@@ -55,14 +111,21 @@ def main() -> int:
         print("  DUPLICATE ACCEPTED, new batch_id:", dup_id, "| same:", dup_id == batch_id)
         if dup_id != batch_id:
             second_batches.append(dup_id)
-    found["duplicate error body"] = status >= 400 and batch_id in json.dumps(resp)
+    found["duplicate error body"] = status == 400 and duplicate_batch_id(resp) == batch_id
 
     for label, path in [
         ("4a list by sender_batch_id", f"/v1/payments/payouts?sender_batch_id={sender_batch_id}"),
         ("4b list payouts", "/v1/payments/payouts"),
     ]:
         status, _, resp = sandbox.brief(label, sandbox.call("GET", path, token=token))
-        hit = status == 200 and batch_id in json.dumps(resp)
+        items = resp.get("items")
+        hit = (
+            status == 200
+            and isinstance(items, list)
+            and any(
+                isinstance(item, dict) and item.get("payout_batch_id") == batch_id for item in items
+            )
+        )
         print("  keys:", sorted(resp)[:10], "| contains batch_id:", hit)
         found[label] = hit
 
@@ -93,7 +156,15 @@ def main() -> int:
     print("paths that yield the existing batch id:", json.dumps(found))
     if second_batches:
         print("  SECOND BATCH CREATED by a retry:", second_batches)
-    ok = any(found.values()) and not second_batches
+    verified = False
+    if any(found.values()) and not second_batches:
+        status, _, recovered = sandbox.brief(
+            "5 verify recovered batch",
+            sandbox.call("GET", f"/v1/payments/payouts/{batch_id}", token=token),
+        )
+        verified = status == 200 and batch_matches_command(recovered, body, batch_id)
+        print("  recovered batch matches original command:", verified)
+    ok = any(found.values()) and not second_batches and verified
     print("SPIKE-11", "PASS" if ok else "FAIL (fallback NEEDS_MANUAL_REVIEW)")
     return 0 if ok else 1
 
