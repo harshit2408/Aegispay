@@ -47,7 +47,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-23** @B Mirror every project `.claude/` file into `.codex/`, activate native rules/routing/hooks/plugins, configure Obsidian for Claude — 20693c8
 - [x] **P0-24** @B Resolve harness review findings: narrow PreToolUse, strengthen/document secret-path guard, make mirror drift remediation explicit — 7f3e4f3
 
-- [x] **P0-25** @B Integrate TokenOps Tier 1 foundation for Python agents: shared invoice cost/call caps, privacy guards and adoption contract; durable restart/resume accounting remains a deployment gate — 07f8d2c
+- [x] **P0-25** @B Integrate TokenOps Tier 1 foundation for Python agents: shared invoice cost/call caps, privacy guards and adoption contract; durable restart/resume accounting remains a deployment gate — 99f5af9
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
