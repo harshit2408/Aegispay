@@ -28,23 +28,57 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--pp-canvas); color: var(--pp-ink); font-family: var(--pp-font); }
-button, a { font: inherit; }
+button, a, summary { font: inherit; }
+a { color: var(--pp-blue); text-underline-offset: 3px; }
 button { border: 1px solid var(--pp-border); border-radius: 6px; padding: 8px 14px; background: var(--pp-surface); color: var(--pp-ink); cursor: pointer; }
 button:hover { background: var(--pp-highlight); }
 :focus-visible { outline: 3px solid var(--pp-blue); outline-offset: 3px; }
-header { padding: 22px 32px 10px; }
+.app-header { max-width: 1600px; margin: auto; padding: 22px 32px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--pp-border); }
+.brand { color: var(--pp-ink); text-decoration: none; font-size: 19px; font-weight: 750; letter-spacing: 0.08em; }
+.brand span { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--pp-muted); letter-spacing: 0.02em; }
+nav { display: flex; flex-wrap: wrap; gap: 6px; }
+nav a { display: inline-block; padding: 10px 12px; border: 1px solid transparent; border-radius: 6px; color: var(--pp-muted); text-decoration: none; }
+nav a:hover, nav a[aria-current="page"] { color: var(--pp-ink); background: var(--pp-highlight); border-color: var(--pp-border); }
+.workspace { max-width: 1600px; margin: auto; padding: 0 32px 48px; }
+main { scroll-margin-top: 5rem; }
+.skip-link { position: fixed; top: -100px; left: 12px; z-index: 30; background: var(--pp-ink); color: var(--pp-canvas); padding: 12px; }
+.skip-link:focus { top: 12px; }
+.preview-status { font-size: 13px; color: var(--pp-muted); margin: 16px 0; }
+.judge-guide { border: 1px solid var(--pp-border); border-radius: 8px; background: var(--pp-surface); }
+.judge-guide summary { padding: 14px 18px; min-height: 48px; cursor: pointer; color: var(--pp-blue); }
+.guide-content { padding: 0 20px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.guide-content h2 { font-size: 18px; }
+.guide-content h3 { font-size: 16px; }
+.guide-content p, .guide-content li { color: var(--pp-muted); font-size: 14px; line-height: 1.7; }
+.guide-content li + li { margin-top: 8px; }
+.guide-content ol { padding-left: 22px; }
+.page-header { padding: 24px 0 12px; max-width: 880px; }
+.page-header > p:not(.eyebrow) { color: var(--pp-muted); }
+.empty-state { margin-top: 14px; padding: 28px; max-width: 880px; border: 1px solid var(--pp-border); border-radius: 10px; background: var(--pp-surface); }
+.empty-state h2 { font-size: clamp(1.2rem, 3vw, 1.6rem); }
+.empty-state p { max-width: 72ch; color: var(--pp-muted); }
+.empty-state .status-label { margin-top: 0; color: var(--pp-blue); font-size: 13px; font-weight: 650; }
+.empty-state .locked-payee { color: var(--pp-ink); font-weight: 650; }
+.text-link { display: inline-block; padding: 10px 0; }
+code { overflow-wrap: anywhere; }
+.simulator-badge { display: inline-block; vertical-align: middle; font-size: 13px; letter-spacing: 0.02em; border: 1px solid var(--pp-sky); border-radius: 20px; padding: 5px 10px; color: var(--pp-sky); }
 h1 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin: 5px 0 10px; }
 p { line-height: 1.6; }
 .eyebrow { font-size: 12px; letter-spacing: 0.1em; color: var(--pp-blue); }
 .replay-banner { position: sticky; top: 0; z-index: 10; padding: 9px 20px; background: #ffe1a3; color: #29200b; font-weight: 700; text-align: center; }
 .licence-status { color: var(--pp-muted); font-size: 14px; }
-.studio-toolbar { padding: 8px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.studio-container { height: 720px; min-height: 500px; width: 100%; }
+.studio-toolbar { padding: 8px 0 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.studio-container { height: 720px; min-height: 500px; width: 100%; overflow: auto; }
 .react-probe { height: 100%; padding: 18px; overflow: auto; }
 .react-probe h2 { margin: 0 0 12px; font-size: 20px; }
 .react-probe output { display: block; margin-top: 10px; color: var(--pp-blue); }
 @media (max-width: 680px) {
-  header { padding: 18px 16px 8px; }
-  .studio-toolbar { padding: 8px 16px; }
-  .studio-container { height: 900px; min-width: 340px; }
+  .app-header { padding: 18px 16px; gap: 16px; }
+  .workspace { padding: 0 16px 32px; }
+  nav { gap: 4px; }
+  nav a { padding: 10px 8px; }
+  .guide-content { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .page-header { padding-top: 20px; }
+  .empty-state { padding: 20px; }
+  .studio-container { height: 900px; min-width: 0; }
 }
