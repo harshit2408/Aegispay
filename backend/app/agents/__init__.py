@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from threading import get_ident
@@ -21,7 +22,7 @@ from tokenops.capabilities import wrap_complete  # noqa: E402
 from tokenops.capabilities.crossing import install_crossing_hook  # noqa: E402
 from tokenops.capabilities.run import TokenOpsBound  # noqa: E402
 from tokenops.framework import Halt  # noqa: E402
-from tokenops.framework.core import Action, ActionKind, Usage  # noqa: E402
+from tokenops.framework.core import Action, ActionKind, Observation, Usage  # noqa: E402
 from tokenops.providers.types import ModelResponse  # noqa: E402
 
 _LOG = logging.getLogger(__name__)
@@ -44,6 +45,16 @@ def _price(provider: str, model: str, usage: Usage) -> int:
     if provider != _PROVIDER or model != _MODEL:
         raise ValueError("unreviewed provider or model price")
     return 2 * (usage.input + usage.cached) + 10 * (usage.output + usage.reasoning)
+
+
+def _usage(response: ModelResponse) -> Usage:
+    # Provider totals are inclusive: cached is part of input, reasoning part of output.
+    return Usage(
+        input=max(response.input_tokens - response.cached_tokens, 0),
+        cached=response.cached_tokens,
+        output=max(response.output_tokens - response.reasoning_tokens, 0),
+        reasoning=response.reasoning_tokens,
+    )
 
 
 class InvoiceRun:
@@ -109,8 +120,14 @@ class InvoiceRun:
                         response = self._dispatch(
                             provider, model, data, max_output_tokens=max_output_tokens
                         )
-                    except BaseException:
+                    except Exception:
                         self._halt("provider outcome uncertain; invoice halted")
+                    except BaseException:
+                        # Cancellation/shutdown: halt the run but keep the original signal.
+                        self._bound.governor.ledger.mark_halted(
+                            self._bound.attr.trace_id, "provider call interrupted"
+                        )
+                        raise
                     if not isinstance(response, ModelResponse):
                         self._halt("missing provider token usage")
                     counts = (
@@ -124,28 +141,41 @@ class InvoiceRun:
                         or response.input_tokens == 0
                     ):
                         self._halt("invalid provider token usage")
-                    if (
+                    rejected = (
                         response.input_tokens > input_token_bound
                         or response.output_tokens > _OUTPUT_CAP
                         or response.cached_tokens > response.input_tokens
                         or response.reasoning_tokens > response.output_tokens
-                    ):
-                        self._halt("provider usage exceeded reviewed bounds")
-                    _LOG.info(
-                        json.dumps(
-                            {
-                                "event": "llm_usage",
-                                "execution_id": str(self._execution_id),
-                                "node": node,
-                                "input_tokens": response.input_tokens,
-                                "output_tokens": response.output_tokens,
-                                "cached_tokens": response.cached_tokens,
-                                "reasoning_tokens": response.reasoning_tokens,
-                                "cost_micros": 2 * response.input_tokens
-                                + 10 * response.output_tokens,
-                            }
-                        )
                     )
+                    usage = _usage(response)
+                    record = {
+                        "event": "llm_usage",
+                        "execution_id": str(self._execution_id),
+                        "node": node,
+                        "input_tokens": response.input_tokens,
+                        "output_tokens": response.output_tokens,
+                        "cached_tokens": response.cached_tokens,
+                        "reasoning_tokens": response.reasoning_tokens,
+                        "cost_micros": _price(_PROVIDER, _MODEL, usage),
+                    }
+                    if rejected:
+                        # The provider billed this request: log it and charge the budget
+                        # before halting, so reconciliation (PRD §16) sees the overrun.
+                        _LOG.info(json.dumps({**record, "rejected": True}))
+                        self._bound.governor.ledger.record(
+                            Observation(
+                                attr=hop.attr,
+                                node_type="llm",
+                                boundary_id=f"{node}.chat",
+                                ts=time.time(),
+                                service=node,
+                                provider=_PROVIDER,
+                                model=_MODEL,
+                                usage=usage,
+                            )
+                        )
+                        self._halt("provider usage exceeded reviewed bounds")
+                    _LOG.info(json.dumps(record))
                     return response
 
                 governed = wrap_complete(
