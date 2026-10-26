@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -71,12 +72,16 @@ test('compose excludes settlement secrets even when host env contains them', {
 
 test('plain compose up defaults non-secret API settings to the PRD section 7 values', {
   skip: composeVersion.status !== 0 && 'Docker Compose CLI not installed',
-}, () => {
+}, (t) => {
+  const directory = mkdtempSync(resolve(tmpdir(), 'aegis-compose-test-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const emptyEnv = resolve(directory, 'empty.env');
+  writeFileSync(emptyEnv, '');
   const template = variables(read('.env.example'));
   const env = Object.fromEntries(Object.entries(process.env)
     .filter(([key]) => !(key in template)));
   const result = spawnSync('docker', [
-    'compose', '--env-file', '/dev/null', 'config', '--format', 'json',
+    'compose', '--env-file', emptyEnv, 'config', '--format', 'json',
   ], { cwd: root, encoding: 'utf8', env });
   assert.equal(result.status, 0, result.stderr);
   const api = JSON.parse(result.stdout).services.api.environment;
