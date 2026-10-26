@@ -52,7 +52,7 @@ The [[PLAN]] explains the why; this file is the state.
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
 - [x] **P1-01** @B Backend skeleton: `pyproject.toml`, `config.py` (pydantic-settings), `db.py` (async SQLAlchemy 2.0) — 16cf6f9
-- [ ] **P1-02** @B ORM models + migration for PRD §8, incl. partial unique indexes (R9) and `one_active_mandate`
+- [ ] **P1-02** @B ORM models + migration for PRD §8, incl. partial unique indexes (R9) and `one_active_mandate` (WIP A, taken over from B at user request 2026-10-26)
 - [ ] **P1-03** @A `paypal/client.py`: OAuth cache per app, mandatory `request_id` on POST, `paypal-debug-id` logging, retry with same Request-Id (R5) (WIP A)
 - [ ] **P1-04** @A `paypal/payouts.py` (Treasury) + import-boundary test: importable only from `settlement/` (R2) (WIP A)
 - [ ] **P1-05** @A `paypal/invoicing.py` + `vendor_sim/gateway.py`: create, send, get, record payment (R7) (WIP A)
