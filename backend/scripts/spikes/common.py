@@ -15,6 +15,7 @@ from pathlib import Path
 
 DEFAULT_ENV = Path(__file__).resolve().parents[3] / ".env"
 RETRIES = 3
+SPIKE_AMOUNT = "1.00"  # USD string (R4); every money-moving probe sends this
 TIMEOUT_S = 60
 # The probes send OAuth credentials and can create payouts: only ever talk to the PayPal sandbox.
 SANDBOX_BASE_URLS = frozenset(
@@ -189,16 +190,16 @@ class Sandbox:
         )
         return status, body
 
-    def payout(self, token, receiver, value, tag):
-        """Create a one-item USD payout. Returns batch id."""
-        body = {
+    def payout_body(self, receiver, value, tag, recipient_type="EMAIL"):
+        """One-item USD payout body; sender_batch_id is fixed per (tag, run)."""
+        return {
             "sender_batch_header": {
                 "sender_batch_id": f"AEGIS-SPIKE-{tag}-{self.run}",
                 "email_subject": f"AegisPay spike {tag}",
             },
             "items": [
                 {
-                    "recipient_type": "EMAIL",
+                    "recipient_type": recipient_type,
                     "receiver": receiver,
                     "amount": {"value": value, "currency": "USD"},
                     "sender_item_id": f"spike-{tag}-{self.run}-1",
@@ -206,6 +207,10 @@ class Sandbox:
                 }
             ],
         }
+
+    def payout(self, token, receiver, value, tag, recipient_type="EMAIL"):
+        """Create a one-item USD payout. Returns batch id."""
+        body = self.payout_body(receiver, value, tag, recipient_type)
         status, _, resp = self.brief(
             "create payout",
             self.call(
