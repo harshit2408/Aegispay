@@ -173,6 +173,37 @@ async def test_vendor_invoice_event_wraps_invoice_in_resource(tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("event_type", "webhook_id", "route"),
+    [
+        ("INVOICING.INVOICE.PAID", "treasury-id", "/api/webhooks/paypal/treasury"),
+        ("PAYMENT.PAYOUTSBATCH.SUCCESS", "vendor-id", "/api/webhooks/paypal/vendor"),
+        ("PAYMENT.PAYOUTSFOO.SUCCESS", "treasury-id", "/api/webhooks/paypal/treasury"),
+    ],
+)
+async def test_event_type_must_match_route_app(tmp_path, event_type, webhook_id, route):
+    raw = json.dumps(
+        {"id": "WH-mismatch", "event_type": event_type, "resource": {"id": "RES-1"}}
+    ).encode()
+    response, rows, _ = await deliver(
+        tmp_path, raw=raw, headers=signed(raw, webhook_id), route=route
+    )
+    assert response.status_code == 400 and rows == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "event_type", ["PAYMENT.PAYOUTSBATCH.SUCCESS", "PAYMENT.PAYOUTS-ITEM.SUCCEEDED"]
+)
+async def test_treasury_route_accepts_measured_payout_event_families(tmp_path, event_type):
+    raw = json.dumps(
+        {"id": "WH-ok", "event_type": event_type, "resource": {"id": "RES-1"}}
+    ).encode()
+    response, rows, _ = await deliver(tmp_path, raw=raw, headers=signed(raw))
+    assert response.status_code == 204 and rows[0]["event_type"] == event_type
+
+
+@pytest.mark.asyncio
 async def test_simulator_signature_is_separate_from_real_routes(tmp_path):
     headers = signed(RAW, "WEBHOOK_ID")
     response, rows, _ = await deliver(tmp_path, headers=headers)

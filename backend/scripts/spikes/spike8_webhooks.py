@@ -182,7 +182,11 @@ def create_app(
                 bytes(raw), request.headers, "WEBHOOK_ID" if simulated else webhook_ids[account]
             )
             event = json.loads(raw)
-            prefix = "PAYMENT.PAYOUT" if account == "treasury" else "INVOICING.INVOICE."
+            prefix = (
+                ("PAYMENT.PAYOUTSBATCH.", "PAYMENT.PAYOUTS-ITEM.")
+                if account == "treasury"
+                else ("INVOICING.INVOICE.",)
+            )
             if not isinstance(event, dict) or not isinstance(event.get("resource"), dict):
                 raise ValueError("event rejected")
             event_id, event_type = event.get("id", ""), event.get("event_type", "")
