@@ -33,3 +33,9 @@ Implementation acceptance for §16: at most four model requests per invoice exec
 ## PayPal APIs / Agent Toolkit / AG Studio / Render
 Pending (P5-02). Notes so far:
 - Agent Toolkit: `paypal-agent-toolkit` 1.1.0 (1.11.0 not installable, pins `crewai-tools==0.13.2`). Read-only config exposes `get_invoice`, `list_invoices` only (SPIKE-6). It has no `list_transactions`, so the Treasury read tool is our own with the same name.
+
+## TokenOps (P0-25)
+
+The application agent completion boundary follows the upstream [integration skill](https://github.com/theagentplane/tokenops/blob/main/.claude/skills/integrate-tokenops/SKILL.md). It uses Tier 1, a local run ledger with `cost_budget` and `pre_call_worst_case`, to enforce the selected $1 cap and four-request limit across component completions in one run. See [TOKENOPS](TOKENOPS.md) for usage, supported dispatch behavior, privacy settings and tests.
+
+The backend graph and A1–A6 components are still pending their existing checklist items. This integration supplies their shared boundary and updates Claude/Codex implementation instructions; it does not claim live inference or provider-account verification. Process-local state is insufficient for restart/resume or multiple worker enforcement; those paths must have durable shared accounting before paid calls are enabled. No TokenOps control plane is provisioned.
