@@ -63,7 +63,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix
 - [ ] **P1-11** @B `audit/events.py` hash chain + verification (HMAC form lands in P2-26) (WIP B)
 - [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox
-- [ ] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) (WIP B)
+- [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — `4931be7` (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
 - [ ] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI
 - [ ] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3)
 - [ ] **P1-16** @B Three 15-min AP/finance conversations → `docs/USER_RESEARCH.md` (due Oct 27)
