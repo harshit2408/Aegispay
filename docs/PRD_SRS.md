@@ -1289,7 +1289,7 @@ Daily cap check: S1 $480.00 + S2 $425.00 = $905.00 ≤ $2,000.00 org-wide and �
 
 ## 18. Day 1–2 verification spikes (do these before product code)
 
-Record each result in this table and update the affected sections.
+Record each result in this table and update the affected sections. The [spike evidence index](spikes/README.md) records the go/no-go per assumption and remaining limits; PARTIAL/INCONCLUSIVE results are not converted to PASS by completing this table.
 
 | ID | Question | How | Pass criterion | Fallback | Result |
 |---|---|---|---|---|---|
