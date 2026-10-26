@@ -572,7 +572,9 @@ CREATE TABLE approvals (
     reason          TEXT NOT NULL CHECK (length(reason) >= 10),
     gate_hash       TEXT NOT NULL,           -- what the human saw; approval void if it changes
     voided_at       TIMESTAMPTZ,
-    consumed_at     TIMESTAMPTZ,             -- set once when used to resume (R11, §11.3)
+    resume_checkpoint_id TEXT NOT NULL,     -- server-read pending checkpoint, never supplied by browser
+    resume_interrupt_id TEXT NOT NULL,      -- exact pending human_review interrupt (R11, §11.3)
+    consumed_at     TIMESTAMPTZ,             -- set after durable graph acceptance receipt, never before ainvoke
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (execution_id, actor, gate_hash)  -- one vote per human per case state
 );
@@ -987,6 +989,7 @@ class AegisState(TypedDict, total=False):
     short_pay: Optional[ShortPayDecision]
     gate: GateDecision
     approval_ids: list[str]                      # replaced, not appended; policy_gate reloads rows from the DB
+    resume_receipts: dict[str, dict[str, str]]     # retained acceptance bindings keyed by approval_id (§11.3)
 ```
 
 ### 11.2 Policy gate (`decision/policy_gate.py`) — pure Python, table-driven
@@ -1051,7 +1054,7 @@ def build_graph(checkpointer: AsyncPostgresSaver):
         g.add_edge(n, END)
     return g.compile(checkpointer=checkpointer)
 
-def human_review(state: AegisState) -> dict:
+def human_review(state: AegisState, config: RunnableConfig) -> dict:
     decision_id = interrupt({
         "execution_id": state["execution_id"],
         "reasons": state["gate"].reasons,
@@ -1061,17 +1064,30 @@ def human_review(state: AegisState) -> dict:
     })
     if not isinstance(decision_id, str):                # resume carries only an opaque id
         raise ValueError("resume payload must be an approval_id")
-    return {"approval_ids": approvals_repo.ids_for(state["execution_id"])}   # rows are the source of truth
+    # Server-only dispatcher context carries the persisted checkpoint/interrupt binding.
+    # Validate the DB row (including consumed_at IS NULL) against it and this case/gate.
+    binding = approvals_repo.validate_pending(
+        decision_id, state, config["configurable"]["resume_binding"]
+    )
+    return {
+        "approval_ids": approvals_repo.ids_for(state["execution_id"]),
+        "resume_receipts": {**state.get("resume_receipts", {}), decision_id: binding},
+    }  # checkpointed receipt is acceptance, not payment authority
 
 # Resume from POST /api/executions/{id}/decisions:
-#   router inserts the approvals row (actor from session, gate_hash = current gate's) then
-#   await graph.ainvoke(Command(resume=approval_id), config={"configurable": {"thread_id": execution_id}})
+#   serialized dispatcher validates + commits the row and its pending interrupt binding;
+#   await graph.ainvoke(Command(resume=approval_id), config=server_config, durability="sync")
+#   reload checkpoint receipt, then mark consumed_at in a separate app transaction (§11.3).
 ```
 On resume LangGraph re-runs `human_review` from the top (SPIKE-9); completed nodes are not re-run. Resume integrity rules (R11, on top of the `gate_hash` binding above):
-- **Check before resume.** In one transaction the router locks the case (`SELECT … FROM invoice_executions WHERE execution_id = :id FOR UPDATE`), loads the approvals row by `approval_id`, and requires: `execution_id` = the thread id, `gate_hash` = the gate of the pending interrupt, actor eligible (not the uploader, role allowed, not already voted on this hash), `voided_at` and `consumed_at` NULL. Any failure → 409, no `ainvoke`. `human_review` repeats the same checks inside the node: a bare string passes `isinstance`, so the type check alone proves nothing.
-- **Consumed once, one resume at a time.** The same transaction sets `approvals.consumed_at`; the row lock serialises concurrent decisions on one case, so a second or replayed resume with the same `approval_id` is rejected.
-- **Reject bad payloads.** Anything that is not an `approval_id` string, or names an unknown, voided, consumed, stale-hash or other-case approval → the node raises, the thread stays at the interrupt, nothing is written.
-- **No side effects before `interrupt()`; idempotent writes after it.** The node may re-run after a crash, so every write after resume is keyed (upsert on `approval_id` / `execution_id`); `approve_for_payment` already relies on the R5 outbox key.
+- **Serialize the whole dispatch, not just insertion.** Every graph invocation for a case (initial run, decision, restart recovery) holds the same Postgres **session advisory lock** keyed by execution id on a dedicated connection until invocation and receipt reconciliation finish. It spans app commits and saver writes; a transaction-scoped lock released before `ainvoke` is insufficient. Do not return that connection to a pool while locked. If its connection is lost, cancel dispatch and do not continue graph writes. Pending recovery is reconciled before a new decision is accepted. This is cooperative serialization, not an atomic transaction across the app connection and `AsyncPostgresSaver`.
+- **Validate, bind, commit; leave unconsumed.** Under that lock, read the latest checkpoint and require exactly one pending `human_review` interrupt. In an app transaction lock the case row, check the authenticated actor, reason, action and displayed `gate_hash`, then insert the immutable approval with server-read `resume_checkpoint_id` and `resume_interrupt_id`. An existing vote is loaded, not inserted twice; the unique actor/hash constraint counts it once. Require this case/thread, matching pending gate, eligible actor (not uploader, role allowed), `voided_at IS NULL` and `consumed_at IS NULL`. Commit **without** setting `consumed_at`; only then call `Command(resume=approval_id)` on the latest thread. Never invoke an old checkpoint to fork/replay history. Browser input cannot set checkpoint/interrupt bindings or dispatcher config.
+- **Validate again in the node; persist acceptance before consumption.** `human_review` repeats row/case/gate/eligibility checks after `interrupt()`, including `consumed_at IS NULL`, against the original pending binding supplied by the trusted serialized dispatcher. A recovery retry may run at a later checkpoint of the **same task/interrupt**; compare its recorded binding, not a newly invented approval. Return a `resume_receipts[approval_id]` entry containing execution id, original checkpoint id, interrupt id and gate hash. Retain receipts across later nodes and approval loops. Use `durability="sync"`. After a freshly read checkpoint contains the matching receipt, the dispatcher sets `consumed_at` once in a separate app transaction. Consumption means accepted by the graph; it does not invalidate the vote. `policy_gate` still loads eligible, non-voided same-hash rows, including consumed votes, and recomputes all facts (R11).
+- **Recover each commit gap.** Scan non-voided, unconsumed approval rows on startup and before later dispatch, under the same lock. Before the row commit there is nothing to recover. After its commit but before a durable receipt, retry the same `approval_id` only if checkpoint lineage still identifies the original pending task/interrupt and gate; no replacement approval or new vote. A matching receipt means never send that `Command` again: mark consumed and, if ordinary graph work remains, continue with `ainvoke(None, ...)`; a later interrupt waits for its own decision. Crash after consumption is also a continuation, never a new resume. Changed gate → void the old vote and require fresh review. Missing/ambiguous checkpoint lineage or binding → fail closed and alert; do not infer acceptance from HTTP success or advance payment. Keep relevant checkpoints/receipts until reconciliation; pending writes and errored tasks must be inspected, not blindly treated as a new interrupt.
+- **Reject bad payloads without claiming saver rollback.** Non-string, unknown, voided, consumed, stale-hash, foreign-case or wrong-interrupt requests → 409 before invocation. Node validation remains defense in depth; an exception must prevent approval effects and payment, but the saver may retain error/resume metadata. Recovery must inspect that state; it is incorrect to promise that an exception writes nothing or automatically restores the original interrupt. **A committed approval that node validation rejects** (e.g. the actor's role was revoked after the router check) is voided by the dispatcher (`voided_at` set, reason recorded) in its own app transaction, so the recovery scan never retries it; the case then needs a fresh review and does not advance to payment. Whether the same thread can take a new `Command(resume=…)` at the original interrupt after such an exception is **unverified** (SPIKE-9 follow-up); until a probe records it in §18, such a case goes to manual review rather than being re-resumed.
+- **No side effects before `interrupt()`; idempotent writes after it.** The node may re-run after a crash, so every application write after resume is keyed (upsert on `approval_id` / `execution_id`); `approve_for_payment` already relies on the R5 outbox key. The spike deliberately writes counters before the interrupt to measure this replay, not as a product-node pattern.
+
+This is the required P1/P2 implementation contract, **not an implemented approval router or recovery worker**. SPIKE-9 proves durable interrupts and a persisted acceptance receipt only; auth, DB approval validation, serialization and recovery-gap tests remain required by §17.
 A dual-approval case loops `human_review → match → … → policy_gate → human_review` until two distinct eligible operators approve the **same** `gate_hash` or one rejects. If anything the gate depends on changed in between, the hash changes, earlier approvals are voided and the case asks again. `approve_for_payment` writes the frozen outbox command (R5) and the PO reservation (R17) in the same transaction as the status change.
 
 ### 11.4 Settlement state machine (`settlement/`)
@@ -1259,7 +1275,7 @@ Daily cap check: S1 $480.00 + S2 $425.00 = $905.00 ≤ $2,000.00 org-wide and �
 | Unit | Policy gate truth table G1–G14, risk scoring, short-pay math (S2 numbers exact to the cent), HMAC chain + anchor verification, invoice-number normalization, transition table (R6), every mandate clamp (R13) | `pytest` |
 | Property | For any extraction + any human input: receiver = approved vendor-master version; paid ≤ accepted value; Σ PO reservations ≤ PO accepted value across any invoice numbers (R17); Σ reservations ≤ cap and per-vendor cap under concurrent executions; releases land on the reservation's date | `hypothesis` |
 | Static / architecture | Tool registry contains only read tools; `paypal/payouts.py` imported only from `settlement/`; no `float` in money schemas; each service boots only with its tagged env (R22); DB grants (api role cannot write vendor_master/outbox/payouts/ledgers) | `pytest` + `import-linter` + `ruff` |
-| Security / SoD | Role matrix (every route × role); author cannot activate; uploader cannot approve; one human cannot supply both approvals; stale `gate_hash` approval rejected; resume with a dict payload rejected; resume with an approval of another case, a voided or an already-consumed `approval_id` → 409 and no `ainvoke`; two concurrent decisions on one case → one resume; a crash after resume and re-run of `human_review` → no duplicate writes; vendor change with requester = approver rejected; payee change during cooling freezes; CSRF missing → 403; demo routes absent when `DEMO_ENABLED=false`; boot refuses demo/replay with a live URL | `pytest` |
+| Security / SoD | Role matrix (every route × role); author cannot activate; uploader cannot approve; one human cannot supply both approvals; stale `gate_hash` approval rejected; resume with a dict payload rejected; resume with an approval of another case, a voided or an already-consumed `approval_id` → 409 and no `ainvoke`; concurrent same-case decisions serialize across app commits and saver writes; crash before/after approval commit, before/after durable acceptance receipt and after consumption → recover the same bound task without a new vote or duplicate effects; a later interrupt never receives an old approval; node rejects a committed approval → row voided, no retry loop, case to manual review; lost lock, missing checkpoint lineage and node validation errors fail closed; vendor change with requester = approver rejected; payee change during cooling freezes; CSRF missing → 403; demo routes absent when `DEMO_ENABLED=false`; boot refuses demo/replay with a live URL | `pytest` |
 | Crash / settlement chaos | Kill the worker after each step of R19 (before commit, after commit before POST, after POST before response, after response before commit) → exactly one payout, correct ledger; duplicate-batch error → adopted; respx mocks do **not** dedupe on Request-Id, and the test asserts at most one POST per recovery attempt, no POST after `PAYOUT_RECOVERY_TTL_MIN` or under halt/failed R20, and reservations kept on every `NEEDS_MANUAL_REVIEW` exit; adopt rejects a batch with a foreign `sender_batch_id`, extra items or a different `sender_item_id`; an error href on another host is never requested; response amount/receiver mismatch → halt; velocity breaker trips | `pytest` + `respx` |
 | Contract | Every PayPal call against recorded sandbox fixtures; one manual live smoke job | `respx` |
 | Webhook chaos | Duplicate, out-of-order, delayed, unsigned, simulator events; forged cert host (`paypal.com.evil.com`); `resource_id` not ours; wrong app; late `PENDING` after `SUCCESS`; webhook + poller racing `record_payment` → one call | `pytest` |
