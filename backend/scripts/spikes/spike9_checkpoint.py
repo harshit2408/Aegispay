@@ -1,6 +1,7 @@
 """SPIKE-9 (PRD §18, ADR-005): dynamic interrupt() + AsyncPostgresSaver survives a process restart. No LLM.
 Process 1 runs a minimal graph to the interrupt and hard-exits (os._exit, no cleanup). Process 2, a fresh Python
-process, reads the frozen thread, resumes with Command(resume=approval_id) and completes. Each node writes a
+process, reads the frozen thread, resumes with Command(resume=approval_id), completes and hard-exits.
+Process 3 restores the acceptance receipt without sending another Command. Each node writes a
 side-effect row (with its pid) to Postgres, so the script records exactly what re-runs on resume.
 Needs: pip install -r requirements-spike9.txt (separate venv) and Postgres (docker compose up -d postgres).
 Run (password from env, not argv; values from the compose postgres service, localhost only):
@@ -25,7 +26,7 @@ except ImportError as exc:
 from common import nonlocal_pg_target
 
 DSN = os.environ.get("SPIKE9_DB_URL", "")
-ROLES = ("p1", "p2")
+ROLES = ("p1", "p2", "p3")
 SPAWN_TIMEOUT_S = 60
 PAYABLE_CENTS = 1234
 APPROVAL_ID = "appr_spike9"
@@ -42,6 +43,7 @@ class State(TypedDict, total=False):
     execution_id: str
     payable_cents: int
     approval_id: str
+    resume_receipts: dict[str, str]
     done: bool
 
 
@@ -61,10 +63,12 @@ async def prepare(state: State) -> dict:
 async def review(state: State) -> dict:
     await effect(state["execution_id"], "review", "before_interrupt")
     approval_id = interrupt({"execution_id": state["execution_id"], "reasons": ["SPIKE"]})
-    if not isinstance(approval_id, str):
+    if not isinstance(approval_id, str) or approval_id != APPROVAL_ID:
         raise ValueError("resume payload must be an approval_id")
     await effect(state["execution_id"], "review", "after_interrupt")
-    return {"approval_id": approval_id}
+    # Spike-only receipt: proves recovery can observe node acceptance after a later crash.
+    # Product approval lookup, actor/gate/interrupt binding and consumption are specified in §11.3.
+    return {"approval_id": approval_id, "resume_receipts": {approval_id: state["execution_id"]}}
 
 
 async def finish(state: State) -> dict:
@@ -88,7 +92,7 @@ async def process_1(thread_id: str) -> None:
     config = {"configurable": {"thread_id": thread_id}}
     async with AsyncPostgresSaver.from_conn_string(DSN) as saver:
         await saver.setup()
-        out = await build(saver).ainvoke({"execution_id": thread_id}, config)
+        out = await build(saver).ainvoke({"execution_id": thread_id}, config, durability="sync")
         interrupts = out.get("__interrupt__") or []
         print(f"p1 pid={os.getpid()} interrupts={[i.value for i in interrupts]}", flush=True)
         if len(interrupts) != 1:
@@ -108,7 +112,7 @@ async def process_2(thread_id: str) -> None:
             raise RuntimeError(f"frozen thread not restored: next={snap.next} values={snap.values}")
         if not pending or pending[0]["execution_id"] != thread_id:
             raise RuntimeError(f"interrupt payload lost: {pending}")
-        out = await graph.ainvoke(Command(resume=APPROVAL_ID), config)
+        out = await graph.ainvoke(Command(resume=APPROVAL_ID), config, durability="sync")
         print(f"p2 final={out}")
         if not (out.get("done") is True and out.get("approval_id") == APPROVAL_ID):
             raise RuntimeError(f"resume did not complete: {out}")
@@ -116,6 +120,18 @@ async def process_2(thread_id: str) -> None:
             raise RuntimeError(f"state changed across resume: {out}")
         if (await graph.aget_state(config)).next != ():
             raise RuntimeError("thread should be finished")
+        sys.stdout.flush()
+        # Simulate a crash after graph persistence but before an application could mark consumption.
+        os._exit(0)
+
+
+async def process_3(thread_id: str) -> None:
+    config = {"configurable": {"thread_id": thread_id}}
+    async with AsyncPostgresSaver.from_conn_string(DSN) as saver:
+        snap = await build(saver).aget_state(config)
+        if snap.next or snap.values.get("resume_receipts") != {APPROVAL_ID: thread_id}:
+            raise RuntimeError(f"durable acceptance receipt lost: {snap}")
+        print(f"p3 pid={os.getpid()} receipt restored; already accepted, no second Command")
 
 
 def spawn(role: str, thread_id: str) -> int:
@@ -142,6 +158,7 @@ def orchestrate() -> int:
         print(f"FAIL: process 1 exit {rc1}")
         return 1
     rc2 = spawn("p2", thread_id)
+    rc3 = spawn("p3", thread_id) if rc2 == 0 else 1
     with psycopg.connect(DSN) as conn:
         rows = conn.execute(
             "SELECT node, phase, pid FROM spike9_effects WHERE thread_id = %s ORDER BY id",
@@ -153,8 +170,8 @@ def orchestrate() -> int:
     for node, phase, pid in rows:
         seen.setdefault((node, phase), []).append(role[pid])
     print("side effects:", [(n, ph, role[p]) for n, ph, p in rows])
-    ok = rc2 == 0 and len(pids) == 2 and seen == EXPECTED
-    print("PASS" if ok else f"FAIL: p2 exit {rc2}, effects {seen} != {EXPECTED}")
+    ok = rc2 == rc3 == 0 and len(pids) == 2 and seen == EXPECTED
+    print("PASS" if ok else f"FAIL: p2 exit {rc2}, p3 exit {rc3}, effects {seen} != {EXPECTED}")
     return 0 if ok else 1
 
 
@@ -167,7 +184,7 @@ def main() -> int:
     if len(sys.argv) == 3:
         if sys.argv[1] not in ROLES:
             sys.exit(f"role must be one of {ROLES}")
-        step = process_1 if sys.argv[1] == "p1" else process_2
+        step = {"p1": process_1, "p2": process_2, "p3": process_3}[sys.argv[1]]
         # psycopg async cannot use the Windows default ProactorEventLoop
         asyncio.run(step(sys.argv[2]), loop_factory=asyncio.SelectorEventLoop)
         return 0
