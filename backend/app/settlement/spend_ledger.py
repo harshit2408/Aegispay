@@ -46,7 +46,7 @@ async def committed_cents(session: AsyncSession, policy_id: str, day: date) -> i
     return int((await session.execute(query)).scalar_one())
 
 
-async def _open_reserve(session: AsyncSession, execution_id: str) -> SpendLedger | None:
+async def open_reserve(session: AsyncSession, execution_id: str) -> SpendLedger | None:
     later = aliased(SpendLedger)
     query = select(SpendLedger).where(
         SpendLedger.execution_id == execution_id,
@@ -79,7 +79,7 @@ async def reserve(
     ).scalar_one_or_none()
     if mandate is None:
         raise NoActiveMandate(policy_id)
-    existing = await _open_reserve(session, execution_id)
+    existing = await open_reserve(session, execution_id)
     if existing is not None:
         if existing.amount_cents != amount_cents:
             raise ValueError("open reservation exists with a different amount")
