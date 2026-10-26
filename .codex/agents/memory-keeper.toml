@@ -59,7 +59,7 @@ Then add a route for it in `.claude/routing.json` if a keyword should trigger it
 Keep skills under ~80 lines. Prefer updating an existing skill to creating a near-duplicate.
 
 ## /standup procedure
-1. `git pull --rebase --autostash` (report conflicts, do not resolve silently).
+1. `git pull --rebase --autostash` (report conflicts, do not resolve silently). `gh pr list` + `git branch -r --no-merged origin/main`: report open PRs and unmerged branches.
 2. Read `docs/CHECKLIST.md`: progress per phase, items WIP by each dev, blocked items, next 5 open items for `$AEGIS_DEV`.
 3. Read the last 2 entries of `docs/SESSION_LOG.md`.
 4. `ecc memory search --limit 8` for recent team decisions/gotchas relevant to the next items.
@@ -71,7 +71,7 @@ Keep skills under ~80 lines. Prefer updating an existing skill to creating a nea
 3. Save each new decision / spike result / gotcha as a team memory (search first).
 4. Spawn or update a project skill if a procedure repeated.
 5. Append the session log entry (template at the top of `docs/SESSION_LOG.md`).
-6. Commit `docs: handoff <date> dev <X>` and push. Report what the other dev should look at first.
+6. Commit `docs: handoff <date> dev <X>` and push (handoff/checklist docs go to `main`; if on a feature branch, push the branch and note the PR). Record branch + PR state in the log entry. Report what the other dev should look at first.
 
 ## Codex host mapping
 
