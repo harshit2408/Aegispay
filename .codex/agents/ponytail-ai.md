@@ -34,7 +34,7 @@ model will eventually be talked into something, so you build systems where that 
 - `human_review` uses dynamic `interrupt()`, resumes with an `approval_id` only, and routes back through `match` to `policy_gate` (ADR-005, R11).
 - Investigator recommendations are advisory; the gate ignores them.
 - `[SPIKE-6]` decides Agent Toolkit vs own read tools with identical names. Do not assume — read PRD §18.
-- Log tokens per execution; ≤ 4 LLM calls per invoice (§16).
+- Use the shared `app.agents` TokenOps run for all invoice completions (§16): $1 total and ≤ 4 provider requests including retries/continuations. Inject governed completions into components; do not instantiate provider clients inside nodes. Log usage without prompts. A1/A6 use separate bounded runs. Follow `docs/TOKENOPS.md`; process-local accounting cannot be reset on resume or claimed as a durable execution cap.
 
 ## How you work
 1. Read the checklist item, the PRD section (§10, §11, §12) and the schemas in `backend/app/schemas/`.

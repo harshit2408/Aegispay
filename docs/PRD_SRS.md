@@ -1267,6 +1267,8 @@ Daily cap check: S1 $480.00 + S2 $425.00 = $905.00 ≤ $2,000.00 org-wide and �
 | Honesty | `DEMO_REPLAY_MODE` (requires `DEMO_ENABLED`, sandbox only) serves recorded sandbox responses only when the sandbox is unavailable, with a persistent **REPLAY** banner; replayed executions are tagged `replayed=true` and never touch ledgers (R24). README states the threat model and what is simulated (§4.0, §3). |
 | Cost | LLM calls per invoice execution ≤ 4 (A2, A3, optional A4, optional A5), including retries and tool-loop continuations. Q3: **$1.00 USD total per invoice execution**, OpenAI `gpt-6.1-sol` for extraction and reasoning. Reserve a conservative maximum billable cost before each request; insufficient budget fails closed. Count image input, reasoning/output, cache writes and applicable premiums; reconcile actual tokens/cost per execution. See `docs/TOOLS.md` for dated pricing and implementation limits. |
 
+**TokenOps integration (P0-25):** the Python completion boundary uses `tokenops_run` and `wrap_complete`, with cost and pre-call policies sharing one invoice-run ledger. Individual components receive governed completions. Tier 1 is process-local groundwork; it does not satisfy this section's execution-wide cap across restarts, HTTP hops or graph resumes. Before those paths can call a model, persist/reuse the budget and request count through a shared ledger (Tier 2 or an equivalent durable reservation), and fail closed if that state is unavailable. A1 mandate authoring and A6 simulator runs remain separately bounded. Integration contract and verification: `docs/TOKENOPS.md`.
+
 ---
 
 ## 17. Testing and evaluation
