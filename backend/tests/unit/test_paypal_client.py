@@ -222,3 +222,16 @@ async def test_401_after_two_5xx_still_refreshes_and_succeeds():
     )
     async with make_client() as c:
         assert (await c.get("/v1/x")).status == 200
+
+
+@respx.mock
+async def test_post_without_retry_sends_once_but_still_refreshes_a_401():
+    token_route(respx.mock)
+    route = respx.post(f"{BASE}/v1/y").mock(
+        side_effect=[httpx.Response(401), httpx.Response(500, json={"name": "X"})]
+    )
+    async with make_client() as c:
+        with pytest.raises(PayPalError) as exc:
+            await c.post("/v1/y", request_id="r", json={}, retry=False)
+    assert exc.value.status == 500
+    assert route.call_count == 2  # the 401 was rejected unprocessed; the 500 is not retried

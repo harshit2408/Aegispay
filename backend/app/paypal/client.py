@@ -1,6 +1,8 @@
 """Async PayPal REST client: one instance per app, so one OAuth token cache per app (PRD §9.1).
 
-Every POST requires a caller-supplied `request_id` and every retry reuses it (R5). The base URL is
+Every POST requires a caller-supplied `request_id` and every retry reuses it (R5). A caller that
+must recheck state before each attempt (the payout POST, R19/R20) passes `retry=False` and retries
+itself. The base URL is
 an exact HTTPS host allowlist and redirects are never followed, so tokens cannot leave PayPal.
 """
 
@@ -118,11 +120,18 @@ class PayPalClient:
         request_id: str,
         json: dict[str, Any] | None = None,
         execution_id: str | None = None,
+        retry: bool = True,
     ) -> PayPalResponse:
+        """`retry=False`: one request only (a 401 still refreshes the token once: not processed)."""
         if not request_id or not request_id.strip():
             raise ValueError("PayPal POST requires a non-empty request_id (R5)")
         return await self._request(
-            "POST", path, json=json, request_id=request_id, execution_id=execution_id
+            "POST",
+            path,
+            json=json,
+            request_id=request_id,
+            execution_id=execution_id,
+            max_attempts=MAX_ATTEMPTS if retry else 1,
         )
 
     async def _access_token(self, *, force: bool = False) -> str:
@@ -163,12 +172,13 @@ class PayPalClient:
         json: dict[str, Any] | None = None,
         request_id: str | None = None,
         execution_id: str | None = None,
+        max_attempts: int = MAX_ATTEMPTS,
     ) -> PayPalResponse:
         if not path.startswith("/") or path.startswith("//"):
             raise ValueError("path must be relative to the configured PayPal base URL")
         refreshed = False
         attempt = 0
-        while attempt < MAX_ATTEMPTS:
+        while attempt < max_attempts:
             attempt += 1
             headers = {
                 "Authorization": f"Bearer {await self._access_token()}",
@@ -189,7 +199,7 @@ class PayPalClient:
                     attempt,
                     execution_id,
                 )
-                if attempt == MAX_ATTEMPTS:
+                if attempt == max_attempts:
                     raise
                 await self._sleep(BACKOFF_BASE_S * 2 ** (attempt - 1))
                 continue
@@ -208,7 +218,7 @@ class PayPalClient:
                 attempt -= 1  # a token refresh is not a retry of the request
                 await self._access_token(force=True)
                 continue
-            if resp.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
+            if resp.status_code in RETRY_STATUSES and attempt < max_attempts:
                 await self._sleep(BACKOFF_BASE_S * 2 ** (attempt - 1))
                 continue
             body = _json_or_raw(resp) if resp.content else {}
