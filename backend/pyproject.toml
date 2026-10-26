@@ -18,16 +18,16 @@ dependencies = [
     "agent-tokenops==2.0.1",
     "agent-chronicle==1.1.1",
     "python-dotenv>=1.2",
+    "cryptography>=45",
+    "httpx",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "cryptography>=45",
     "hypothesis>=6",
     "pytest",
     "pytest-asyncio",
     "respx",
-    "httpx",
     "aiosqlite",
     "ruff",
 ]
