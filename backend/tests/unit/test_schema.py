@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.db import Base
 from app.models.core import MandatePolicy, Operator
 from app.models.payables import SettlementControl, SpendLedger
-from tests.seed import POLICY_ID, make_execution, seed_world
+from tests.seed import POLICY_ID, make_execution, seed_approved, seed_world
 
 pytestmark = pytest.mark.usefixtures("pg_template")
 
@@ -132,3 +132,35 @@ async def test_spend_ledger_release_must_reference_a_reserve(pg_sessionmaker, ba
 async def test_settlement_controls_is_single_row(pg_sessionmaker):
     with pytest.raises(IntegrityError):
         await _insert(pg_sessionmaker, SettlementControl(id=False))
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "update settlement_outbox set amount_cents = 1",
+        "update settlement_outbox set receiver_payer_id = 'ATTACKER123'",
+        "update settlement_outbox set vendor_version = 2",
+        "update invoice_executions set approved_cents = 49000",
+        "update invoice_executions set replayed = true",
+    ],
+)
+async def test_frozen_command_cannot_be_changed(pg_sessionmaker, tamper):
+    """R5/R24: amount, payee and vendor version are frozen by DB triggers once written."""
+    async with pg_sessionmaker() as s, s.begin():
+        await seed_world(s)
+        await seed_approved(s)
+    with pytest.raises(IntegrityError):
+        async with pg_sessionmaker() as s, s.begin():
+            await s.execute(text(tamper))
+
+
+async def test_outbox_status_and_first_approved_cents_stay_writable(pg_sessionmaker):
+    async with pg_sessionmaker() as s, s.begin():
+        await seed_world(s)
+        await seed_approved(s)
+        s.add(make_execution("e2"))
+    async with pg_sessionmaker() as s, s.begin():
+        await s.execute(text("update settlement_outbox set status = 'CLAIMED', attempts = 1"))
+        await s.execute(
+            text("update invoice_executions set approved_cents = 100 where execution_id = 'e2'")
+        )

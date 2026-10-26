@@ -112,9 +112,10 @@ class Env:
     async def status(self, execution_id="e1"):
         return (await self.rows(InvoiceExecution, execution_id=execution_id))[0].status
 
-    async def sql(self, statement):
+    async def sql(self, statements):
         async with self.sm() as s, s.begin():
-            await s.execute(text(statement))
+            for statement in statements.split(";"):
+                await s.execute(text(statement))
 
 
 @pytest.fixture
@@ -162,6 +163,10 @@ async def test_unknown_execution_raises(env):
         await env.service.execute("nope")
 
 
+# Bypasses the R5/R24 triggers to prove the R20 recheck is still a second line of defence
+BYPASS = "set local session_replication_role = replica; "
+
+
 @pytest.mark.parametrize(
     ("break_it", "reason"),
     [
@@ -170,8 +175,8 @@ async def test_unknown_execution_raises(env):
         ("update vendor_master set paypal_payer_id = 'OTHER99999'", "PAYEE_CHANGED"),
         ("update purchase_orders set version = 2", "PO_CHANGED"),
         ("update settlement_controls set halted = true", "HALTED"),
-        ("update invoice_executions set approved_cents = 49000", "AMOUNT_CHANGED"),
-        ("update invoice_executions set replayed = true", "REPLAYED_EXECUTION"),
+        (BYPASS + "update invoice_executions set approved_cents = 49000", "AMOUNT_CHANGED"),
+        (BYPASS + "update invoice_executions set replayed = true", "REPLAYED_EXECUTION"),
         ("update invoice_executions set grn_id = null", "NO_GRN"),
         ("update invoice_executions set vendor_id = null", "NO_VENDOR"),
     ],
