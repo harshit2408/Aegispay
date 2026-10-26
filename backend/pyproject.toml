@@ -14,6 +14,8 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg",
     "alembic",
+    "cryptography>=45",  # webhook signature + certificate chain verification (R10)
+    "httpx",
     "tzdata",
     "agent-tokenops==2.0.1",
     "agent-chronicle==1.1.1",
@@ -22,12 +24,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "cryptography>=45",
     "hypothesis>=6",
     "pytest",
     "pytest-asyncio",
     "respx",
-    "httpx",
     "aiosqlite",
     "ruff",
 ]
