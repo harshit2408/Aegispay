@@ -9,10 +9,13 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
+from app.routers import webhooks
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AegisPay API")
+app.include_router(webhooks.router)
+app.include_router(webhooks.simulator_router)  # 404s unless DEMO_ENABLED (R24); unmounted in P3-15
 
 
 # Liveness + DB ping only; the full PRD §13 health checks come in a later checklist item.
