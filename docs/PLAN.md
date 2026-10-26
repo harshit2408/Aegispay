@@ -19,6 +19,8 @@ Spec: [[PRD_SRS]] (single source of truth). State: [[CHECKLIST]]. Daily log: [[S
 
 Touching the other developer's directory: allowed for small fixes, but say so in the commit message and the session log.
 
+Session exception (user-authorized 2026-10-25): Dev B owns P0-14 sandbox webhook setup and SPIKE-8 verification. P1-09 application webhook receiver and deduplication remain with Dev A.
+
 ## Phases (detail and IDs in [[CHECKLIST]])
 
 | Phase | Dates | Exit criterion | Critical items |
