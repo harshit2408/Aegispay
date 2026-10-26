@@ -2,19 +2,19 @@ import { StudioSpike } from "./studio/studio-spike";
 
 export default function Home() {
   return (
-    <main id="main">
-      <div className="replay-banner">REPLAY · SPIKE-7 · Synthetic probe data · No PayPal or LLM calls</div>
-      <header>
-        <p className="eyebrow">AEGISPAY / STUDIO INTEGRATION</p>
-        <h1>AG Studio feasibility cockpit</h1>
-        <p>Official PayPal + AG Grid starter · Custom React widget · Scripted Agent Framework hello-world</p>
+    <>
+      <section className="page-header" aria-labelledby="cockpit-title">
+        <p className="eyebrow">OPERATIONS / COCKPIT</p>
+        <h1 id="cockpit-title">Payables cockpit</h1>
+        <p>Review invoice cases, follow settlement and see what needs attention.</p>
+        <p className="pending-note">Live payables widgets are not connected yet. The Studio workspace below contains local integration probes.</p>
         <p className="licence-status">
           {process.env.NEXT_PUBLIC_AG_LICENSE_KEY
             ? "Licence supplied at build; entitlement and validity through 2026-12-15 still require confirmation."
             : "No licence supplied. Development evaluation only; validity through 2026-12-15 is unconfirmed."}
         </p>
-      </header>
+      </section>
       <StudioSpike />
-    </main>
+    </>
   );
 }
