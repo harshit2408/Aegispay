@@ -68,3 +68,19 @@ test('compose excludes settlement secrets even when host env contains them', {
   assert.deepEqual(Object.keys(services.frontend.build.args), ['NEXT_PUBLIC_API_URL']);
   assert.deepEqual(services.frontend.profiles, ['frontend']);
 });
+
+test('plain compose up defaults non-secret API settings to the PRD section 7 values', {
+  skip: composeVersion.status !== 0 && 'Docker Compose CLI not installed',
+}, () => {
+  const template = variables(read('.env.example'));
+  const env = Object.fromEntries(Object.entries(process.env)
+    .filter(([key]) => !(key in template)));
+  const result = spawnSync('docker', [
+    'compose', '--env-file', '/dev/null', 'config', '--format', 'json',
+  ], { cwd: root, encoding: 'utf8', env });
+  assert.equal(result.status, 0, result.stderr);
+  const api = JSON.parse(result.stdout).services.api.environment;
+  for (const key of ['LLM_PROVIDER', 'LLM_MODEL_EXTRACT', 'LLM_MODEL_REASON']) {
+    assert.equal(api[key], template[key], key);
+  }
+});
