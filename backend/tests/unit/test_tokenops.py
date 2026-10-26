@@ -1,7 +1,10 @@
+import json
 import os
+import re
 import subprocess
 import sys
 import traceback
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -134,7 +137,7 @@ def test_cancellation_marks_run_halted():
         raise KeyboardInterrupt()
 
     with invoice_run(uuid4(), dispatch=dispatch) as run:
-        with pytest.raises(Halt):
+        with pytest.raises(KeyboardInterrupt):
             run.complete("A2", [], input_token_bound=100)
         with pytest.raises(Halt):
             run.complete("A2", [], input_token_bound=100)
@@ -211,6 +214,8 @@ def test_nested_run_cannot_spend_through_outer_handle():
 def test_import_disables_library_dotenv_loading(tmp_path):
     code = """
 import os
+import re
+import re
 import dotenv
 real = dotenv.load_dotenv
 
@@ -234,3 +239,55 @@ assert os.environ["PYTHON_DOTENV_DISABLED"] == "1"
         capture_output=True,
         text=True,
     )
+
+
+@pytest.mark.parametrize(
+    ("response", "cost"),
+    [
+        (ModelResponse("ok", input_tokens=101), 202),
+        (ModelResponse("ok", input_tokens=1, output_tokens=1025), 10_252),
+    ],
+)
+def test_over_bound_usage_is_logged_and_charged_before_halt(caplog, response, cost):
+    with caplog.at_level("INFO"), invoice_run(uuid4(), dispatch=lambda *a, **k: response) as run:
+        with pytest.raises(Halt):
+            run.complete("A2", [], input_token_bound=100)
+        assert run.spent_micros == cost
+    records = [json.loads(r.getMessage()) for r in caplog.records if "llm_usage" in r.getMessage()]
+    assert records == [
+        {
+            "event": "llm_usage",
+            "execution_id": records[0]["execution_id"],
+            "node": "A2",
+            "input_tokens": response.input_tokens,
+            "output_tokens": response.output_tokens,
+            "cached_tokens": 0,
+            "reasoning_tokens": 0,
+            "cost_micros": cost,
+            "rejected": True,
+        }
+    ]
+
+
+def test_logged_cost_matches_ledger_charge(caplog):
+    response = ModelResponse(
+        "ok", input_tokens=100, output_tokens=50, cached_tokens=80, reasoning_tokens=40
+    )
+    with caplog.at_level("INFO"), invoice_run(uuid4(), dispatch=lambda *a, **k: response) as run:
+        run.complete("A2", [], input_token_bound=100)
+        spent = run.spent_micros
+    logged = [json.loads(r.getMessage()) for r in caplog.records if "llm_usage" in r.getMessage()]
+    assert [r["cost_micros"] for r in logged] == [spent]
+
+
+def test_only_app_agents_imports_tokenops():
+    # app.agents disables TokenOps' import-time dotenv loading; an earlier import elsewhere
+    # would bypass that, so no other app module may import tokenops directly.
+    app_dir = Path(__file__).resolve().parents[2] / "app"
+    offenders = [
+        str(path.relative_to(app_dir))
+        for path in app_dir.rglob("*.py")
+        if path.parent.name != "agents"
+        and re.search(r"^\s*(from|import)\s+tokenops\b", path.read_text(), re.M)
+    ]
+    assert offenders == []
