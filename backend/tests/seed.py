@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.core import MandatePolicy, Operator, PurchaseOrder, VendorMaster
-from app.models.payables import InvoiceDocument, InvoiceExecution
+from app.models.core import GoodsReceipt, MandatePolicy, Operator, PurchaseOrder, VendorMaster
+from app.models.payables import InvoiceDocument, InvoiceExecution, SettlementOutbox
 
 PAYER_ID = "PAYER12345678"
 POLICY_ID = "pol-1"
@@ -92,3 +92,43 @@ def make_execution(
         "status": status,
     }
     return InvoiceExecution(**{**fields, **kw})
+
+
+async def seed_approved(
+    session: AsyncSession, execution_id: str = "e1", amount_cents: int = 48_000, **kw
+) -> None:
+    """An APPROVED_FOR_PAYMENT execution with its GRN, invoice id and frozen outbox command."""
+    if await session.get(GoodsReceipt, "grn-1") is None:
+        session.add(
+            GoodsReceipt(
+                grn_id="grn-1",
+                po_id="PO-1042",
+                received_qty=100,
+                accepted_qty=100,
+                rejected_qty=0,
+                recorded_by="op-ctl",
+                source="SEEDED",
+                received_at=datetime(2026, 1, 1, tzinfo=UTC),
+            )
+        )
+        await session.flush()
+    fields = {
+        "grn_id": "grn-1",
+        "paypal_invoice_id": "INV2-ABC",
+        "approved_cents": amount_cents,
+        "vendor_version": 1,
+        "po_version": 1,
+    }
+    session.add(make_execution(execution_id, **{**fields, **kw}))
+    await session.flush()
+    session.add(
+        SettlementOutbox(
+            command_id=f"cmd-{execution_id}",
+            execution_id=execution_id,
+            amount_cents=amount_cents,
+            receiver_payer_id=PAYER_ID,
+            vendor_version=1,
+            status="PENDING",
+        )
+    )
+    await session.flush()
