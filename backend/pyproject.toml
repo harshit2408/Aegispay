@@ -49,3 +49,5 @@ select = ["E", "F", "W", "I", "B", "UP", "T20"]
 [tool.ruff.lint.per-file-ignores]
 # PRD §18 spike probes are throwaway CLI tools: printing is their output
 "scripts/spikes/**" = ["T201", "E501"]
+# Alembic output: long literal lines are expected
+"migrations/versions/**" = ["E501", "W291"]
