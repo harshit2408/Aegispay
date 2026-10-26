@@ -29,7 +29,7 @@ python -m pytest backend/tests/unit/test_spikes_common.py   # offline
 Run them without `python -I` (they import `common.py` from their own folder).
 Webhook observations and event shapes are now recorded in SPIKE-8 below. SPIKE-2 remains inconclusive until Invoicing is enabled on the Treasury app; use the VendorGateway fallback. The cross-spike decisions and evidence limits are indexed in `docs/spikes/README.md`.
 
-# SPIKE-8: sandbox webhook verification
+## SPIKE-8: sandbox webhook verification (`spike8_webhooks.py`)
 
 This standalone probe records signature-verification evidence for P0-14. It does not
 implement P1-09's application receiver, database deduplication, resource-ownership checks,

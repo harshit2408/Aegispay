@@ -1,29 +1,34 @@
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "spikes"))
 
+import common  # noqa: E402
 import spike5_unclaimed  # noqa: E402
 
 
-def test_cancel_uses_a_stable_request_id(monkeypatch):
-    calls = []
-    sandbox = SimpleNamespace(
-        run="offline-run",
-        token=lambda app: ("offline-token", []),
-        payout=lambda *args: "offline-batch",
-        poll_payout=lambda *args, **kwargs: ("offline-item", ("SUCCESS", "UNCLAIMED")),
-        brief=lambda label, result: result,
+def test_cancel_post_carries_a_stable_request_id(monkeypatch):
+    sandbox = common.Sandbox(
+        {
+            "PAYPAL_BASE_URL": "https://api-m.sandbox.paypal.com",
+            "VENDOR_ACCOUNT_EMAIL": "v@x",
+            "TREASURY_ACCOUNT_EMAIL": "t@x",
+        }
     )
+    posts = []
 
-    def call(method, path, **kwargs):
-        calls.append((method, path, kwargs))
-        return 200, "offline-debug", {"transaction_status": "UNCLAIMED"}
+    def fake_call(method, path, **kw):
+        if method == "POST":
+            posts.append((path, kw.get("request_id")))
+        return 400, "dbg", {}
 
-    sandbox.call = call
     monkeypatch.setattr(spike5_unclaimed, "Sandbox", lambda: sandbox)
+    monkeypatch.setattr(sandbox, "token", lambda app: ("tok", {}))
+    monkeypatch.setattr(sandbox, "payout", lambda *a, **k: "BATCH-1")
+    monkeypatch.setattr(sandbox, "poll_payout", lambda *a, **k: ("ITEM-1", ("ITEM-1", "UNCLAIMED")))
+    monkeypatch.setattr(sandbox, "call", fake_call)
 
     assert spike5_unclaimed.main() == 0
-    assert calls[0][0:2] == ("POST", "/v1/payments/payouts-item/offline-item/cancel")
-    assert calls[0][2]["request_id"] == "aegis-spike-s5-offline-run-cancel"
+    assert posts == [
+        ("/v1/payments/payouts-item/ITEM-1/cancel", f"aegis-spike-s5-cancel-{sandbox.run}")
+    ]

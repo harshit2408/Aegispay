@@ -21,7 +21,7 @@
     },
     {
       "id": "ai-decision",
-      "match": "langgraph|agent.?toolkit|investigat|extract|classifier|inject|forensic|hidden.?text|\\beval\\b|prompt|llm|mandate.?compil|notice.?draft|negotiat|interrupt\\(|checkpoint",
+      "match": "tokenops|token.?budget|langgraph|agent.?toolkit|investigat|extract|classifier|inject|forensic|hidden.?text|\\beval\\b|prompt|llm|mandate.?compil|notice.?draft|negotiat|interrupt\\(|checkpoint",
       "agent": "ponytail-ai",
       "review": ["ecc:security-reviewer", "ecc:python-reviewer"],
       "skills": ["ecc:eval-harness", "ecc:ai-regression-testing", "ecc:python-testing"],

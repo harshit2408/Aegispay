@@ -25,13 +25,9 @@ const output = [resp.stdout, resp.stderr, resp.output, input.error].filter(Boole
 // Any reported exit status must be exactly 0. Interrupted or backgrounded runs have no final result yet.
 const exitCode = [resp.exit_code, resp.exitCode, resp.returnCode, resp.code].find((c) => c !== undefined && c !== null);
 const completed = !resp.interrupted && !resp.backgroundTaskId && !resp.backgroundedByUser;
-const passed =
-  event === 'PostToolUse' &&
-  completed &&
-  exitCode !== undefined && Number(exitCode) === 0 &&
-  !FAIL_TEXT.test(output);
-// Publishing a new remote branch is a bigger step than syncing one: only on an explicit exit status of 0.
-const exitedZero = exitCode !== undefined && Number(exitCode) === 0;
+// Every git mutation (pull --rebase, push) needs an explicit exit status of 0; a missing status is unknown, not success.
+const exitedZero = exitCode === 0 || exitCode === '0';
+const passed = event === 'PostToolUse' && completed && exitedZero && !FAIL_TEXT.test(output);
 
 const say = (systemMessage, additionalContext) =>
   emit({ systemMessage, hookSpecificOutput: { hookEventName: event, additionalContext } });
@@ -56,7 +52,7 @@ const branch = tryGit(cwd, 'branch', '--show-current').out || 'HEAD';
 const onTrunk = branch === TRUNK;
 let upstream = tryGit(cwd, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}');
 if (!upstream.ok) {
-  const canPush = exitedZero && !onTrunk && branch !== 'HEAD' && process.env.AEGIS_AUTOPUSH !== '0';
+  const canPush = !onTrunk && branch !== 'HEAD' && process.env.AEGIS_AUTOPUSH !== '0';
   if (!canPush || !tryGit(cwd, 'push', '-u', 'origin', branch).ok) {
     say(
       `team-sync: tests passed; branch "${branch}" has no upstream.`,

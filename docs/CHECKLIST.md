@@ -29,16 +29,16 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
 - [x] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) — PASS, see PRD §18 SPIKE-1 — 1774589
 - [x] **P0-08** @A SPIKE-2 Can Treasury credentials read an invoice addressed to the treasury? — RESULT: 403 on treasury token (inconclusive), vendor-gateway fallback; PRD §18 SPIKE-2 — be2c466
-- [x] **P0-09** @A SPIKE-3 Payout Treasury → supplier: status transitions + webhook latency measured — PASS poll-only (item SUCCESS ~18s); webhook observations now recorded in SPIKE-8 (a3d89ae); PRD §18 SPIKE-3 — be2c466
-- [x] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event — PARTIAL: full payment gives MARKED_AS_PAID, not PAID; Vendor paid event now observed in SPIKE-8 (a3d89ae); PRD §18 SPIKE-4 — be2c466
+- [x] **P0-09** @A SPIKE-3 Payout Treasury → supplier: status transitions + webhook latency measured — PASS (poll item SUCCESS ~18s; webhook item SUCCEEDED ~42.5s after POST in the P0-14 real run, one sample, no faster than polling); PRD §18 SPIKE-3 — be2c466
+- [x] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event — PARTIAL: full payment gives MARKED_AS_PAID, not PAID (PRD §9.2 treats both as paid); Vendor app gets INVOICE.PAID (P0-14); partial-payment event not observed, confirm by GET; PRD §18 SPIKE-4 — be2c466
 - [x] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works — PARTIAL: UNCLAIMED confirmed, cancel fails (500); PRD §18 SPIKE-5 — be2c466
 - [x] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config — PASS: read-only config exposes get_invoice/list_invoices; no list_transactions; PRD §18 SPIKE-6 — be2c466
 - [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15 — technical probe PASS in development evaluation (667760d); see `docs/spikes/SPIKE-7.md` (WIP B) (BLOCKED: account owner must confirm legitimate Studio + AI entitlement through 2026-12-15)
-- [x] **P0-14** @B SPIKE-8 Webhook self-verification for real + simulator events; Dev B takeover authorized 2026-10-25; both sandbox apps registered and verification evidence in `docs/spikes/SPIKE-8.md` — a3d89ae
-- [x] **P0-15** @B SPIKE-9 durable interrupt + hard-exit/restart PASS; third process restores acceptance receipt without another resume; PRD §8/§11.3 consumption contract corrected (product recovery remains P1/P2) — b0dac94
+- [x] **P0-14** @B SPIKE-8 Webhook self-verification for real + simulator events; Dev B takeover authorized 2026-10-25; both sandbox apps registered and verification evidence in `docs/spikes/SPIKE-8.md` — e4612c6
+- [x] **P0-15** @B SPIKE-9 durable interrupt + hard-exit/restart PASS; third process restores acceptance receipt without another resume; PRD §8/§11.3 consumption contract corrected (product recovery remains P1/P2) — b8a0745
 - [x] **P0-16** @B Decide Q3: OpenAI `gpt-6.1-sol` for extraction + reasoning, $1.00 per invoice execution, ≤4 requests including retries; rationale and exact IDs in `docs/TOOLS.md`; runtime enforcement/eval remain application work — 8b6b2c8
 - [x] **P0-17** @AB All eleven PRD §18 spike results and go/no-go decisions recorded; affected webhook/approval/recovery sections reconciled, PR review gaps fixed with offline regressions. PARTIAL/INCONCLUSIVE outcomes retained; P0-04/P0-13 remain external verification work — 5e6d9f5
-- [x] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7; full local stack build/health/HTTP + non-root/secret isolation verified; Linux CI coverage enabled — ae1db36
+- [x] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7; full local stack build/health/HTTP + non-root/secret isolation verified; Linux CI coverage enabled — 048071c
 - [x] **P0-19** @B SPIKE-10 payer-ID source and PAYPAL_ID payout confirmed in the 2026-10-23 sandbox run; only GETs echo receiver/amount. Dev B review adds fail-closed confirmation verdict + 12 offline cases; evidence/limits in `docs/spikes/SPIKE-10.md` — 346bc21
 - [x] **P0-20** @B SPIKE-11 recovery assumption reviewed: recorded EMAIL duplicate POST returns 400 SENDER_BATCH_ID with existing ID; Request-Id not replayed, list/reporting 404/403. Probe now requires strict sandbox link + GET frozen-command match; 25 offline regressions pass. PAYPAL_ID error shape and uniqueness retention remain unconfirmed; see docs/spikes/SPIKE-11.md — 3976d46
 
@@ -47,7 +47,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-23** @B Mirror every project `.claude/` file into `.codex/`, activate native rules/routing/hooks/plugins, configure Obsidian for Claude — 20693c8
 - [x] **P0-24** @B Resolve harness review findings: narrow PreToolUse, strengthen/document secret-path guard, make mirror drift remediation explicit — 7f3e4f3
 
-- [ ] **P0-25** @B Integrate TokenOps run governance boundary for Python agents; enforce invoice cost/call caps and document adoption (WIP B)
+- [x] **P0-25** @B Integrate TokenOps Tier 1 foundation for Python agents: shared invoice cost/call caps, privacy guards and adoption contract; durable restart/resume accounting remains a deployment gate — 07f8d2c
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 

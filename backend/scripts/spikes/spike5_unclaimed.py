@@ -27,7 +27,7 @@ def main() -> int:
             "POST",
             f"/v1/payments/payouts-item/{item_id}/cancel",
             token=token,
-            request_id=f"aegis-spike-s5-{sandbox.run}-cancel",
+            request_id=f"aegis-spike-s5-cancel-{sandbox.run}",
         ),
     )
     _, _, item = sandbox.call("GET", f"/v1/payments/payouts-item/{item_id}", token=token)

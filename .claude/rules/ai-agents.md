@@ -1,5 +1,6 @@
 ---
 paths:
+  - "backend/app/agents/**"
   - "backend/app/decision/**"
   - "backend/app/forensics/**"
   - "backend/app/paypal/toolkit.py"
@@ -19,4 +20,4 @@ paths:
 - A1 mandate fields are all clamped to `ORG_HARD_*`; activation needs a second operator (R13).
 - Eval: ≥ 50 PDFs, held-out split, 5 runs, per-class counts with Wilson intervals (PRD §10.1).
 - Every LLM component has eval cases in `backend/tests/eval/` and results in `docs/EVAL.md` (actuals, not targets).
-- Record provider + exact model IDs in `docs/TOOLS.md`. ≤ 4 LLM calls per invoice; log tokens per execution.
+- Record provider + exact model IDs in `docs/TOOLS.md`. Invoice calls use one shared `app.agents` TokenOps run: $1 total, ≤ 4 provider requests including retries/continuations, no direct provider calls. Inject governed completions into each component; log usage without prompts. See `docs/TOKENOPS.md` for the API and current process-local limits.
