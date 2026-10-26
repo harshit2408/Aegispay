@@ -88,6 +88,7 @@ class Env:
             sm,
             Payouts(paypal_client("TREASURY")),
             VendorReader(Invoicing(paypal_client("VENDOR"))),
+            sleep=_no_sleep,
         )
         router.post(f"{BASE}/v1/oauth2/token").mock(
             return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 3600})
@@ -112,9 +113,10 @@ class Env:
     async def status(self, execution_id="e1"):
         return (await self.rows(InvoiceExecution, execution_id=execution_id))[0].status
 
-    async def sql(self, statement):
+    async def sql(self, statements):
         async with self.sm() as s, s.begin():
-            await s.execute(text(statement))
+            for statement in statements.split(";"):
+                await s.execute(text(statement))
 
 
 @pytest.fixture
@@ -162,6 +164,10 @@ async def test_unknown_execution_raises(env):
         await env.service.execute("nope")
 
 
+# Bypasses the R5/R24 triggers to prove the R20 recheck is still a second line of defence
+BYPASS = "set local session_replication_role = replica; "
+
+
 @pytest.mark.parametrize(
     ("break_it", "reason"),
     [
@@ -170,8 +176,8 @@ async def test_unknown_execution_raises(env):
         ("update vendor_master set paypal_payer_id = 'OTHER99999'", "PAYEE_CHANGED"),
         ("update purchase_orders set version = 2", "PO_CHANGED"),
         ("update settlement_controls set halted = true", "HALTED"),
-        ("update invoice_executions set approved_cents = 49000", "AMOUNT_CHANGED"),
-        ("update invoice_executions set replayed = true", "REPLAYED_EXECUTION"),
+        (BYPASS + "update invoice_executions set approved_cents = 49000", "AMOUNT_CHANGED"),
+        (BYPASS + "update invoice_executions set replayed = true", "REPLAYED_EXECUTION"),
         ("update invoice_executions set grn_id = null", "NO_GRN"),
         ("update invoice_executions set vendor_id = null", "NO_VENDOR"),
     ],
@@ -257,6 +263,49 @@ async def test_post_that_never_answers_goes_to_manual_review_keeping_reservation
     (payout,) = await env.rows(Payout)
     assert payout.payout_batch_id is None
     assert (await env.rows(SettlementOutbox))[0].last_error == "UNRESOLVED:ReadTimeout"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [httpx.Response(500, json={"name": "INTERNAL_SERVER_ERROR"}), httpx.ReadTimeout("t")],
+    ids=["5xx", "transport"],
+)
+async def test_halt_committed_between_payout_attempts_stops_the_retry(env, failure):
+    # Dev B review repro: a retry below the settlement layer re-POSTed after a committed halt.
+    async def halt_during_backoff(_: float) -> None:
+        await env.sql("update settlement_controls set halted = true")
+
+    env.service._sleep = halt_during_backoff
+    env.post.mock(side_effect=[failure, httpx.Response(201, json=created_json())])
+    assert await env.service.execute("e1") == "NEEDS_MANUAL_REVIEW"
+    assert env.post.call_count == 1
+    assert len(await env.rows(SpendLedger)) == 1  # money may have moved: reservation kept
+    assert (await env.rows(SettlementOutbox))[0].last_error == "HALTED"
+
+
+async def test_payout_retry_after_5xx_rechecks_then_posts_with_same_keys(env):
+    env.post.mock(
+        side_effect=[
+            httpx.Response(503, json={"name": "SERVICE_UNAVAILABLE"}),
+            httpx.Response(201, json=created_json()),
+        ]
+    )
+    assert await env.service.execute("e1") == "PAYOUT_SUBMITTED"
+    assert env.post.call_count == 2
+    ids = {c.request.headers["paypal-request-id"] for c in env.post.calls}
+    assert ids == {"aegis-e1-payout"}
+    assert env.invoice.call_count == 2  # the R20 invoice recheck ran again before the retry
+
+
+async def test_payout_retry_after_ttl_does_not_post(env):
+    async def ttl_passes(_: float) -> None:
+        await env.sql("update payouts set created_at = now() - interval '31 minutes'")
+
+    env.service._sleep = ttl_passes
+    env.post.mock(side_effect=httpx.ReadTimeout("t"))
+    assert await env.service.execute("e1") == "NEEDS_MANUAL_REVIEW"
+    assert env.post.call_count == 1
+    assert (await env.rows(SettlementOutbox))[0].last_error == "RECOVERY_TTL_EXPIRED"
 
 
 async def _crash_after_write_ahead(env, age=timedelta(minutes=1)):
