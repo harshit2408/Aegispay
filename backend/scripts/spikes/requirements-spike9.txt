@@ -1,0 +1,6 @@
+# Spike-only. Versions recorded in PRD §18 SPIKE-9 (2026-10-23 run).
+langgraph==1.2.16
+langgraph-checkpoint==4.3.0
+langgraph-checkpoint-postgres==3.2.0
+psycopg[binary,pool]==3.3.6
+psycopg-pool==3.3.3
