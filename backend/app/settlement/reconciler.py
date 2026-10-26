@@ -30,6 +30,7 @@ KEEP_POLLING = frozenset({"PENDING", "ONHOLD"})
 FAILED = frozenset({"FAILED", "RETURNED", "BLOCKED", "DENIED"})
 REVERSED = frozenset({"REFUNDED", "REVERSED"})
 POLLED = ("PAYOUT_SUBMITTED", "PAYOUT_SUCCEEDED")
+RECORDPAY_GRACE = timedelta(minutes=5)  # longer than one record call with its client retries
 
 
 class Reconciler:
@@ -139,14 +140,28 @@ class Reconciler:
         return await self._settle(execution_id)
 
     async def _settle(self, execution_id: str) -> str:
-        """Record the invoice payment once (R7), then SETTLED. Safe to re-enter after a crash."""
+        """Record the invoice payment once (R7), then SETTLED. Safe to re-enter after a crash.
+
+        `payouts.recordpay_sent_at` is committed before the record call, so a re-entry knows
+        whether this execution already tried. The invoice's aggregate paid amount is never taken
+        as proof of this execution's payment: payments recorded before approval count there too.
+        """
         async with self._sm() as s:
             execution = await s.get(InvoiceExecution, execution_id)
             payout = await _payout(s, execution_id)
         invoice_id = execution.paypal_invoice_id
-        invoice = await self._vendor.get_invoice(invoice_id, execution_id=execution_id)
-        already = invoice.is_fully_paid or (invoice.paid_cents or 0) >= execution.approved_cents
-        if not already:
+        if payout.recordpay_sent_at is not None:
+            if self._clock() - payout.recordpay_sent_at < RECORDPAY_GRACE:
+                return execution.status  # another reconcile pass may still be in its call
+            invoice = await self._vendor.get_invoice(invoice_id, execution_id=execution_id)
+            if not invoice.is_fully_paid:  # did our call land? partial payments cannot tell
+                return await self._manual_review(execution_id, "RECORD_PAYMENT_UNCONFIRMED")
+        else:
+            invoice = await self._vendor.get_invoice(invoice_id, execution_id=execution_id)
+            if not invoice.is_open:  # paid or cancelled by someone else after our payout
+                return await self._manual_review(execution_id, "INVOICE_NOT_OPEN_AT_RECORD")
+            if not await self._mark_recordpay_sent(execution_id):
+                return execution.status
             try:
                 await self._vendor.record_payment(
                     invoice_id,
@@ -167,6 +182,16 @@ class Reconciler:
             if execution.route == "SHORT_PAY":
                 execution.short_pay_balance = "NOTICE_SENT"
         return "SETTLED"
+
+    async def _mark_recordpay_sent(self, execution_id: str) -> bool:
+        """Write-ahead for record-payment (R7). False if another pass claimed it first."""
+        async with self._sm() as s, s.begin():
+            execution = await _lock(s, execution_id)
+            payout = await _payout(s, execution_id)
+            if execution.status != "PAYOUT_SUCCEEDED" or payout.recordpay_sent_at is not None:
+                return False
+            payout.recordpay_sent_at = self._clock()
+            return True
 
     async def _manual_review(self, execution_id: str, reason: str, *, halt: bool = False) -> str:
         """Reservation is kept: money may have moved (R6, R8)."""

@@ -618,6 +618,7 @@ CREATE TABLE payouts (                    -- inserted BEFORE the POST (R19)
     batch_status      TEXT,
     item_status       TEXT,
     last_polled_at    TIMESTAMPTZ,
+    recordpay_sent_at TIMESTAMPTZ,           -- committed before the R7 record-payment POST
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
