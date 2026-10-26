@@ -1,7 +1,8 @@
 """SPIKE-10 (PRD §18): read the supplier's payer ID, pay 1.00 USD by recipient_type=PAYPAL_ID, and record
 whether the create response and the GET batch/item responses echo receiver + amount.
 Payer ID source, first that works: vendor token userinfo (payer_id), vendor-created order payee.merchant_id,
-VENDOR_PAYER_ID in .env (dashboard). Pass: item SUCCESS. Sends a real sandbox payout of 1.00 USD.
+VENDOR_PAYER_ID in .env (dashboard). Pass: confirmed SUCCESS with matching receiver/type/amount.
+Sends a real sandbox payout of 1.00 USD.
 Run: python spike10_payer_id.py"""
 
 import json
@@ -64,7 +65,7 @@ def read_payer_id(sandbox):
 
 
 def echo(label, item, payer_id):
-    """Print which receiver/amount fields a response item carries and whether they match the command."""
+    """Print the response fields and return whether all three match the command."""
     fields = {k: item.get(k) for k in ("recipient_type", "receiver", "amount")}
     print(f"  {label} item fields: {json.dumps(fields)}")
     print(
@@ -72,6 +73,11 @@ def echo(label, item, payer_id):
         f" | amount == {SPIKE_AMOUNT} USD:"
         f" {item.get('amount') == {'value': SPIKE_AMOUNT, 'currency': 'USD'}}"
     )
+    return fields == {
+        "recipient_type": "PAYPAL_ID",
+        "receiver": payer_id,
+        "amount": {"value": SPIKE_AMOUNT, "currency": "USD"},
+    }
 
 
 def main() -> int:
@@ -104,17 +110,30 @@ def main() -> int:
     echo("create", (resp.get("items") or [{}])[0].get("payout_item", {}), payer_id)
     batch_id = resp["batch_header"]["payout_batch_id"]
     item_id, last = sandbox.poll_payout(token, batch_id, TERMINAL_ITEM)
-    _, _, batch = sandbox.call("GET", f"/v1/payments/payouts/{batch_id}", token=token)
+    batch_status, _, batch = sandbox.call("GET", f"/v1/payments/payouts/{batch_id}", token=token)
     batch_item = (batch.get("items") or [{}])[0]
     print("  GET batch item keys:", sorted(batch_item))
-    echo("GET batch", batch_item.get("payout_item", {}), payer_id)
+    batch_matches = echo("GET batch", batch_item.get("payout_item", {}), payer_id)
+    item_ok = False
     if item_id:
-        _, _, item = sandbox.call("GET", f"/v1/payments/payouts-item/{item_id}", token=token)
-        echo("GET item", item.get("payout_item", {}), payer_id)
+        item_status, _, item = sandbox.call(
+            "GET", f"/v1/payments/payouts-item/{item_id}", token=token
+        )
+        item_matches = echo("GET item", item.get("payout_item", {}), payer_id)
+        item_ok = (
+            item_status == 200 and item.get("transaction_status") == "SUCCESS" and item_matches
+        )
         print("  GET item payout_item_fee:", item.get("payout_item_fee"))
     else:
         print("  no payout_item_id seen while polling; GET item skipped")
-    ok = last is not None and last[1] == "SUCCESS"
+    ok = (
+        last is not None
+        and last[1] == "SUCCESS"
+        and batch_status == 200
+        and batch_item.get("transaction_status") == "SUCCESS"
+        and batch_matches
+        and item_ok
+    )
     print("SPIKE-10", "PASS" if ok else "FAIL", "| final (batch, item):", last)
     return 0 if ok else 1
 
