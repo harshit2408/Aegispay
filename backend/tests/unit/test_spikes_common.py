@@ -122,3 +122,37 @@ def test_call_returns_redirect_as_error_instead_of_following(monkeypatch):
     status, _, _ = sandbox.call("POST", "/v1/oauth2/token", basic="id:secret", form="x")
     assert status == 302
     assert seen == ["https://api-m.sandbox.paypal.com/v1/oauth2/token"]
+
+
+@pytest.mark.parametrize(
+    "params,environ",
+    [
+        ({"host": "localhost", "dbname": "aegis"}, {}),
+        ({"host": "127.0.0.1", "hostaddr": "127.0.0.1"}, {}),
+        ({"host": "::1"}, {"PGHOSTADDR": "::1"}),
+        ({}, {"PGHOST": "localhost"}),
+    ],
+)
+def test_pg_guard_accepts_loopback_only_targets(params, environ):
+    assert common.nonlocal_pg_target(params, environ) is None
+
+
+@pytest.mark.parametrize(
+    "params,environ",
+    [
+        ({"host": "db.example.com"}, {}),
+        (
+            {"host": "localhost", "hostaddr": "203.0.113.42", "dbname": "review"},
+            {},
+        ),  # libpq uses hostaddr
+        ({"host": "localhost"}, {"PGHOSTADDR": "203.0.113.42"}),
+        ({}, {"PGHOST": "db.example.com"}),
+        ({"host": "localhost,db.example.com"}, {}),
+        ({"host": "localhost", "hostaddr": "127.0.0.1,203.0.113.42"}, {}),
+        ({"host": "localhost", "service": "prod"}, {}),
+        ({"host": "localhost"}, {"PGSERVICE": "prod"}),
+        ({}, {}),  # no host: unix socket default, not the compose service
+    ],
+)
+def test_pg_guard_rejects_any_non_loopback_target(params, environ):
+    assert common.nonlocal_pg_target(params, environ)
