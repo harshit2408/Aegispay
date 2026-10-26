@@ -161,6 +161,7 @@ class SpendLedger(Base):
         CheckConstraint("amount_cents > 0", name="ck_spend_amount"),
         CheckConstraint("(kind = 'RELEASE') = (reserve_entry_id IS NOT NULL)", name="ck_spend_ref"),
         Index("ix_spend_policy_date", "policy_id", "business_date"),
+        UniqueConstraint("reserve_entry_id", name="uq_spend_one_release_per_reserve"),
     )
 
     entry_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -182,6 +183,7 @@ class POLedger(Base):
         CheckConstraint(_in("kind", ("RESERVE", "RELEASE")), name="ck_poled_kind"),
         CheckConstraint("qty >= 0", name="ck_poled_qty"),
         CheckConstraint("amount_cents > 0", name="ck_poled_amount"),
+        UniqueConstraint("reserve_entry_id", name="uq_poled_one_release_per_reserve"),
     )
 
     entry_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)

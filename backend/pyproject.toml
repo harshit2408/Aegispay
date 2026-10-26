@@ -13,6 +13,8 @@ dependencies = [
     "pydantic-settings",
     "sqlalchemy[asyncio]>=2.0",
     "asyncpg",
+    "alembic",
+    "tzdata",
     "agent-tokenops==2.0.1",
     "agent-chronicle==1.1.1",
     "python-dotenv>=1.2",
