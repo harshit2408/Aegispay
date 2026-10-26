@@ -74,3 +74,31 @@ test('publishes a new feature branch only after an explicit exit status of 0', (
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('does not pull or push an existing-upstream branch without an explicit exit status', () => {
+  const { root, remote, work } = scratchRepo();
+  try {
+    git(work, 'push', '-q', '-u', 'origin', 'a/P0-99-feature');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
+    git(work, 'add', '.');
+    git(work, 'commit', '-qm', 'local work');
+    runHook(work, { hook_event_name: 'PostToolUse', tool_response: { stdout: '3 passed' } });
+    assert.notEqual(git(remote, 'rev-parse', 'a/P0-99-feature'), git(work, 'rev-parse', 'HEAD'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('pushes an existing-upstream branch on an explicit exit status of 0', () => {
+  const { root, remote, work } = scratchRepo();
+  try {
+    git(work, 'push', '-q', '-u', 'origin', 'a/P0-99-feature');
+    writeFileSync(join(work, 'b.txt'), 'b\n');
+    git(work, 'add', '.');
+    git(work, 'commit', '-qm', 'local work');
+    runHook(work, { hook_event_name: 'PostToolUse', tool_response: { exit_code: 0, stdout: '3 passed' } });
+    assert.equal(git(remote, 'rev-parse', 'a/P0-99-feature'), git(work, 'rev-parse', 'HEAD'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
