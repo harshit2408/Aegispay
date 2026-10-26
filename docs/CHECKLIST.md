@@ -40,12 +40,14 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P0-17** @AB Record every spike result in PRD §18 "Result" column; update affected PRD sections — SPIKE-1..6 probes in PR #1, SPIKE-10/11 in PR #2, SPIKE-9 in PR #3; SPIKE-7 (B) and SPIKE-8 (P0-14) pending (WIP B)
 - [ ] **P0-18** @B `docker-compose.yml` (postgres + api + frontend) and `.env.example` per PRD §7 (WIP B)
 - [x] **P0-19** @B SPIKE-10 payer-ID source and PAYPAL_ID payout confirmed in the 2026-10-23 sandbox run; only GETs echo receiver/amount. Dev B review adds fail-closed confirmation verdict + 12 offline cases; evidence/limits in `docs/spikes/SPIKE-10.md` — 346bc21
-- [ ] **P0-20** @B SPIKE-11 crash recovery: find a batch by `sender_batch_id`; error body on a re-POST of a used `sender_batch_id` (PRD §18, R19) — PASS via 400 `SENDER_BATCH_ID` error body (batch id in `details[].link`); Request-Id not replayed; lookups 404/403; PR #2 (needs B review) (WIP B)
+- [x] **P0-20** @B SPIKE-11 recovery assumption reviewed: recorded EMAIL duplicate POST returns 400 SENDER_BATCH_ID with existing ID; Request-Id not replayed, list/reporting 404/403. Probe now requires strict sandbox link + GET frozen-command match; 25 offline regressions pass. PAYPAL_ID error shape and uniqueness retention remain unconfirmed; see docs/spikes/SPIKE-11.md — 3976d46
 
 - [x] **P0-21** @B Codex harness for Dev B: shared context/rules/memory, native configuration and standup/handoff workflows — 4b71712
 - [x] **P0-22** @B Port all `.claude/agents/` and `.claude/skills/` definitions to native Codex agents and skills, preserving complete instructions — b0901d8
 - [x] **P0-23** @B Mirror every project `.claude/` file into `.codex/`, activate native rules/routing/hooks/plugins, configure Obsidian for Claude — 20693c8
 - [x] **P0-24** @B Resolve harness review findings: narrow PreToolUse, strengthen/document secret-path guard, make mirror drift remediation explicit — 7f3e4f3
+
+- [ ] **P0-25** @B Integrate TokenOps run governance boundary for Python agents; enforce invoice cost/call caps and document adoption (WIP B)
 
 ## P1 — Foundations (Oct 23–27) · exit: **headless S1** (CLI upload → real sandbox payout → invoice `PAID`)
 
