@@ -86,6 +86,19 @@ curl http://localhost:8000/api/health
 - PayPal sandbox setup (two Business accounts, two REST apps, webhooks) is documented step by step in [docs/SANDBOX_SETUP.md](docs/SANDBOX_SETUP.md). Put sandbox credentials only in your local `.env`.
 - `.env`, keys, sandbox credentials and the AG Studio licence key are never committed. CI runs gitleaks.
 
+Compose binds to loopback. If a host service already uses a default port, set `POSTGRES_PORT`,
+`API_PORT` or `FRONTEND_PORT` in your shell. When changing the API port, set
+`NEXT_PUBLIC_API_URL` to its browser URL before rebuilding the frontend. Validate the safe
+template with `docker compose --env-file .env.example --profile frontend config --quiet`.
+The optional frontend profile requires the actual P0-13 scaffold and its Dockerfile.
+
+The API receives an explicit PRD §7 environment allowlist; Treasury credentials and audit keys
+are excluded. The current backend reads only its skeleton settings; later features add the
+remaining configuration validation. The local database still uses one development owner.
+Separate DB roles/grants (P1-19), the settlement worker and boot environment assertions
+(P1-24), and the isolated parser (P3-14) remain scheduled work. Settlement entries in the
+template do not create a worker or a database role. Never expose this local stack as a hosted deployment.
+
 ## Team workflow
 
 Two developers. Dev A owns backend, PayPal, settlement and agents. Dev B owns frontend, AG Studio, data, CI and deploy. Ownership and the A↔B interface contract are in [docs/PLAN.md](docs/PLAN.md).

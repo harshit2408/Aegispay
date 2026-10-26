@@ -17,6 +17,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "cryptography>=45",
+    "hypothesis>=6",
     "pytest",
     "pytest-asyncio",
     "httpx",

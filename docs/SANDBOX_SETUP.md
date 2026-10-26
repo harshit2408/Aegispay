@@ -18,7 +18,7 @@ Create them in the PayPal Developer Dashboard (sandbox). Tick each box when done
 - [x] REST app `aegispay-treasury` created under account A → `TREASURY_CLIENT_ID`, `TREASURY_CLIENT_SECRET`
 - [x] REST app `aegispay-vendor-sim` created under account B → `VENDOR_CLIENT_ID`, `VENDOR_CLIENT_SECRET`
 - [x] Enable Payouts on the treasury app; Invoicing on the vendor app (confirm in dashboard; record result in PRD §18 SPIKE-1/3) — verified by SPIKE-1/3, not before
-- [ ] Webhooks per app (P0-14 / SPIKE-8) → `TREASURY_WEBHOOK_ID`, `VENDOR_WEBHOOK_ID` — DEFERRED to P0-14 (needs public HTTPS host, P0-04)
+- [x] Webhooks per app (P0-14 / SPIKE-8) → `TREASURY_WEBHOOK_ID`, `VENDOR_WEBHOOK_ID` — registered and saved locally 2026-10-25; both real/simulator signatures and signing-certificate chains verified. Temporary HTTPS tunnel; retarget existing subscriptions when the tunnel changes or Render is ready. See [evidence](spikes/SPIKE-8.md).
 - [x] Put all values in local `.env` only (git-ignored). `PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com`
 
 Dashboard click-paths and permission names are not recorded here until confirmed by a spike. Do not fill them in from memory.
