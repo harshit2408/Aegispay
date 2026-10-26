@@ -27,4 +27,6 @@ This resolves the former contradiction where the router consumed a row before th
 
 The spike entry-point tests reject explicit nonlocal `hostaddr`, `PGHOST`, `PGHOSTADDR`, service-file overrides and mixed host lists before a database connection. Invalid synthetic resume payloads fail before the acceptance effect; a valid payload returns a receipt. These checks do not implement real approval lookup or authentication.
 
+The probe's receipt is a minimal `{approval_id: execution_id}` marker; product code must store the full §11.1 binding (execution id, original checkpoint id, interrupt id, gate hash), not copy the spike shape. A committed approval that the node rejects is voided by the dispatcher (§11.3); whether the thread then accepts a new `Command` at the same interrupt is not yet probed.
+
 Not proved here: a Render restart, concurrent product dispatch, lock-loss fencing, approval database validation, every app/saver commit gap, dual-human authorization or payment idempotency. Those remain P1/P2 implementation and §17 acceptance tests. The existing four Postgres 16 runs remain historical evidence in PRD §18; this independent run adds a third-process receipt check on Postgres 18.
