@@ -6,7 +6,7 @@ Q4: use the official AG Studio dark theme as the base and share its tokens with 
 
 Q2: the PRD decided the rule on October 22: HIGH_RISK cases require two distinct eligible humans, neither the uploader. The mocked case view demonstrates this locally; authentication and the production policy gate remain later tasks. Recording the existing decision does not permit bypassing those services.
 
-P1-16 remains pending because the owner confirmed the conversations have not occurred. USER_RESEARCH.md is an interview guide, not findings.
+P1-16 uses the owner-authorized October 27 substitution: three cited public AP/finance case profiles with evidence/inference mapping and source limitations in USER_RESEARCH.md. No firsthand interviews, AegisPay usability results or endorsement are claimed; those remain deferred. The revised task is assessed against the documented secondary-research scope, not the replaced interview requirement.
 
 P1-12 requires real evidence of CLI upload through sandbox settlement. Local tests, seeder manifests, direct settlement fixtures and HTTP 501 case contracts do not satisfy that exit. Independent source reviews on October 27 confirmed that the mounted app has no authenticated document-upload route, case routes return HTTP 501, and the parser, extraction/forensics, matching, risk, policy gate, graph and approval-to-outbox path are absent. The seeder creates trusted records and invoices; it does not implement that pipeline. A test-only approved execution or a hardcoded CLEAN classification would bypass R3/R11/R14/R22 rather than prove S1.
 

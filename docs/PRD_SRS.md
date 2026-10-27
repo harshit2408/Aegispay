@@ -73,7 +73,7 @@ What this does **not** claim: protection against a compromised operator pair, da
 ### 1.3 Target users
 - **Primary — Finance controller at a 20–200 person hardware SMB.** Seeded example: a robotics hardware company buying components from dozens of long-tail suppliers, many of them small businesses that bill through **PayPal Invoicing**. AP is 1–2 people.
 - **Secondary — The supplier.** A small business on PayPal Invoicing that wants fast payment and a clear explanation when paid short.
-- **Validation task (P0, by 2026-10-27):** three 15-minute conversations with people who run AP or finance at SMBs. Record findings in `docs/USER_RESEARCH.md`; use one real quote (with permission) in the video.
+- **Validation task (P1-16; owner scope revision 2026-10-27):** substitute three cited, publicly published AP/finance case profiles for the originally planned three 15-minute conversations. Record source evidence separately from AegisPay inferences and disclose commercial selection bias in `docs/USER_RESEARCH.md`. No firsthand customer validation is claimed: interviews, AegisPay usability testing and permissioned participant quotes are deferred. The video may use clearly attributed public evidence without implying participant feedback or endorsement of AegisPay.
 
 ### 1.4 User stories and acceptance criteria
 
@@ -131,7 +131,7 @@ Live (non-sandbox) PayPal (boot refuses live credentials while `DEMO_ENABLED` or
 |---|---|
 | Technological Implementation | Real sandbox payouts and invoice reconciliation across two PayPal apps; verified webhooks; Agent Toolkit read tools inside a LangGraph agent; deterministic settlement; published test and eval results |
 | Design | One coherent loop: Inbox → Case → Decision → Settlement receipt; supplier-side view; AG Studio cockpit with custom widgets and a consistent theme |
-| Potential Impact | Named persona + real quotes; IC3 statistic; duplicate, short-pay and BEC handled; honest savings math |
+| Potential Impact | Named persona + attributed public AP/finance evidence (P1-16 secondary research; no firsthand validation or endorsement claim); IC3 statistic; duplicate, short-pay and BEC handled; honest savings assumptions |
 | Innovation | Injection-aware agent payments with an architectural payee lock; NL mandate → versioned guardrails; (P1) agent-to-agent short-pay remedy negotiation |
 | Presentation | Storyboarded video (§20) with live sandbox evidence and a "kill-switch" proof that the payee lock does not depend on the detector (it does not claim the detector is unnecessary) |
 

@@ -83,3 +83,7 @@ User authorized Dev B and task-specific subagents to finish all remaining P0 wor
 ## P1 completion delegation — 2026-10-27
 
 The user authorized Dev B to finish every locally achievable P1 task before the account usage window ends, batching implementation and final validation while minimizing Git calls. Dev B temporarily owns the unclaimed P1-12/P1-21/P1-22/P1-23 settlement and exit work in addition to the remaining B items. Existing P1-11 work and review gates are preserved. Real AP/finance interviews, live sandbox evidence and hosted account setup are completed only when actual evidence exists; no research or deployment success is inferred from mocks. R1–R4 changes still require the other developer to review before merge.
+
+## P1-16 research scope revision — 2026-10-27
+
+The owner explicitly substituted internet research because direct AP/finance interviews are not feasible now. P1-16 accepts three cited published AP/finance customer case profiles, a clear separation of source evidence from product inference, and limitations with an access date. PRD §1.3/§2.4 and USER_RESEARCH.md record this revision. Firsthand interviews, usability testing and permissioned participant quotes remain deferred; commercial case studies do not prove demand for AegisPay, willingness to delegate payments or an endorsement. This replaces only the P1-16 interview acceptance requirement; live S1, hosted deployment and money review gates are unchanged.
