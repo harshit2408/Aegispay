@@ -225,7 +225,7 @@ async def test_401_after_two_5xx_still_refreshes_and_succeeds():
 
 
 @respx.mock
-async def test_post_without_retry_sends_once_but_still_refreshes_a_401():
+async def test_post_without_retry_refreshes_401_but_returns_control_before_second_post():
     token_route(respx.mock)
     route = respx.post(f"{BASE}/v1/y").mock(
         side_effect=[httpx.Response(401), httpx.Response(500, json={"name": "X"})]
@@ -233,5 +233,20 @@ async def test_post_without_retry_sends_once_but_still_refreshes_a_401():
     async with make_client() as c:
         with pytest.raises(PayPalError) as exc:
             await c.post("/v1/y", request_id="r", json={}, retry=False)
-    assert exc.value.status == 500
-    assert route.call_count == 2  # the 401 was rejected unprocessed; the 500 is not retried
+    assert exc.value.status == 401
+    assert route.call_count == 1  # settlement must recheck before any second POST
+
+
+@respx.mock
+async def test_before_send_checks_after_token_acquisition_and_can_refuse_the_post():
+    token = token_route(respx.mock)
+    payout = respx.post(f"{BASE}/v1/y")
+
+    async def halted():
+        assert token.call_count == 1
+        raise ValueError("halted")
+
+    async with make_client() as client:
+        with pytest.raises(ValueError, match="halted"):
+            await client.post("/v1/y", request_id="r", retry=False, before_send=halted)
+    assert payout.call_count == 0

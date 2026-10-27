@@ -224,6 +224,7 @@ async def test_a_success_webhook_is_only_a_hint_the_get_decides(hook):
     item = {
         "payout_item_id": "ITEM1",
         "transaction_status": "PENDING",
+        "payout_batch_id": "BATCH1",
         "payout_item": {
             "recipient_type": "PAYPAL_ID",
             "receiver": PAYER_ID,

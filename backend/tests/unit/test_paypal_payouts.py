@@ -240,6 +240,17 @@ async def test_get_item_and_batch_parse_status_and_cents(payouts):
     assert item.matches(cmd())
 
 
+async def test_batch_get_must_echo_the_requested_batch_id(payouts):
+    p, router = payouts
+    body = batch_body()
+    body["batch_header"]["payout_batch_id"] = "OTHERBATCH"
+    router.get(f"{BASE}/v1/payments/payouts/{BATCH}").mock(
+        return_value=httpx.Response(200, json=body)
+    )
+    with pytest.raises(PayoutMismatch):
+        await p.get_batch(BATCH)
+
+
 async def test_unparseable_amount_in_get_is_a_mismatch_not_a_crash(payouts):
     p, router = payouts
     router.get(f"{BASE}/v1/payments/payouts/{BATCH}").mock(

@@ -5,6 +5,7 @@ payee from anywhere but a `PayoutCommand`, which settlement builds from the froz
 """
 
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from app.paypal.client import PayPalClient, PayPalError
@@ -133,6 +134,8 @@ def _check_id(value: str) -> str:
 
 
 def _parse_item(raw: dict, payout_batch_id: str | None) -> PayoutItem:
+    if not isinstance(raw, dict):
+        raise PayoutUnresolved("payout item is not an object")
     detail = raw.get("payout_item")
     detail = detail if isinstance(detail, dict) else {}
     amount = detail.get("amount")
@@ -158,6 +161,8 @@ def _parse_batch(body: dict) -> PayoutBatch:
     if not isinstance(header, dict) or not isinstance(header.get("payout_batch_id"), str):
         raise PayoutUnresolved("payout response has no batch_header.payout_batch_id")
     batch_id = header["payout_batch_id"]
+    if not _PAYPAL_ID.fullmatch(batch_id):
+        raise PayoutUnresolved("payout response has an invalid batch id")
     sender = header.get("sender_batch_header")
     raw_items = body.get("items")
     items = tuple(
@@ -192,7 +197,9 @@ class Payouts:
     def __init__(self, client: PayPalClient) -> None:
         self._client = client
 
-    async def create_or_adopt(self, cmd: PayoutCommand) -> PayoutRef:
+    async def create_or_adopt(
+        self, cmd: PayoutCommand, *, before_send: Callable[[], Awaitable[None]] | None = None
+    ) -> PayoutRef:
         """POST the batch once. On a duplicate sender_batch_id, adopt the batch iff it matches.
 
         Never retried here: each re-POST must first pass the halt and R20 rechecks (R19), which only
@@ -204,6 +211,7 @@ class Payouts:
                 json=cmd.body(),
                 execution_id=cmd.execution_id,
                 retry=False,  # settlement retries, after halt + R20 rechecks (R19)
+                before_send=before_send,
             )
         except PayPalError as err:
             if err.status == 400 and err.body.get("name") == "USER_BUSINESS_ERROR":
@@ -227,7 +235,10 @@ class Payouts:
         resp = await self._client.get(
             f"/v1/payments/payouts/{_check_id(payout_batch_id)}", execution_id=execution_id
         )
-        return _parse_batch(resp.body)
+        batch = _parse_batch(resp.body)
+        if batch.payout_batch_id != payout_batch_id:
+            raise PayoutMismatch("GET returned a different payout batch", payout_batch_id)
+        return batch
 
     async def get_item(self, payout_item_id: str, *, execution_id: str | None = None) -> PayoutItem:
         resp = await self._client.get(

@@ -256,3 +256,7 @@ Thumbs.db
 
 # Caveman compress backups
 *.original.md
+
+# Local demo manifests and private operator seed input
+.demo-runs/
+operator-seed*.json

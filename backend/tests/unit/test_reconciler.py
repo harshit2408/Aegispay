@@ -9,9 +9,11 @@ import pytest
 import respx
 from sqlalchemy import select, text
 
+from app.models.core import PurchaseOrder
 from app.models.payables import (
     InvoiceExecution,
     Payout,
+    POLedger,
     SettlementControl,
     SettlementOutbox,
     SpendLedger,
@@ -19,7 +21,7 @@ from app.models.payables import (
 from app.paypal.client import PayPalClient
 from app.paypal.invoicing import Invoicing
 from app.paypal.payouts import Payouts
-from app.settlement import spend_ledger
+from app.settlement import po_ledger, spend_ledger
 from app.settlement.reconciler import Reconciler, run_forever
 from app.vendor_sim.gateway import VendorGateway
 from tests.seed import PAYER_ID, POLICY_ID, seed_approved, seed_world
@@ -126,6 +128,7 @@ async def _seed_submitted(sm, status="PAYOUT_SUBMITTED"):
             amount_cents=48000,
             now=NOW,
         )
+        await po_ledger.reserve(s, execution_id="e1", po_id="PO-1042", amount_cents=48000)
         # submitted at NOW, so the fake clock and the poll window line up
         await s.execute(text("update invoice_executions set updated_at = :ts").bindparams(ts=NOW))
 
@@ -148,6 +151,9 @@ async def test_success_records_payment_once_and_settles(env):
     assert body["payment_date"] == "2026-11-05"
     assert (await env.execution()).status == "SETTLED"
     assert await env.committed() == 48000  # paid money stays counted against the cap
+    async with env.sm() as s:
+        assert (await s.get(PurchaseOrder, "PO-1042")).status == "CLOSED"
+        assert await po_ledger.committed_cents(s, "PO-1042") == 48000
 
 
 async def test_settled_execution_is_not_recorded_twice(env):
@@ -269,6 +275,7 @@ async def test_non_payment_releases_on_the_reserve_date(env, status):
     entries = await env.rows(SpendLedger)
     assert sorted(e.kind for e in entries) == ["RELEASE", "RESERVE"]
     assert len({e.business_date for e in entries}) == 1
+    assert sorted(e.kind for e in await env.rows(POLedger)) == ["RELEASE", "RESERVE"]
     assert env.record.call_count == 0
 
 
@@ -297,6 +304,16 @@ async def test_item_that_differs_from_the_command_halts(env, bad):
     assert await env.rec.reconcile("e1") == "NEEDS_MANUAL_REVIEW"
     (control,) = await env.rows(SettlementControl)
     assert control.halted is True
+    assert env.record.call_count == 0
+    assert await env.committed() == 48000
+
+
+@pytest.mark.parametrize("field", ["payout_batch_id", "payout_item_id"])
+async def test_item_response_must_be_the_requested_item_in_our_batch(env, field):
+    item = item_json("SUCCESS")
+    item[field] = "OTHER123"
+    env.item.mock(return_value=httpx.Response(200, json=item))
+    assert await env.rec.reconcile("e1") == "NEEDS_MANUAL_REVIEW"
     assert env.record.call_count == 0
     assert await env.committed() == 48000
 

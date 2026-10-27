@@ -78,6 +78,20 @@ async def test_gives_up_after_max_attempts(sm):
         assert nxt.execution_id == "e1"  # the exhausted command is skipped, not retried
     row = await outbox(sm, "e0")
     assert (row.status, row.last_error) == ("FAILED", "MAX_ATTEMPTS")
+    async with sm() as s:
+        assert (await s.get(InvoiceExecution, "e0")).status == "FROZEN"
+
+
+@pytest.mark.parametrize("expired_at", [NOW, None])
+async def test_lease_boundary_or_missing_lease_is_reclaimable(sm, expired_at):
+    async with sm() as s, s.begin():
+        await s.execute(
+            update(SettlementOutbox)
+            .where(SettlementOutbox.execution_id == "e0")
+            .values(status="CLAIMED", claimed_until=expired_at)
+        )
+    async with sm() as s, s.begin():
+        assert (await claim_next(s, NOW)).execution_id == "e0"
 
 
 async def test_tick_executes_the_claimed_command(sm):

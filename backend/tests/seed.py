@@ -24,6 +24,9 @@ async def seed_world(session: AsyncSession, *, daily_cap_cents: int = 500_000) -
             ),
             Operator(operator_id="op-cfo", display_name="CFO", role="cfo", password_hash="x"),
             Operator(operator_id="op-adm", display_name="Admin", role="admin", password_hash="x"),
+            Operator(
+                operator_id="op-rcv", display_name="Receiver", role="receiver", password_hash="x"
+            ),
         ]
     )
     await session.flush()
@@ -106,7 +109,7 @@ async def seed_approved(
                 received_qty=100,
                 accepted_qty=100,
                 rejected_qty=0,
-                recorded_by="op-ctl",
+                recorded_by="op-rcv",
                 source="SEEDED",
                 received_at=datetime(2026, 1, 1, tzinfo=UTC),
             )
