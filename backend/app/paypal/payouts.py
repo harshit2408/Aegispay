@@ -193,13 +193,17 @@ class Payouts:
         self._client = client
 
     async def create_or_adopt(self, cmd: PayoutCommand) -> PayoutRef:
-        """POST the batch; on a duplicate sender_batch_id adopt the existing one iff it matches."""
+        """POST the batch once. On a duplicate sender_batch_id, adopt the batch iff it matches.
+
+        Never retried here: each re-POST must first pass the halt and R20 rechecks (R19), which only
+        settlement can run."""
         try:
             resp = await self._client.post(
                 "/v1/payments/payouts",
                 request_id=cmd.request_id,
                 json=cmd.body(),
                 execution_id=cmd.execution_id,
+                retry=False,  # settlement retries, after halt + R20 rechecks (R19)
             )
         except PayPalError as err:
             if err.status == 400 and err.body.get("name") == "USER_BUSINESS_ERROR":

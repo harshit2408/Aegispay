@@ -250,6 +250,7 @@ class Payout(Base):
     batch_status: Mapped[str | None] = mapped_column(Text)
     item_status: Mapped[str | None] = mapped_column(Text)
     last_polled_at: Mapped[datetime | None] = mapped_column(TS)
+    recordpay_sent_at: Mapped[datetime | None] = mapped_column(TS)  # R7 write-ahead
     created_at: Mapped[datetime] = mapped_column(TS, server_default=NOW)
 
 

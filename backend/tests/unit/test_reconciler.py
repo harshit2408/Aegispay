@@ -164,12 +164,59 @@ async def test_short_pay_route_marks_notice_sent(env):
     assert (await env.execution()).short_pay_balance == "NOTICE_SENT"
 
 
-async def test_crash_after_succeeded_with_invoice_already_paid_skips_the_record_call(env):
+async def _crash_after_record_call(env, sent_at=NOW - timedelta(minutes=10)):
     await env.sql("update invoice_executions set status = 'PAYOUT_SUCCEEDED'")
+    async with env.sm() as s, s.begin():
+        await s.execute(text("update payouts set recordpay_sent_at = :ts").bindparams(ts=sent_at))
+
+
+async def test_crash_after_record_call_with_invoice_paid_settles_without_a_second_call(env):
+    await _crash_after_record_call(env)
     paid = invoice_json("MARKED_AS_PAID", "480.00")
     env.invoice.mock(return_value=httpx.Response(200, json=paid))
     assert await env.rec.reconcile("e1") == "SETTLED"
     assert env.record.call_count == 0
+
+
+async def test_crash_after_record_call_on_a_partly_paid_invoice_is_manual_review(env):
+    # 1,000.00 invoice, 500.00 paid before approval: still PARTIALLY_PAID whether or not our
+    # 480.00 landed, so neither re-recording nor settling is safe (R7).
+    await _crash_after_record_call(env)
+    partly = invoice_json("PARTIALLY_PAID", "500.00") | {
+        "amount": {"currency_code": "USD", "value": "1000.00"}
+    }
+    env.invoice.mock(return_value=httpx.Response(200, json=partly))
+    assert await env.rec.reconcile("e1") == "NEEDS_MANUAL_REVIEW"
+    assert env.record.call_count == 0
+    assert (await env.rows(SettlementOutbox))[0].last_error == "RECORD_PAYMENT_UNCONFIRMED"
+    assert await env.committed() == 48000
+
+
+async def test_record_call_in_flight_elsewhere_is_left_alone(env):
+    await _crash_after_record_call(env, sent_at=NOW - timedelta(seconds=30))
+    assert await env.rec.reconcile("e1") == "PAYOUT_SUCCEEDED"
+    assert env.record.call_count == 0 and env.invoice.call_count == 0
+
+
+async def test_prior_partial_payment_does_not_skip_this_executions_record(env):
+    # Reviewer repro: 1,000.00 invoice, 500.00 paid before approval, our 480.00 payout succeeds.
+    partly = invoice_json("PARTIALLY_PAID", "500.00") | {
+        "amount": {"currency_code": "USD", "value": "1000.00"}
+    }
+    env.invoice.mock(return_value=httpx.Response(200, json=partly))
+    env.set_item("SUCCESS")
+    assert await env.rec.reconcile("e1") == "SETTLED"
+    assert env.record.call_count == 1
+    body = json.loads(env.record.calls[0].request.content)
+    assert body["amount"] == {"currency_code": "USD", "value": "480.00"}
+
+
+async def test_invoice_paid_elsewhere_before_record_is_manual_review(env):
+    env.invoice.mock(return_value=httpx.Response(200, json=invoice_json("PAID", "480.00")))
+    env.set_item("SUCCESS")
+    assert await env.rec.reconcile("e1") == "NEEDS_MANUAL_REVIEW"
+    assert env.record.call_count == 0
+    assert (await env.rows(SettlementOutbox))[0].last_error == "INVOICE_NOT_OPEN_AT_RECORD"
 
 
 async def test_crash_after_succeeded_with_unpaid_invoice_records_then_settles(env):
@@ -184,6 +231,8 @@ async def test_record_payment_failure_is_manual_review_not_payout_failure(env):
     assert await env.rec.reconcile("e1") == "NEEDS_MANUAL_REVIEW"
     assert await env.committed() == 48000
     assert (await env.rows(SettlementOutbox))[0].last_error == "RECORD_PAYMENT_FAILED"
+    (payout,) = await env.rows(Payout)
+    assert payout.recordpay_sent_at is not None  # never re-sent automatically
 
 
 @pytest.mark.parametrize("status", ["PENDING", "ONHOLD"])

@@ -11,8 +11,9 @@ No DB lock is held across an HTTP call. Any unresolved outcome after the write-a
 to NEEDS_MANUAL_REVIEW with the spend reservation KEPT, because money may already have moved.
 """
 
+import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -20,7 +21,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.payables import InvoiceExecution, Payout, SettlementOutbox
-from app.paypal.client import PayPalError
+from app.paypal.client import BACKOFF_BASE_S, RETRY_STATUSES, PayPalError
 from app.paypal.payouts import PayoutBatch, PayoutCommand, PayoutMismatch, Payouts, PayoutUnresolved
 from app.settlement import halt as halt_flag
 from app.settlement import spend_ledger, transitions
@@ -32,6 +33,7 @@ log = logging.getLogger("aegis.settlement")
 PAYOUT_RECOVERY_TTL = timedelta(minutes=30)  # PAYOUT_RECOVERY_TTL_MIN (R19)
 PROGRESSED = frozenset({"PAYOUT_SUBMITTED", "PAYOUT_SUCCEEDED", "SETTLED", "PAYOUT_FAILED"})
 UNRESOLVED = (PayPalError, PayoutUnresolved, httpx.TransportError)
+POST_ATTEMPTS = 3  # §9.3 crash recovery step 5: 5xx/timeout, same keys, at most 3 attempts
 
 
 class NoCommand(Exception):
@@ -47,12 +49,14 @@ class SettlementService:
         *,
         recovery_ttl: timedelta = PAYOUT_RECOVERY_TTL,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._sm = sessionmaker
         self._payouts = payouts
         self._vendor = vendor_reader
         self._ttl = recovery_ttl
         self._clock = clock
+        self._sleep = sleep
 
     async def execute(self, execution_id: str) -> str:
         """Pay one approved execution. Returns the execution status it ends in. Idempotent."""
@@ -124,22 +128,26 @@ class SettlementService:
     async def _recover(self, command: PayoutCommand) -> str:
         """PAYOUT_SENDING after a crash or lease expiry (R19)."""
         async with self._sm() as s:
-            execution = await s.get(InvoiceExecution, command.execution_id)
             payout = await _payout(s, command.execution_id)
-            outbox = await _outbox(s, command.execution_id)
-            if payout is not None and payout.payout_batch_id:
-                return await self._post_and_submit(command, known_batch_id=payout.payout_batch_id)
-            if payout is None:
-                reason = "NO_WRITE_AHEAD_ROW"
-            elif self._clock() - payout.created_at > self._ttl:
-                reason = "RECOVERY_TTL_EXPIRED"
-            else:
-                reason = await db_recheck(s, execution, outbox)
-        if reason is None:
-            reason = await invoice_recheck(self._vendor, execution)
+        if payout is not None and payout.payout_batch_id:
+            return await self._post_and_submit(command, known_batch_id=payout.payout_batch_id)
+        reason = await self._repost_reason(command)
         if reason:
             return await self._manual_review(command, reason)
         return await self._post_and_submit(command)
+
+    async def _repost_reason(self, command: PayoutCommand) -> str | None:
+        """R19 step 1, before every re-POST (recovery or retry): TTL, halt and the R20 recheck."""
+        async with self._sm() as s:
+            execution = await s.get(InvoiceExecution, command.execution_id)
+            payout = await _payout(s, command.execution_id)
+            outbox = await _outbox(s, command.execution_id)
+            if payout is None:
+                return "NO_WRITE_AHEAD_ROW"
+            if self._clock() - payout.created_at > self._ttl:
+                return "RECOVERY_TTL_EXPIRED"
+            reason = await db_recheck(s, execution, outbox)
+        return reason or await invoice_recheck(self._vendor, execution)
 
     async def _post_and_submit(
         self, command: PayoutCommand, known_batch_id: str | None = None
@@ -150,8 +158,23 @@ class SettlementService:
                 if await halt_flag.is_halted(s):
                     return await self._manual_review(command, "HALTED_BEFORE_POST")
         try:
-            if batch_id is None:
-                batch_id = (await self._payouts.create_or_adopt(command)).payout_batch_id
+            attempt = 1
+            while batch_id is None:  # one POST per checked attempt; keys never change (R5)
+                try:
+                    batch_id = (await self._payouts.create_or_adopt(command)).payout_batch_id
+                except (PayPalError, httpx.TransportError) as err:
+                    retryable = not isinstance(err, PayPalError) or err.status in RETRY_STATUSES
+                    if not retryable or attempt == POST_ATTEMPTS:
+                        raise
+                    log.warning(
+                        "payout POST attempt %s unresolved execution_id=%s",
+                        attempt,
+                        command.execution_id,
+                    )
+                    await self._sleep(BACKOFF_BASE_S * 2 ** (attempt - 1))
+                    attempt += 1
+                    if reason := await self._repost_reason(command):
+                        return await self._manual_review(command, reason)
             batch = await self._payouts.get_batch(batch_id, execution_id=command.execution_id)
         except PayoutMismatch as err:
             return await self._manual_review(

@@ -267,3 +267,17 @@ async def test_ids_in_paths_are_validated(payouts, bad):
         await p.get_batch(bad)
     with pytest.raises(ValueError):
         await p.get_item(bad)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [httpx.Response(500, json={"name": "INTERNAL_SERVER_ERROR"}), httpx.ConnectError("down")],
+    ids=["5xx", "transport"],
+)
+async def test_create_posts_once_and_leaves_retries_to_settlement(payouts, failure):
+    # R19/R20: a re-POST must follow a halt + recheck, which only settlement can run.
+    p, router = payouts
+    post = router.post(f"{BASE}/v1/payments/payouts").mock(side_effect=[failure])
+    with pytest.raises((PayPalError, httpx.TransportError)):
+        await p.create_or_adopt(cmd())
+    assert post.call_count == 1
