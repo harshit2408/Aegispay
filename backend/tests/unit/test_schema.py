@@ -162,5 +162,8 @@ async def test_outbox_status_and_first_approved_cents_stay_writable(pg_sessionma
     async with pg_sessionmaker() as s, s.begin():
         await s.execute(text("update settlement_outbox set status = 'CLAIMED', attempts = 1"))
         await s.execute(
-            text("update invoice_executions set approved_cents = 100 where execution_id = 'e2'")
+            text(
+                "update invoice_executions set approved_cents = 100, billed_cents = 100 "
+                "where execution_id = 'e2'"
+            )
         )

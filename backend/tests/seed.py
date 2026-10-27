@@ -119,6 +119,7 @@ async def seed_approved(
         "grn_id": "grn-1",
         "paypal_invoice_id": "INV2-ABC",
         "approved_cents": amount_cents,
+        "billed_cents": amount_cents,
         "vendor_version": 1,
         "po_version": 1,
     }

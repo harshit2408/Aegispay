@@ -31,6 +31,8 @@ async def world(sm):
         "UPDATE invoice_executions SET grn_id=NULL",
         "UPDATE invoice_executions SET paypal_invoice_id='INV2-TAMPER'",
         "UPDATE invoice_executions SET policy_version=2",
+        "UPDATE invoice_executions SET approved_cents=approved_cents+1",
+        "UPDATE invoice_executions SET billed_cents=billed_cents+1",
     ],
 )
 async def test_frozen_trust_roots_are_immutable(pg_sessionmaker, sql):
@@ -213,6 +215,7 @@ async def test_verified_vendor_record_cannot_lose_its_evidence_or_version(pg_ses
         ("aegis_settlement_role", "UPDATE mandate_policies SET daily_cap_cents=999999"),
         ("aegis_settlement_role", "UPDATE mandate_policies SET policy_id=policy_id"),
         ("aegis_settlement_role", "UPDATE operators SET role='cfo'"),
+        ("aegis_settlement_role", "SELECT password_hash FROM operators"),
         ("aegis_settlement_role", "DELETE FROM execution_events"),
     ],
 )
@@ -250,3 +253,10 @@ async def test_runtime_roles_can_do_their_assigned_work(pg_sessionmaker):
         await po_ledger.release(s, reserve_entry_id=goods)
         assert await po_ledger.committed_cents(s, "PO-1042") == 0
         await s.execute(text("DELETE FROM audit_queue"))
+
+
+async def test_approved_amount_cannot_exceed_billed(pg_sessionmaker):
+    await world(pg_sessionmaker)
+    with pytest.raises(IntegrityError):
+        async with pg_sessionmaker() as s, s.begin():
+            await s.execute(text("UPDATE invoice_executions SET status='FROZEN', billed_cents=1"))

@@ -179,7 +179,10 @@ BYPASS = "set local session_replication_role = replica; "
         ("update vendor_master set paypal_payer_id = 'OTHER99999'", "PAYEE_CHANGED"),
         ("update purchase_orders set version = 2", "PO_CHANGED"),
         ("update settlement_controls set halted = true", "HALTED"),
-        (BYPASS + "update invoice_executions set approved_cents = 49000", "AMOUNT_CHANGED"),
+        (
+            BYPASS + "update invoice_executions set billed_cents = 49000, approved_cents = 49000",
+            "AMOUNT_CHANGED",
+        ),
         (BYPASS + "update invoice_executions set replayed = true", "REPLAYED_EXECUTION"),
         (BYPASS + "update invoice_executions set grn_id = null", "NO_GRN"),
         (BYPASS + "update invoice_executions set vendor_id = null", "NO_VENDOR"),
