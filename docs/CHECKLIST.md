@@ -66,7 +66,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — `4931be7` (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
 - [x] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI — 4b9ce9a
 - [x] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) — 4b9ce9a
-- [ ] **P1-16** @B Three 15-min AP/finance conversations → `docs/USER_RESEARCH.md` (due Oct 27) (WIP B) (BLOCKED: owner confirmed three real conversations remain pending; interview guide prepared)
+- [ ] **P1-16** @B Three cited public AP/finance case profiles, evidence/inference mapping and limitations → `docs/USER_RESEARCH.md` (owner-authorized secondary-research substitution 2026-10-27; firsthand interviews deferred) (WIP B)
 - [x] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base — 4b9ce9a
 - [x] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config? — 4b9ce9a
 - [x] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22) — 4b9ce9a
