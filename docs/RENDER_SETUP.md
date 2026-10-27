@@ -65,6 +65,31 @@ needs an explicit upgrade plan; it is not the final judging configuration.
 
 ## Connection and deployment boundary
 
+### Empty configuration slots and owner inputs
+
+`.env.example` keeps working local database/API URLs and includes a blank hosted-override
+worksheet using the actual `render.yaml` variable names. Its credential and AG licence
+slots are empty; the administrator-only `MIGRATION_DATABASE_URL` slot is commented out.
+Copy only the variables
+for each process into that Render service; replace local URLs rather than adding duplicate
+keys. Do not import the combined template as one shared environment group.
+
+| Where to configure | Values the owner must supply privately |
+|---|---|
+| Separate migration session | `MIGRATION_DATABASE_URL` using the database owner; never a runtime service variable |
+| API | `DATABASE_URL` and `CHECKPOINT_DB_URL` using the restricted API login; existing Vendor sandbox/webhook values and `LLM_API_KEY`; Render generates `SESSION_SECRET` |
+| Settlement worker | `SETTLEMENT_DATABASE_URL` using its restricted login; existing Treasury/Vendor sandbox credentials, account emails and webhook IDs; `AUDIT_HMAC_KEY` |
+| Frontend build | `NEXT_PUBLIC_API_URL` with the public HTTPS API origin; `NEXT_PUBLIC_AG_LICENSE_KEY` with the legitimate Studio licence |
+
+`AUDIT_ANCHOR_REPO` and `ALERT_WEBHOOK_URL` already have blank slots; their consumers remain
+P2 work. This deployment does not consume a Render API token or a separate AG Studio AI key.
+Do not paste licence keys, database URLs or passwords into chat or this document.
+
+To verify the account-dependent work, share only project/Postgres/service dashboard links,
+the selected region and plans, redeemed credit balance and expiry, and confirmation that
+the Studio licence includes the needed AI entitlement through **2026-12-15**. Confirm when
+the private values above are entered, so a licensed rebuild and hosted isolation checks can run.
+
 Use the database's **internal** host from Render services in the same workspace and region.
 Disable external database access unless required for setup; if temporarily enabled, restrict
 it to the operator's IP and require TLS. Never put connection URLs/passwords in this document.
