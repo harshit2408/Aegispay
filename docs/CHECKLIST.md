@@ -62,7 +62,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe — ef630d5, review fixes 34de277
 - [x] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix — 4b9ce9a
 - [x] **P1-11** @B `audit/events.py` global HMAC hash chain + verification — 46a2ecc (integrated audit foundation; anchors/runtime remain P2-26)
-- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP B) (BLOCKED: real CLI upload/parser/graph flow and sandbox acceptance evidence pending; see P1_COMPLETION.md)
+- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP B) (BLOCKED: upload/decision pipeline absent; dependencies P2-01/02/05/06/07/09/10/13 and P3-13/14, then owner-configured real sandbox acceptance; see P1_COMPLETION.md)
 - [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — `4931be7` (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
 - [x] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI — 4b9ce9a
 - [x] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) — 4b9ce9a
