@@ -1,0 +1,28 @@
+# Render blueprint (PRD §6): api web service + Postgres. Frontend, settlement worker land later.
+# Render must build from backend/Dockerfile; docker-compose.yml is local-dev only.
+databases:
+  - name: aegis-db
+    plan: basic-256mb
+    databaseName: aegis
+    user: aegis_api
+
+services:
+  - type: web
+    name: aegis-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aegis-db
+          property: connectionString
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.sandbox.paypal.com
+      - key: DEMO_ENABLED
+        value: "false"
+      - key: TREASURY_WEBHOOK_ID
+        sync: false
+      - key: VENDOR_WEBHOOK_ID
+        sync: false
