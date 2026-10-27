@@ -83,7 +83,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-03** @A Forensics `ocr_diff.py` (cut-order item 5 — keep PDF-structure checks if cut)
 - [ ] **P2-04** @A Eval set ≥ 50 labelled PDFs (held-out split, adaptive + A4 memo-injection cases, 5 runs, Wilson intervals) incl. false-positive traps in `tests/fixtures/eval/`
 - [ ] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport`
-- [ ] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9)
+- [ ] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9) (WIP B)
 - [ ] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed
 - [ ] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00)
 - [ ] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests
@@ -93,9 +93,9 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream
 - [ ] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution
 - [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md`
-- [ ] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case)
-- [ ] **P2-17** @B Widget: Mandate gauge (committed vs daily cap)
-- [ ] **P2-18** @B Widget: Exposure by reason (G2–G10)
+- [ ] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) (WIP B)
+- [ ] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) (WIP B)
+- [ ] **P2-18** @B Widget: Exposure by reason (G2–G10) (WIP B)
 - [ ] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required
 - [ ] **P2-20** @B Mandate studio: compile → diff → activate
 - [ ] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s
