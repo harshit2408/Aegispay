@@ -121,8 +121,9 @@ class PayPalClient:
         json: dict[str, Any] | None = None,
         execution_id: str | None = None,
         retry: bool = True,
+        before_send: Callable[[], Awaitable[None]] | None = None,
     ) -> PayPalResponse:
-        """`retry=False`: one request only (a 401 still refreshes the token once: not processed)."""
+        """`retry=False` sends once; a 401 refreshes auth and returns control to the caller."""
         if not request_id or not request_id.strip():
             raise ValueError("PayPal POST requires a non-empty request_id (R5)")
         return await self._request(
@@ -132,6 +133,7 @@ class PayPalClient:
             request_id=request_id,
             execution_id=execution_id,
             max_attempts=MAX_ATTEMPTS if retry else 1,
+            before_send=before_send,
         )
 
     async def _access_token(self, *, force: bool = False) -> str:
@@ -173,6 +175,7 @@ class PayPalClient:
         request_id: str | None = None,
         execution_id: str | None = None,
         max_attempts: int = MAX_ATTEMPTS,
+        before_send: Callable[[], Awaitable[None]] | None = None,
     ) -> PayPalResponse:
         if not path.startswith("/") or path.startswith("//"):
             raise ValueError("path must be relative to the configured PayPal base URL")
@@ -186,6 +189,8 @@ class PayPalClient:
             }
             if request_id:
                 headers["PayPal-Request-Id"] = request_id
+            if before_send is not None:
+                await before_send()  # auth can perform HTTP: caller checks after it, before POST
             try:
                 resp = await self._http.request(
                     method, self._base + path, params=params, json=json, headers=headers
@@ -215,9 +220,10 @@ class PayPalClient:
             )
             if resp.status_code == 401 and not refreshed:
                 refreshed = True
-                attempt -= 1  # a token refresh is not a retry of the request
                 await self._access_token(force=True)
-                continue
+                if max_attempts > 1:
+                    attempt -= 1
+                    continue
             if resp.status_code in RETRY_STATUSES and attempt < max_attempts:
                 await self._sleep(BACKOFF_BASE_S * 2 ** (attempt - 1))
                 continue

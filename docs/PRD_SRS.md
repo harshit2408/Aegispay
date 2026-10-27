@@ -1193,6 +1193,8 @@ When `DEMO_ENABLED=false` the `demo` router is not mounted at all (R24). SSE fan
 
 ---
 
+P1 frontend contract seam (P1-14): `backend/openapi.json` is exported from the actual FastAPI app. `GET /api/executions`, `GET /api/executions/{id}` and `POST /api/executions/{id}/decisions` publish schemas while returning HTTP 501 until authentication and the case/decision service land. `CaseDetail` combines the §11.1 models with execution status, trusted-record versions/payee history, server-supplied PO consumption, viewer eligibility, approvals and settlement/audit presentation fields from §14.3. The decision request accepts only action, reason (at least ten characters) and the displayed `gate_hash`; actor, payee and amount are forbidden. Generated frontend types describe this contract; mocked screens do not establish functioning business endpoints.
+
 ## 14. Frontend and AG Studio (`frontend/src/`)
 
 ### 14.1 Information architecture
@@ -1391,4 +1393,4 @@ v2.1 adds work to existing checklist items rather than new phases: schema (P1-02
 | Q1 | ~~Pay by `PAYPAL_ID` instead of `EMAIL`?~~ **Decided 2026-10-22 (v2.1): yes**, payer ID is the primary binding (R1, R15); confirmed by SPIKE-10 PASS 2026-10-23. | Dev A | SPIKE-10 |
 | Q2 | ~~Should `HIGH_RISK` cases be approvable?~~ **Decided 2026-10-22 (v2.1):** approvable only with 2 distinct eligible humans, neither the uploader (G3); payment still goes only to the vendor-master payee. | Both | Done |
 | Q3 | ~~Which single LLM provider, and per-run cost cap?~~ **Decided 2026-10-26 (Dev B, user-delegated closeout): OpenAI; `gpt-6.1-sol` for both extraction and reasoning; $1.00 USD per invoice execution** (cap agreed 2026-10-23), ≤4 requests including retries. Selection rationale, exact IDs and dated prices in `docs/TOOLS.md`; enforcement and accuracy still require implementation/eval. | Dev B (P0 closeout); Dev A implementation | Decided |
-| Q4 | Keep the dark "terminal" aesthetic or adopt the AG Studio theme as the base? | Dev B | Oct 23 |
+| Q4 | **Decided 2026-10-27:** official AG Studio dark theme as the base, with shared application tokens, native Studio controls and accessible focus/contrast. | Dev B | Done (P1-17) |

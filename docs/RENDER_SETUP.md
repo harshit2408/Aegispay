@@ -79,11 +79,14 @@ role. Driver-specific TLS settings must be verified in the deployment connection
 Supply only each service's PRD §7 variables. Do not attach a shared group containing all
 secrets: Treasury credentials and `AUDIT_HMAC_KEY` belong only to settlement; the LLM key
 and session secret belong only to API; frontend receives its public build variables.
-The parser subprocess gets an empty environment. Existing skeleton code does not yet
-implement the full R22 boot/grant assertions; this guide does not claim that isolation works.
+Parser subprocess isolation remains P3-14. P1 supplies API/settlement environment assertions,
+actual database-role checks and migration 0006 capability grants. Local evidence does not
+establish that the owner has configured those boundaries in the hosted account.
 
-Before P3-04, implement the settlement worker and frontend, service env assertions and grants;
-then produce `render.yaml` with one API instance, one settlement worker and the frontend.
+The committed `render.yaml` defines one API instance, one settlement worker and the frontend.
+Its resource fields follow the [Render Blueprint reference](https://render.com/docs/blueprint-spec).
+Automatic deploys are disabled in the template. Before activating it, provision the runtime
+logins and service variables below; migration credentials never belong in a runtime service.
 Use `/api/health` for readiness and the external uptime check. Keep PayPal sandbox-only and
 enable demo routes only under R24's sandbox guard.
 
@@ -108,3 +111,39 @@ Append only non-secret facts after account access and creation are confirmed:
 
 Mark P0-04 complete only when the project/database and redeemed credit balance are evidenced.
 Local tests or a Blueprint alone cannot satisfy that item.
+
+## P1-19/P1-24 role and process setup
+
+Run Alembic migrations in a separate administrator session with a database owner that can
+create roles. The migrations create `aegis_api_role` and `aegis_settlement_role` as NOLOGIN
+capabilities. Their names differ from login names so an existing local owner cannot silently
+be mistaken for an unprivileged capability. Runtime logins must be NOSUPERUSER, NOCREATEDB,
+NOCREATEROLE and NOBYPASSRLS, and inherit exactly one of those capabilities.
+
+For a new managed database, the owner creates private `aegis_api` and `aegis_settle` logins,
+grants only `aegis_api_role` to the former and `aegis_settlement_role` to the latter, and sets
+passwords privately. Then set API DATABASE_URL/CHECKPOINT_DB_URL to the API login and worker
+SETTLEMENT_DATABASE_URL to the settlement login. Do not reuse the database owner connection.
+Boot checks inspect PostgreSQL role flags and memberships, not just the URL username.
+Verify the hosted owner's role-management permissions before applying migrations; no hosted
+role provisioning is claimed by this repository change.
+
+On a **fresh local Compose volume**, local-db-init.sql supplies clearly development-only
+logins, and the one-shot migrate service applies Alembic before the API starts. The API and
+optional settlement service then use different, restricted logins. Existing volumes from the
+earlier superuser skeleton need an explicit owner-led migration of roles; do not delete a
+volume or expect init scripts to rerun automatically. Use a unique COMPOSE_PROJECT_NAME for
+disposable verification so another developer's data is preserved.
+
+The settlement profile starts `python -m app.settlement.worker`, with independent outbox,
+GET reconciliation and verified-webhook-consumer loops. It requires configured Treasury and
+Vendor sandbox credentials. It receives no LLM/session/demo/API database variables. The API
+receives no Treasury credentials, signing key or worker database URL. Do not start either
+process by loading one combined secret file; inject only its tagged PRD §7 variables.
+Settings validation errors expose field names, not credential values. SIGTERM stops the
+worker loops and closes HTTP clients and the database engine; leased commands survive a kill.
+
+P1-24 code/configuration can be reviewed locally. Hosted deployment evidence, webhook
+retargeting, licence entitlement, uptime and real sandbox S1 still require owner setup and
+their explicit acceptance checks. Audit queue consumption/external anchors and the velocity
+breaker remain P2 work; worker presence alone does not claim those controls are deployed.

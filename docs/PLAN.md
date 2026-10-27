@@ -65,7 +65,7 @@ A change to any of these three = write an ADR or memory `decision` and tell the 
 | Q1 | ~~Pay by `PAYPAL_ID` instead of `EMAIL`?~~ Decided (PRD v2.1): yes, confirm in SPIKE-10 | A | SPIKE-10 | P0-19 |
 | Q2 | ~~`HIGH_RISK` approvable in demo?~~ Decided (PRD v2.1): only by 2 distinct eligible humans, not the uploader. A to confirm | A+B | Oct 27 | P1-18 |
 | Q3 | Decided 2026-10-26: OpenAI `gpt-6.1-sol` for extraction + reasoning; $1.00 per invoice execution, ≤4 requests incl. retries. See TOOLS for rationale and implementation limits. | B closeout; A implementation | Decided | P0-16 |
-| Q4 | Terminal aesthetic vs AG Studio theme base? | B | Oct 23 | P1-17 |
+| Q4 | Decided 2026-10-27: official AG Studio dark base and shared application tokens; native controls, keyboard focus and AA contrast retained. | B | Done | P1-17 |
 
 Record each answer as an ECC team memory (`kind: decision`) and in the PRD.
 

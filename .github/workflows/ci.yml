@@ -68,14 +68,20 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:18000
       TREASURY_CLIENT_SECRET: test-must-not-reach-api
       AUDIT_HMAC_KEY: test-must-not-reach-api
+      TREASURY_CLIENT_ID: verify-only-treasury
+      VENDOR_CLIENT_ID: verify-only-vendor
+      VENDOR_CLIENT_SECRET: verify-only-vendor-secret
     steps:
       - uses: actions/checkout@v4
       - name: Build and start isolated stack
-        run: docker compose --env-file .env.example up --build --detach --wait --wait-timeout 90 postgres api
+        run: docker compose --env-file .env.example --profile settlement up --build --detach --wait --wait-timeout 90 postgres api settlement
       - name: Verify DB health and runtime secret isolation
         run: |
           curl --fail --silent http://127.0.0.1:18000/api/health | python -c 'import json,sys; assert json.load(sys.stdin) == {"status": "ok", "db": True}'
           docker compose --env-file .env.example exec -T api python -c 'import os; assert "TREASURY_CLIENT_SECRET" not in os.environ; assert "AUDIT_HMAC_KEY" not in os.environ; assert os.getuid() != 0'
+          docker compose --env-file .env.example --profile settlement exec -T settlement python -c 'import os; assert "DATABASE_URL" not in os.environ; assert "LLM_API_KEY" not in os.environ; assert "SESSION_SECRET" not in os.environ; assert os.getuid() != 0'
+          docker compose --env-file .env.example --profile settlement stop settlement
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$(docker compose --env-file .env.example --profile settlement ps -a -q settlement)")" = "0"
       - name: Build and verify frontend profile when the P0-13 scaffold is present
         if: hashFiles('frontend/Dockerfile') != '' && hashFiles('frontend/package.json') != ''
         run: |
@@ -83,10 +89,10 @@ jobs:
           curl --retry 10 --retry-connrefused --retry-delay 2 --fail --silent --output /dev/null http://127.0.0.1:13000/
       - name: Failure diagnostics
         if: failure()
-        run: docker compose --env-file .env.example --profile frontend logs --tail 100
+        run: docker compose --env-file .env.example --profile frontend --profile settlement logs --tail 100
       - name: Remove this test stack and its volumes
         if: always()
-        run: docker compose --env-file .env.example --profile frontend down --volumes --remove-orphans
+        run: docker compose --env-file .env.example --profile frontend --profile settlement down --volumes --remove-orphans
 
   secrets:
     name: secrets (gitleaks)
@@ -133,6 +139,7 @@ jobs:
         run: |
           npm run lint
           npm test
+          npm run api:check
       - name: Build
         if: steps.detect.outputs.present == 'true'
         working-directory: frontend
