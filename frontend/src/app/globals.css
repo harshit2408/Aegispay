@@ -126,6 +126,25 @@ p { line-height: 1.6; }
 button:disabled { opacity: 0.65; cursor: not-allowed; }
 .mock-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .local-status { padding: 14px; border-left: 3px solid var(--pp-blue); background: var(--pp-canvas); }
+.cockpit-widget { height: 100%; overflow: auto; padding: 20px; }
+.cockpit-widget h2 { font-size: 20px; margin: 0 0 10px; }
+.cockpit-widget p { margin: 10px 0; }
+.cockpit-widget meter { width: 100%; min-width: 65px; height: 22px; accent-color: var(--pp-blue); }
+.payables-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.payables-table caption { text-align: left; color: var(--pp-muted); font-size: 12px; padding: 0 0 12px; }
+.payables-table th, .payables-table td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--pp-gridline); }
+.payables-table thead th { color: var(--pp-muted); font-size: 12px; }
+.payables-table tbody tr { cursor: pointer; }
+.payables-table tbody tr:hover, .payables-table tbody tr:focus-within { background: var(--pp-highlight); }
+.ledger-secondary { display: block; color: var(--pp-muted); font-size: 12px; font-weight: 400; margin-top: 6px; }
+.ledger-money { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.triad-pills { display: flex; flex-wrap: wrap; gap: 5px; min-width: 185px; }
+.case-badge.success { color: #93dfa6; border-color: #518d60; }
+.gauge-amount { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gauge-amount span { font-size: 14px; font-weight: 400; color: var(--pp-muted); }
+.exposure-list { list-style: none; padding: 0; }
+.exposure-list li { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--pp-gridline); }
+.exposure-list li > strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 1000px) {
   .case-grid, .money-grid { grid-template-columns: minmax(0, 1fr); }
 }
