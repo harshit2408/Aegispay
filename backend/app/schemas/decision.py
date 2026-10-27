@@ -35,7 +35,7 @@ class InvoiceExtraction(BaseModel):
     vendor_invoice_number: str | None
     po_reference: str | None
     payee_email: str | None
-    billed_qty: int = Field(ge=0)
+    billed_qty: int = Field(ge=0, strict=True)
     unit_price_cents: Cents
     total_cents: Cents
     currency: Literal["USD"]
