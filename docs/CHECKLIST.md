@@ -60,21 +60,21 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-07** @A `settlement/service.py` `execute(execution_id)` only (R1) + outbox worker (`SKIP LOCKED`, 2 s poll) — ef630d5, review fixes 34de277
 - [x] **P1-08** @A `settlement/reconciler.py` item-status state machine (PRD §9.3) + 15 s / 30 min poll fallback (R6) — ef630d5, review fixes 34de277
 - [x] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe — ef630d5, review fixes 34de277
-- [ ] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix
+- [ ] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix (WIP B)
 - [ ] **P1-11** @B `audit/events.py` hash chain + verification (HMAC form lands in P2-26) (WIP B)
-- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox
+- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP B)
 - [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — `4931be7` (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
-- [ ] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI
-- [ ] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3)
-- [ ] **P1-16** @B Three 15-min AP/finance conversations → `docs/USER_RESEARCH.md` (due Oct 27)
-- [ ] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base
-- [ ] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config?
-- [ ] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22)
-- [ ] **P1-20** @B `vendor_master` v2.1 (payer ID, version, onboarding evidence) + append-only `vendor_master_changes` with immutability trigger (PRD §8, R15)
-- [ ] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17)
-- [ ] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19)
-- [ ] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20)
-- [ ] **P1-24** @B Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007)
+- [ ] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI (WIP B)
+- [ ] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) (WIP B)
+- [ ] **P1-16** @B Three 15-min AP/finance conversations → `docs/USER_RESEARCH.md` (due Oct 27) (WIP B)
+- [ ] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base (WIP B)
+- [ ] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config? (WIP B)
+- [ ] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22) (WIP B)
+- [ ] **P1-20** @B `vendor_master` v2.1 (payer ID, version, onboarding evidence) + append-only `vendor_master_changes` with immutability trigger (PRD §8, R15) (WIP B)
+- [ ] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17) (WIP B)
+- [ ] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19) (WIP B)
+- [ ] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20) (WIP B)
+- [ ] **P1-24** @B Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007) (WIP B)
 
 ## P2 — Decision engine + core UI (Oct 28 – Nov 2) · exit: **headless S1–S4 pass**; first `docs/EVAL.md` numbers
 

@@ -79,3 +79,7 @@ Record each answer as an ECC team memory (`kind: decision`) and in the PRD.
 ## P0 closeout delegation — 2026-10-25
 
 User authorized Dev B and task-specific subagents to finish all remaining P0 work today. Checklist ownership/claims are the task state. P0-15, P0-16, P0-19 and P0-20 are temporarily assigned to Dev B for closeout; Dev A retains the P1+ application responsibilities. Agents use isolated branches/worktrees and report verification evidence. Existing pull requests keep their review and merge gates.
+
+## P1 completion delegation — 2026-10-27
+
+The user authorized Dev B to finish every locally achievable P1 task before the account usage window ends, batching implementation and final validation while minimizing Git calls. Dev B temporarily owns the unclaimed P1-12/P1-21/P1-22/P1-23 settlement and exit work in addition to the remaining B items. Existing P1-11 work and review gates are preserved. Real AP/finance interviews, live sandbox evidence and hosted account setup are completed only when actual evidence exists; no research or deployment success is inferred from mocks. R1–R4 changes still require the other developer to review before merge.
