@@ -62,7 +62,7 @@ export const previewCase: components["schemas"]["CaseDetail"] = {
       p_vendor_contests: 0.1, contest_cost_cents: 10000 },
   },
   gate: {
-    route: "FREEZE", payable_cents: 42500, reasons: ["HIGH_RISK", "G3 · Hidden instruction and payee mismatch", "G2 · 15 units not accepted"],
+    route: "FREEZE", payable_cents: 42500, reasons: ["HIGH_RISK", "G3 · Hidden instruction and payee mismatch"],
     required_approvals: 2, allowed_actions: ["APPROVE", "SHORT_PAY", "REJECT"], policy_id: "mock-policy",
     policy_version: 2, gate_hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   },

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CasePreview } from "./case-preview";
+import { previewCase } from "@/fixtures/case-preview";
 
 export default async function CaseWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -10,7 +11,7 @@ export default async function CaseWorkspace({ params }: { params: Promise<{ id: 
         <h1 id="case-title">Case workspace</h1>
         <p>Review the evidence, security findings and payment decision for one invoice.</p>
       </section>
-      {id === "preview" ? <CasePreview /> : <section className="empty-state" aria-labelledby="case-empty-title">
+      {id === "preview" || id === previewCase.execution_id ? <CasePreview /> : <section className="empty-state" aria-labelledby="case-empty-title">
         <p className="status-label">No case loaded</p>
         <h2 id="case-empty-title">Case details are not connected yet</h2>
         <p>Route reference: <code>{id}</code>. This preview has no invoice, evidence or payment decision attached.</p>

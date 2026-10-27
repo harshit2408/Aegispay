@@ -1,4 +1,4 @@
-# AegisPay frontend (P1-13 · P1-14 · P1-15)
+# AegisPay frontend (P1 foundation · P2-16/P2-17/P2-18 cockpit widgets)
 
 Based on the [official PayPal + AG Grid hackathon boilerplate](https://github.com/paypaldev/hackathon-paypal-ag-grid-boilerplate/tree/5de114eb4306e844396022f9ca0558a4937761e2), pinned to `5de114eb4306e844396022f9ca0558a4937761e2`.
 
@@ -13,7 +13,11 @@ npm run build
 npm run dev -- --port 3000
 ```
 
-Open `http://localhost:3000`. Click **Test React state** inside the custom Studio widget. Choose **Edit Studio layout**, then select **Say hello (scripted)** in Studio's AI side panel. The native Studio harness runs a custom scripted runner and displays a hello-world response. It makes no LLM/PayPal requests, has no tools, needs no credentials, and does not implement the P3-11 Treasury Analyst. The persistent REPLAY banner labels the synthetic probe data.
+Open `http://localhost:3000`. The first Studio page shows the payables ledger, active-policy mandate gauge and frozen exposure widgets. The snapshot is synthetic and makes no API, LLM or PayPal request. Click the invoice row or its keyboard-accessible link to open the matching synthetic case at `/cases/synthetic-s3`.
+
+The ledger shows PO/receipt/source pills, billed and execution-paid cents, risk and execution status. Paid cents are supplied separately for that execution; PO aggregate paid cents are never treated as an invoice payment. The gauge shows supplied committed spend against the daily cap and active version, handles zero/exceeded caps, and labels the snapshot's business date and timezone. Exposure groups frozen billed value by G2–G10 reason, deduplicating reason aliases within an invoice; unknown reasons remain visible. An invoice with several reasons appears in several groups, so those groups are not additive. Empty states cover no payables, no active mandate and no frozen exposure. Live API and SSE wiring remain separate tasks.
+
+The second Studio page retains integration probes. Choose **Integration probes** above the workspace to click **Test React state**; **Cockpit widgets** returns to the default page. Choose **Edit Studio layout**, then select **Say hello (scripted)** in Studio's AI side panel. The native Studio harness runs a custom scripted runner and displays a hello-world response. It has no tools, needs no credentials, and does not implement the P3-11 Treasury Analyst. The persistent REPLAY banner labels the synthetic data.
 
 The shared navigation opens the cockpit (`/`), the synthetic case workspace (`/cases/preview`), mandate studio (`/mandate`) and clearly labelled supplier simulator (`/vendor`). The native collapsible judge guide explains S1–S4, operator access and the simulation boundary. The REPLAY banner remains visible on every route. Unknown case IDs keep the unloaded-case state.
 
