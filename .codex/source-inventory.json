@@ -14,6 +14,7 @@
   "rules/money-safety.md": "62db7fcdc429d46bba0cf8b92e043f78c8a3edb607664bb0f20b2cc2b1efff93",
   "settings.json": "2c1386740ecf1da239fd9a8509e21852033430ce5df49f84a35bca0900c1b0b4",
   "skills/handoff/SKILL.md": "81e54a4ac86a055f71b480cccdc26b33bfa9d6f16274b4778f162253f698932b",
+  "skills/isolated-linux-verification/SKILL.md": "7a70428703ca8d9086fa0b0368f49382e393d6a66a2852382ef2e173faeb9383",
   "skills/standup/SKILL.md": "44244abb33661646e070f2651001125de4b43c4ee2565ae15d8602ebfc497b3b",
   "tests/post-test-sync.test.mjs": "9cd4dce847ab78b8a396e8639cfcc0bf51d85a76705a17a322a796d3fc1a3df3"
 }
