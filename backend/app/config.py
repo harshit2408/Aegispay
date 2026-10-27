@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     paypal_base_url: str = "https://api-m.sandbox.paypal.com"
     demo_enabled: bool = False
     demo_replay_mode: bool = False
+    # Registered PayPal webhook IDs (not secrets): verification fails closed while empty (R10)
+    treasury_webhook_id: str = ""
+    vendor_webhook_id: str = ""
 
 
 @lru_cache
