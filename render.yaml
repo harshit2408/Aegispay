@@ -1,5 +1,12 @@
 # Apply only after owner-side role provisioning in docs/RENDER_SETUP.md.
 # Service variables are deliberately separate; do not attach one shared secret environment group.
+databases:
+  - name: aegis-db
+    plan: 0.1c-256mb
+    postgresMajorVersion: "16"
+    databaseName: aegis
+    user: aegis_owner
+    ipAllowList: []
 services:
   - type: web
     name: aegispay-api

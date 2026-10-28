@@ -39,7 +39,7 @@ or database rather than creating duplicates.
 |---|---|
 | Project | `AegisPay` |
 | First environment | `sandbox` (PayPal sandbox; this label grants no security controls) |
-| Postgres service name | `aegispay-postgres` |
+| Postgres service name | `aegis-db` (the committed Blueprint name) |
 | Database name | `aegis` |
 | PostgreSQL version | **16**, matching the repository's local Compose image |
 | Region | **Singapore**, proposed for the developers in India; keep API, settlement worker and database together |
@@ -50,6 +50,16 @@ Then use **New → Postgres** ([creation form](https://dashboard.render.com/new/
 assign it to that project/environment and enter the settings above. Wait for **Available**.
 [Project instructions](https://render.com/docs/projects) and
 [database instructions](https://render.com/docs/postgresql-creating-connecting).
+
+The Blueprint's `databases:` block describes a **new** paid PostgreSQL 16 instance, using
+the current `0.1c-256mb` plan and an administrator named `aegis_owner`. Its empty
+`ipAllowList` disables public database connections. Confirm cost before applying it.
+An existing suitable database should be reused: reconcile its resource name and immutable
+database/user/version settings before applying the Blueprint, rather than creating a
+duplicate or attempting to rename its owner. The Blueprint omits region for all resources,
+so new resources default to Oregon; set the same chosen region on the database and all
+services before first creation if using Singapore. See the
+[Blueprint database reference](https://render.com/docs/blueprint-spec#database-fields).
 
 Singapore is a supported region. Render cannot change an existing resource's region in place;
 cross-region resources lose private-network connectivity. Confirm the region before creating
@@ -97,6 +107,10 @@ it to the operator's IP and require TLS. Never put connection URLs/passwords in 
 
 The generated owner credential is for administration, not the application. P1-19/P1-24 must
 create the separate `aegis_api` and `aegis_settle` roles and verify grants before deployment.
+Keep runtime database variables as `sync: false` and enter those restricted login URLs
+privately. Do not use `fromDatabase` with `connectionString`: it supplies the owner login,
+which violates R22 and is rejected by the API/worker startup checks. The `aegis_owner` URL
+belongs only in the separate migration session.
 Use `postgresql+asyncpg://` for SQLAlchemy's `DATABASE_URL` and
 `SETTLEMENT_DATABASE_URL`; the API's `CHECKPOINT_DB_URL` uses `postgresql://` with the API
 role. Driver-specific TLS settings must be verified in the deployment connection test.
