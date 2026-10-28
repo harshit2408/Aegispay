@@ -74,6 +74,8 @@ external anchoring; no production remote or token is supplied by this change.
 Without `AUDIT_ANCHOR_REPO`, the PRD's explicitly permitted degraded HMAC-only mode logs
 `audit_external_anchor_disabled mode=HMAC_ONLY exports=unavailable`. Signed events still drain,
 but externally verified exports refuse to run. A missing/short HMAC key refuses worker startup.
+Removing the repo after external receipts exist is refused as lost external history, rather
+than silently downgrading a previously anchored chain.
 An anchor transport outage retries with generic logs; an unavailable remote is never replaced
 by a DB-derived checkpoint. Hosted availability and the authenticated export HTTP route remain
 separate integration/deployment work.

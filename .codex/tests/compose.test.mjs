@@ -30,7 +30,7 @@ test('compose excludes settlement secrets even when host env contains them', {
 }, () => {
   const forbidden = [
     'TREASURY_CLIENT_ID', 'TREASURY_CLIENT_SECRET', 'TREASURY_ACCOUNT_EMAIL',
-    'SETTLEMENT_DATABASE_URL', 'AUDIT_HMAC_KEY', 'AUDIT_ANCHOR_REPO',
+    'SETTLEMENT_DATABASE_URL', 'AUDIT_HMAC_KEY', 'AUDIT_ANCHOR_REPO', 'AUDIT_ANCHOR_TOKEN',
     'VELOCITY_MAX_PAYOUTS_PER_HOUR', 'VELOCITY_MAX_CENTS_PER_HOUR', 'ALERT_WEBHOOK_URL',
   ];
   const result = spawnSync('docker', [

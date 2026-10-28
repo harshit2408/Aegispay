@@ -190,7 +190,11 @@ disposable verification so another developer's data is preserved.
 
 The settlement profile starts `python -m app.settlement.worker`, with independent outbox,
 GET reconciliation and verified-webhook-consumer loops. It requires configured Treasury and
-Vendor sandbox credentials. It receives no LLM/session/demo/API database variables. The API
+Vendor sandbox credentials and an `AUDIT_HMAC_KEY` of at least 32 characters. P2-26 adds the
+audit consumer and optional external Git anchor publication; follow [audit setup](AUDIT.md)
+and verify migration `0007` and its grants before deploying this version. Keep the dedicated
+anchor token only in the worker. Without an anchor repo it explicitly runs HMAC-only, with
+verified exports unavailable. It receives no LLM/session/demo/API database variables. The API
 receives no Treasury credentials, signing key or worker database URL. Do not start either
 process by loading one combined secret file; inject only its tagged PRD §7 variables.
 Settings validation errors expose field names, not credential values. SIGTERM stops the
@@ -198,5 +202,6 @@ worker loops and closes HTTP clients and the database engine; leased commands su
 
 P1-24 code/configuration can be reviewed locally. Hosted deployment evidence, webhook
 retargeting, licence entitlement, uptime and real sandbox S1 still require owner setup and
-their explicit acceptance checks. Audit queue consumption/external anchors and the velocity
-breaker remain P2 work; worker presence alone does not claim those controls are deployed.
+their explicit acceptance checks. P2-26's audit runtime is tested locally; hosted anchor
+publication remains unverified. The velocity breaker remains P2 work; worker presence alone
+does not claim those controls are deployed.
