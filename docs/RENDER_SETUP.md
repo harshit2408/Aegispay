@@ -39,7 +39,7 @@ or database rather than creating duplicates.
 |---|---|
 | Project | `AegisPay` |
 | First environment | `sandbox` (PayPal sandbox; this label grants no security controls) |
-| Postgres service name | `aegispay-postgres` |
+| Postgres service name | `aegis-db` (the committed Blueprint name) |
 | Database name | `aegis` |
 | PostgreSQL version | **16**, matching the repository's local Compose image |
 | Region | **Singapore**, proposed for the developers in India; keep API, settlement worker and database together |
@@ -50,6 +50,16 @@ Then use **New → Postgres** ([creation form](https://dashboard.render.com/new/
 assign it to that project/environment and enter the settings above. Wait for **Available**.
 [Project instructions](https://render.com/docs/projects) and
 [database instructions](https://render.com/docs/postgresql-creating-connecting).
+
+The Blueprint's `databases:` block describes a **new** paid PostgreSQL 16 instance, using
+the current `0.1c-256mb` plan and an administrator named `aegis_owner`. Its empty
+`ipAllowList` disables public database connections. Confirm cost before applying it.
+An existing suitable database should be reused: reconcile its resource name and immutable
+database/user/version settings before applying the Blueprint, rather than creating a
+duplicate or attempting to rename its owner. The Blueprint omits region for all resources,
+so new resources default to Oregon; set the same chosen region on the database and all
+services before first creation if using Singapore. See the
+[Blueprint database reference](https://render.com/docs/blueprint-spec#database-fields).
 
 Singapore is a supported region. Render cannot change an existing resource's region in place;
 cross-region resources lose private-network connectivity. Confirm the region before creating
@@ -97,6 +107,10 @@ it to the operator's IP and require TLS. Never put connection URLs/passwords in 
 
 The generated owner credential is for administration, not the application. P1-19/P1-24 must
 create the separate `aegis_api` and `aegis_settle` roles and verify grants before deployment.
+Keep runtime database variables as `sync: false` and enter those restricted login URLs
+privately. Do not use `fromDatabase` with `connectionString`: it supplies the owner login,
+which violates R22 and is rejected by the API/worker startup checks. The `aegis_owner` URL
+belongs only in the separate migration session.
 Use `postgresql+asyncpg://` for SQLAlchemy's `DATABASE_URL` and
 `SETTLEMENT_DATABASE_URL`; the API's `CHECKPOINT_DB_URL` uses `postgresql://` with the API
 role. Driver-specific TLS settings must be verified in the deployment connection test.
@@ -128,11 +142,25 @@ Append only non-secret facts after account access and creation are confirmed:
 
 | Evidence | Verified value |
 |---|---|
-| Workspace and project resource links | Pending owner setup |
-| Environment / actual region | Pending owner setup |
-| Postgres resource link, status and version | Pending owner setup |
-| Actual compute plan and storage | Pending owner cost review |
-| Credit amount, redemption date, expiry | Pending owner redemption |
+| Workspace and project resource links | Project `My project`, environment `Production` (dashboard links not recorded; private) |
+| Environment / actual region | `Production`, Oregon (the Singapore proposal above was not used; API, worker and DB must stay in this region) |
+| Postgres resource link, status and version | `aegispay-postgres`, PostgreSQL 16, Available; migrations applied through 0007; `aegis_api`/`aegis_settle` logins created with capability roles, startup role check passes (2026-10-28) |
+| Actual compute plan and storage | Owner attests paid plans chosen; plan names not recorded |
+| Credit amount, redemption date, expiry | Owner attests credits redeemed; amount, date and expiry not recorded |
+
+API service `Aegispay` (Docker, `backend/Dockerfile`, context `./backend`) deploys from `main` and boots; the frontend service is still open.
+
+### P1-24 settlement worker evidence (2026-10-28, owner-supplied dashboard captures; no values recorded)
+
+| Evidence | Verified value |
+|---|---|
+| Worker service | `aegispay-settlement`, Background Worker, Docker, `0.5c-512mb`, branch `main` at `6044496`, status **Live** |
+| Build | Docker build and image push succeeded; "Your service is live" at 08:53:59Z |
+| Worker env var names | `ALERT_WEBHOOK_URL`, `AUDIT_ANCHOR_REPO`, `AUDIT_HMAC_KEY`, `PAYPAL_BASE_URL`, `SETTLEMENT_DATABASE_URL`, `TREASURY_{ACCOUNT_EMAIL,CLIENT_ID,CLIENT_SECRET,WEBHOOK_ID}`, `VELOCITY_MAX_{CENTS,PAYOUTS}_PER_HOUR`, `VENDOR_{ACCOUNT_EMAIL,CLIENT_ID,CLIENT_SECRET,WEBHOOK_ID}`. No `DATABASE_URL`, `CHECKPOINT_DB_URL`, `LLM_*`, `SESSION_SECRET` or `DEMO_*` |
+| API env var names | `CHECKPOINT_DB_URL`, `DATABASE_URL`, `PAYPAL_BASE_URL`, `SESSION_SECRET`, `TREASURY_WEBHOOK_ID`, `VENDOR_{ACCOUNT_EMAIL,CLIENT_ID,CLIENT_SECRET,WEBHOOK_ID}`. No `TREASURY_CLIENT_*`, `AUDIT_HMAC_KEY` or `SETTLEMENT_DATABASE_URL` |
+| API liveness | `GET /api/health` returned 200 repeatedly in the API runtime log |
+
+Not evidenced: the worker's runtime log (role/environment checks passing, outbox/reconcile/webhook loops starting) was not captured, only the build log; which database login each URL uses (values masked); `LLM_*` variables on the API (not needed before P2). Hosted webhook retargeting and the real sandbox S1 remain P1-12 and P3 work.
 
 Mark P0-04 complete only when the project/database and redeemed credit balance are evidenced.
 Local tests or a Blueprint alone cannot satisfy that item.

@@ -24,7 +24,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-01** @AB Claude harness: CLAUDE.md, plan, checklist, hooks, routing, ponytail/caveman/obsidian, ECC memory
 - [x] **P0-02** @B Add `LICENSE` (MIT) and confirm GitHub's About panel detects it — 2062c25
 - [x] **P0-03** @B CI: ruff, pytest, `gitleaks`, frontend build on every push — 16cf6f9
-- [ ] **P0-04** @B Render project + Render Postgres provisioned; claim Render credits (WIP B) (BLOCKED: owner sign-in and credit redemption/resource evidence pending; see RENDER_SETUP.md)
+- [x] **P0-04** @A Render project + Render Postgres provisioned; claim Render credits — project `My project`, Postgres 16 `aegispay-postgres` (Oregon), migrations 0001–0007 applied, API deployed from `main` healthy with restricted `aegis_api` login; owner attests credits redeemed and paid plans chosen (amount/expiry not recorded here); see RENDER_SETUP.md — 4e3c6f6
 - [x] **P0-05** @A Claim APIMatic participant subscription; install the PayPal Context Plugin; log in `docs/TOOLS.md` — subscription claim form deferred to SUB-04; plugin installed, covers Server SDK only (see TOOLS.md)
 - [x] **P0-06** @A Two sandbox Business accounts + two REST apps (Treasury, Vendor); steps in `docs/SANDBOX_SETUP.md` — accounts, apps, .env done; webhook IDs deferred to P0-14
 - [x] **P0-07** @A SPIKE-1 Vendor app creates + sends invoice to treasury email (`invoicer` = vendor account) — PASS, see PRD §18 SPIKE-1 — 1774589
@@ -33,7 +33,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P0-10** @A SPIKE-4 Record payment partial → `PARTIALLY_PAID`, full → `PAID`; which app gets which event — PARTIAL: full payment gives MARKED_AS_PAID, not PAID (PRD §9.2 treats both as paid); Vendor app gets INVOICE.PAID (P0-14); partial-payment event not observed, confirm by GET; PRD §18 SPIKE-4 — be2c466
 - [x] **P0-11** @A SPIKE-5 Payout to unknown email → `UNCLAIMED`; cancel works — PARTIAL: UNCLAIMED confirmed, cancel fails (500); PRD §18 SPIKE-5 — be2c466
 - [x] **P0-12** @A SPIKE-6 PayPal Agent Toolkit (Python) inside LangGraph, read-only config — PASS: read-only config exposes get_invoice/list_invoices; no list_transactions; PRD §18 SPIKE-6 — be2c466
-- [ ] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15 — technical probe PASS in development evaluation (667760d); see `docs/spikes/SPIKE-7.md` (WIP B) (BLOCKED: account owner must confirm legitimate Studio + AI entitlement through 2026-12-15)
+- [x] **P0-13** @B SPIKE-7 AG Studio boilerplate runs; custom widget hosts React; Studio Agent hello-world; licence valid to Dec 15 — probe PASS (667760d); with the licence key supplied locally the console shows no licence diagnostics and the scripted agent replies; owner attests written confirmation of AI entitlement through 2026-12-15 (not stored in repo); see `docs/spikes/SPIKE-7.md` — 4e3c6f6
 - [x] **P0-14** @B SPIKE-8 Webhook self-verification for real + simulator events; Dev B takeover authorized 2026-10-25; both sandbox apps registered and verification evidence in `docs/spikes/SPIKE-8.md` — e4612c6
 - [x] **P0-15** @B SPIKE-9 durable interrupt + hard-exit/restart PASS; third process restores acceptance receipt without another resume; PRD §8/§11.3 consumption contract corrected (product recovery remains P1/P2) — b8a0745
 - [x] **P0-16** @B Decide Q3: OpenAI `gpt-6.1-sol` for extraction + reasoning, $1.00 per invoice execution, ≤4 requests including retries; rationale and exact IDs in `docs/TOOLS.md`; runtime enforcement/eval remain application work — 8b6b2c8
@@ -62,7 +62,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe — ef630d5, review fixes 34de277
 - [x] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix — 4b9ce9a
 - [x] **P1-11** @B `audit/events.py` global HMAC hash chain + verification — 46a2ecc (integrated audit foundation; anchors/runtime remain P2-26)
-- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP B) (BLOCKED: upload/decision pipeline absent; dependencies P2-01/02/05/06/07/09/10/13 and P3-13/14, then owner-configured real sandbox acceptance; see P1_COMPLETION.md)
+- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP A) (BLOCKED: upload/decision pipeline absent; dependencies P2-01/02/05/06/07/09/10/13 and P3-13/14, then owner-configured real sandbox acceptance; see P1_COMPLETION.md)
 - [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — `4931be7` (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
 - [x] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI — 4b9ce9a
 - [x] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) — 4b9ce9a
@@ -74,7 +74,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17) — 4b9ce9a
 - [x] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19) — 4b9ce9a
 - [x] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20) — 4b9ce9a
-- [ ] **P1-24** @B Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007) (WIP B) (local worker, guards, grants, Compose and blueprint — 4b9ce9a) (BLOCKED: owner-configured hosted Render deployment and isolation evidence pending)
+- [x] **P1-24** @A Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007) — 4b9ce9a (local worker, guards, grants, Compose, blueprint); hosted worker Live with disjoint env names, evidence in RENDER_SETUP.md (worker runtime log not captured)
 
 ## P2 — Decision engine + core UI (Oct 28 – Nov 2) · exit: **headless S1–S4 pass**; first `docs/EVAL.md` numbers
 
