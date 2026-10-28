@@ -6,6 +6,9 @@ import signal
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from app.audit import consumer as audit_consumer
+from app.audit.anchor import GitAnchors
+from app.audit.consumer import AuditConsumer
 from app.config import get_settlement_settings
 from app.paypal.client import PayPalClient
 from app.paypal.payouts import Payouts
@@ -48,6 +51,20 @@ async def run(stop: asyncio.Event | None = None) -> None:
                 await validate_database_role(session, "settlement")
         except Exception:
             raise RuntimeError("Settlement database startup validation failed") from None
+        audit = AuditConsumer(
+            sessions,
+            key=settings.audit_hmac_key.get_secret_value().encode(),
+            anchors=GitAnchors(
+                settings.audit_anchor_repo,
+                settings.audit_anchor_token.get_secret_value()
+                if settings.audit_anchor_token
+                else None,
+            )
+            if settings.audit_anchor_repo
+            else None,
+        )
+        # Verify anchored history before enabling any money movement.
+        await audit.run_once()
         treasury = PayPalClient(
             app="TREASURY",
             base_url=settings.paypal_base_url,
@@ -69,6 +86,7 @@ async def run(stop: asyncio.Event | None = None) -> None:
             tasks.create_task(outbox_worker.run_forever(sessions, service, stop))
             tasks.create_task(reconciler.run_forever(poller, sessions, stop))
             tasks.create_task(_consume(consumer, stop))
+            tasks.create_task(audit_consumer.run_forever(audit, stop))
     finally:
         stop.set()
         for sig, old_handler in old_signals.items():

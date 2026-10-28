@@ -25,3 +25,13 @@ test("decision payload contains only the allowed request fields and requires a C
   assert.equal(mocked.mock.callCount(), 0);
   await assert.rejects(api.submitDecision("case", decision, "session-token"), /Case changed, review again/);
 });
+
+test("case refresh forwards cancellation to fetch instead of retaining a superseded request", async (t) => {
+  const controller = new AbortController();
+  t.mock.method(globalThis, "fetch", async (_url: string | URL | Request, init?: RequestInit) => {
+    assert.equal(init?.signal, controller.signal);
+    throw new DOMException("Cancelled", "AbortError");
+  });
+  controller.abort();
+  await assert.rejects(api.getExecution("case", controller.signal), { name: "AbortError" });
+});

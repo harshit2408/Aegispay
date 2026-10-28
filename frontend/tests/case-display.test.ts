@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { previewCase, mockReviewers } from "../src/fixtures/case-preview.ts";
-import { currentApprovals, decisionBlock, isEligible, usd } from "../src/lib/case-display.ts";
+import { caseReadState, currentApprovals, decisionBlock, isEligible, usd } from "../src/lib/case-display.ts";
+
+test("replay warning persists while refreshing or failing without displaying stale case data", () => {
+  const initial = { loading: true, replayed: false };
+  const loaded = caseReadState(initial, { type: "loaded", data: previewCase });
+  assert.equal(loaded.replayed, true);
+  const loading = caseReadState(loaded, { type: "loading" });
+  assert.equal(loading.replayed, true);
+  assert.equal(loading.data, undefined);
+  const failed = caseReadState(loading, { type: "failed", error: "Session expired" });
+  assert.equal(failed.replayed, true);
+  assert.equal(failed.data, undefined);
+  assert.equal(failed.error, "Session expired");
+  const live = caseReadState(failed, { type: "loaded", data: { ...previewCase, replayed: false } });
+  assert.equal(live.replayed, false);
+});
 
 test("integer cents display exactly without allowing fractional or unsafe money", () => {
   assert.equal(usd(0), "$0.00");

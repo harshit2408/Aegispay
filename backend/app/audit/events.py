@@ -2,7 +2,7 @@
 
 The caller owns the transaction and supplies an already-redacted payload and authenticated actor.
 Only settlement supplies the signing key; importing this module reads no environment or credentials.
-Runtime queue consumption, DB grants, halt/alert handling and external anchors remain later work.
+The settlement worker drains the queue and publishes external checkpoints (R21).
 """
 
 import hashlib
@@ -116,6 +116,8 @@ async def enqueue_event(
     """Append an unsigned queue row in the caller's transaction; needs no signing key."""
     ts = ts if ts is not None else datetime.now(UTC)
     _validate(execution_id, actor, event_type, payload, ts)
+    if not session.in_transaction():
+        raise ValueError("audit enqueue requires a caller-owned transaction")
     queued = AuditQueue(
         execution_id=execution_id,
         actor=actor,
@@ -126,6 +128,17 @@ async def enqueue_event(
     session.add(queued)
     await session.flush()
     return queued
+
+
+async def lock_chain(session: AsyncSession) -> None:
+    """Serialize signed-chain writers; unsigned producers never acquire this lock."""
+    if not session.in_transaction():
+        raise ValueError("audit write requires a caller-owned transaction")
+    if session.get_bind().dialect.name != "postgresql":
+        raise ValueError("audit write requires Postgres advisory locking")
+    if await session.scalar(text("SHOW transaction_isolation")) != "read committed":
+        raise ValueError("audit write requires READ COMMITTED isolation")
+    await session.execute(text("SELECT pg_advisory_xact_lock(:lock)"), {"lock": _CHAIN_LOCK})
 
 
 async def append_event(
@@ -142,14 +155,7 @@ async def append_event(
     _key(key)
     ts = ts if ts is not None else datetime.now(UTC)
     _validate(execution_id, actor, event_type, payload, ts)
-    if not session.in_transaction():
-        raise ValueError("audit append requires a caller-owned transaction")
-    if session.get_bind().dialect.name != "postgresql":
-        raise ValueError("audit append requires Postgres advisory locking")
-    # A fresh statement snapshot after the lock must see the preceding writer's commit.
-    if await session.scalar(text("SHOW transaction_isolation")) != "read committed":
-        raise ValueError("audit append requires READ COMMITTED isolation")
-    await session.execute(text("SELECT pg_advisory_xact_lock(:lock)"), {"lock": _CHAIN_LOCK})
+    await lock_chain(session)
     rows = list(
         await session.scalars(
             select(ExecutionEvent)

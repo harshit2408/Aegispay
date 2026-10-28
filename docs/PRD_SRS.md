@@ -369,6 +369,7 @@ OPERATOR_SEED_FILE=                 # path to a git-ignored JSON of {username, r
 # --- Audit [settlement] ---
 AUDIT_HMAC_KEY=                     # R21; never present in the api service
 AUDIT_ANCHOR_REPO=                  # git remote + branch for head-hash anchors
+AUDIT_ANCHOR_TOKEN=                 # optional dedicated HTTPS Git token; settlement only
 
 # --- Org hard limits (every mandate field is clamped to these, R13) [api, settlement] ---
 ORG_HARD_MAX_SINGLE_CENTS=100000
@@ -1194,6 +1195,8 @@ When `DEMO_ENABLED=false` the `demo` router is not mounted at all (R24). SSE fan
 ---
 
 P1 frontend contract seam (P1-14): `backend/openapi.json` is exported from the actual FastAPI app. `GET /api/executions`, `GET /api/executions/{id}` and `POST /api/executions/{id}/decisions` publish schemas while returning HTTP 501 until authentication and the case/decision service land. `CaseDetail` combines the §11.1 models with execution status, trusted-record versions/payee history, server-supplied PO consumption, viewer eligibility, approvals and settlement/audit presentation fields from §14.3. The decision request accepts only action, reason (at least ten characters) and the displayed `gate_hash`; actor, payee and amount are forbidden. Generated frontend types describe this contract; mocked screens do not establish functioning business endpoints.
+
+P2-19/P2-21 read integration: real case IDs fetch that contract without fixture fallback; payment controls stay disabled until authenticated session/CSRF delivery exists. The `/api/stream` contract also returns HTTP 501 until authenticated fan-out lands. Each future SSE data object has exactly `type` (`node`, `settlement`, `webhook`), `execution_id`, `name`, `status` and timezone-aware `ts`, with bounded identifier/state strings and no additional fields. Valid notifications trigger an authorized REST refresh; they never supply decision or money values. Client tests establish immediate dispatch and cleanup, not the end-to-end one-second latency target.
 
 ## 14. Frontend and AG Studio (`frontend/src/`)
 

@@ -31,6 +31,7 @@ def settlement_values(**overrides):
         "vendor_client_id": "test-vendor",
         "vendor_client_secret": "vendor-private",
         "vendor_account_email": "vendor@test.example",
+        "audit_hmac_key": "test-audit-key-not-a-real-secret!!",
         **overrides,
     }
 
@@ -234,8 +235,8 @@ async def test_role_validation_rejects_noninherited_cross_service_membership(
         await admin.dispose()
 
 
-@pytest.mark.parametrize("bad_role", [False, True])
-async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monkeypatch, bad_role):
+@pytest.mark.parametrize("failure", [None, "role", "audit"])
+async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monkeypatch, failure):
     from app.settlement import worker
 
     for field in PROJECT_VARIABLES:
@@ -265,7 +266,7 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
 
     async def validate(session, service):
         events.append("validate:" + service)
-        if bad_role:
+        if failure == "role":
             raise ValueError("wrong role")
 
     async def outbox(sessions, service, stop):
@@ -277,6 +278,20 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
         events.append("poller:start")
         await stop.wait()
         events.append("poller:stop")
+
+    class Audit:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def run_once(self):
+            events.append("audit:verify")
+            if failure == "audit":
+                raise RuntimeError("audit startup verification failed")
+
+    async def audit_loop(consumer, stop):
+        events.append("audit:start")
+        await stop.wait()
+        events.append("audit:stop")
 
     class Consumer:
         def __init__(self, *args):
@@ -297,15 +312,22 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
     monkeypatch.setattr(worker, "validate_database_role", validate)
     monkeypatch.setattr(worker, "PayPalClient", Client)
     monkeypatch.setattr(worker, "WebhookConsumer", Consumer)
+    monkeypatch.setattr(worker, "AuditConsumer", Audit)
+    monkeypatch.setattr(worker.audit_consumer, "run_forever", audit_loop)
     monkeypatch.setattr(worker.outbox_worker, "run_forever", outbox)
     monkeypatch.setattr(worker.reconciler, "run_forever", poller)
-    if bad_role:
+    if failure == "role":
         with pytest.raises(RuntimeError, match="startup validation failed"):
             await worker.run()
         assert events == ["validate:settlement", "dispose"]
+    elif failure == "audit":
+        with pytest.raises(RuntimeError, match="audit startup verification failed"):
+            await worker.run()
+        assert events == ["validate:settlement", "audit:verify", "dispose"]
     else:
         await asyncio.wait_for(worker.run(), timeout=2)
         assert events.index("validate:settlement") < events.index("client:TREASURY")
+        assert events.index("audit:verify") < events.index("client:TREASURY")
         assert {"outbox:stop", "poller:stop", "consumer:tick"} <= set(events)
         assert events[-3:] == ["close:TREASURY", "close:VENDOR", "dispose"]
     assert handlers == {}

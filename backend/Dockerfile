@@ -10,7 +10,10 @@ COPY pyproject.toml ./
 COPY app ./app
 COPY alembic.ini ./
 COPY migrations ./migrations
-RUN pip install . \
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install . \
     && useradd --create-home --uid 10001 aegis
 
 USER aegis

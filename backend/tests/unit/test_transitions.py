@@ -1,5 +1,7 @@
 """P1-07: R6 allowed-pairs table (PRD §8) and optimistic row_version."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.models.payables import EXECUTION_STATUSES, InvoiceExecution
@@ -36,6 +38,21 @@ PRD_PAIRS = {
 
 class FakeSession:
     flushes = 0
+
+    def in_transaction(self):
+        return True
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+
+    async def scalar(self, statement):
+        return "read committed"
+
+    async def execute(self, *args):
+        pass
+
+    def add(self, row):
+        self.queued = row
 
     async def flush(self):
         self.flushes += 1

@@ -10,6 +10,7 @@ import logging
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.events import enqueue_event
 from app.models.payables import InvoiceExecution
 
 log = logging.getLogger("aegis.settlement")
@@ -55,10 +56,18 @@ async def apply(
             execution.execution_id,
         )
         raise IllegalTransition(execution.execution_id, execution.status, to)
+    previous = execution.status
     execution.status = to
     execution.row_version += 1
     execution.updated_at = func.now()
     await session.flush()
+    await enqueue_event(
+        session,
+        execution_id=execution.execution_id,
+        actor="system",
+        event_type=to,
+        payload={"from_status": previous, "to_status": to, "row_version": execution.row_version},
+    )
 
 
 async def apply_or_ignore(session: AsyncSession, execution: InvoiceExecution, to: str) -> bool:

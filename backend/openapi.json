@@ -1260,6 +1260,56 @@
         "title": "ShortPayDecision",
         "type": "object"
       },
+      "StreamEvent": {
+        "additionalProperties": false,
+        "description": "Minimal state notification; clients fetch authorized case details over REST (R25).",
+        "properties": {
+          "execution_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Execution Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_:-]+$",
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_:-]+$",
+            "title": "Status",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "node",
+              "settlement",
+              "webhook"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "execution_id",
+          "name",
+          "status",
+          "ts"
+        ],
+        "title": "StreamEvent",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1550,6 +1600,38 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/stream": {
+      "get": {
+        "operationId": "execution_stream",
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamEvent",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Each SSE data field is a StreamEvent JSON object"
+          },
+          "501": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Authenticated stream not implemented"
+          }
+        },
+        "summary": "Execution Stream",
+        "tags": [
+          "Stream contract (not implemented)"
+        ]
       }
     },
     "/api/webhooks/paypal/simulator/{account}": {

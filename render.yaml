@@ -76,6 +76,8 @@ services:
         sync: false
       - key: AUDIT_ANCHOR_REPO
         sync: false
+      - key: AUDIT_ANCHOR_TOKEN
+        sync: false
       - key: VELOCITY_MAX_PAYOUTS_PER_HOUR
         value: "20"
       - key: VELOCITY_MAX_CENTS_PER_HOUR
