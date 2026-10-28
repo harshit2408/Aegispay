@@ -148,7 +148,19 @@ Append only non-secret facts after account access and creation are confirmed:
 | Actual compute plan and storage | Owner attests paid plans chosen; plan names not recorded |
 | Credit amount, redemption date, expiry | Owner attests credits redeemed; amount, date and expiry not recorded |
 
-API service `Aegispay` (Docker, `backend/Dockerfile`, context `./backend`) deploys from `main` and boots; settlement worker and frontend services are still P1-24.
+API service `Aegispay` (Docker, `backend/Dockerfile`, context `./backend`) deploys from `main` and boots; the frontend service is still open.
+
+### P1-24 settlement worker evidence (2026-10-28, owner-supplied dashboard captures; no values recorded)
+
+| Evidence | Verified value |
+|---|---|
+| Worker service | `aegispay-settlement`, Background Worker, Docker, `0.5c-512mb`, branch `main` at `6044496`, status **Live** |
+| Build | Docker build and image push succeeded; "Your service is live" at 08:53:59Z |
+| Worker env var names | `ALERT_WEBHOOK_URL`, `AUDIT_ANCHOR_REPO`, `AUDIT_HMAC_KEY`, `PAYPAL_BASE_URL`, `SETTLEMENT_DATABASE_URL`, `TREASURY_{ACCOUNT_EMAIL,CLIENT_ID,CLIENT_SECRET,WEBHOOK_ID}`, `VELOCITY_MAX_{CENTS,PAYOUTS}_PER_HOUR`, `VENDOR_{ACCOUNT_EMAIL,CLIENT_ID,CLIENT_SECRET,WEBHOOK_ID}`. No `DATABASE_URL`, `CHECKPOINT_DB_URL`, `LLM_*`, `SESSION_SECRET` or `DEMO_*` |
+| API env var names | `CHECKPOINT_DB_URL`, `DATABASE_URL`, `PAYPAL_BASE_URL`, `SESSION_SECRET`, `TREASURY_WEBHOOK_ID`, `VENDOR_{ACCOUNT_EMAIL,CLIENT_ID,CLIENT_SECRET,WEBHOOK_ID}`. No `TREASURY_CLIENT_*`, `AUDIT_HMAC_KEY` or `SETTLEMENT_DATABASE_URL` |
+| API liveness | `GET /api/health` returned 200 repeatedly in the API runtime log |
+
+Not evidenced: the worker's runtime log (role/environment checks passing, outbox/reconcile/webhook loops starting) was not captured, only the build log; which database login each URL uses (values masked); `LLM_*` variables on the API (not needed before P2). Hosted webhook retargeting and the real sandbox S1 remain P1-12 and P3 work.
 
 Mark P0-04 complete only when the project/database and redeemed credit balance are evidenced.
 Local tests or a Blueprint alone cannot satisfy that item.
