@@ -96,14 +96,14 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — 55b2f38
 - [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — 55b2f38
 - [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — 55b2f38
-- [ ] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required
+- [ ] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required (WIP B)
 - [ ] **P2-20** @B Mandate studio: compile → diff → activate
-- [ ] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s
+- [ ] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s (WIP B)
 - [ ] **P2-22** @A `routers/vendors.py`: payee change request → second approver → cooling → effective; alerts (R15)
 - [ ] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16)
 - [ ] **P2-24** @A Gate G11–G14, approvals bound to `gate_hash`, resume by `approval_id` only, distinct-human count inside the gate (R11)
 - [ ] **P2-25** @A `SETTLEMENT_HALT`, velocity breaker, `ops/alerts.py` (R23)
-- [ ] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21)
+- [ ] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21) (WIP B)
 
 ## P3 — Agents, auth, deploy (Nov 3–6) · exit: **hosted S1–S4 green on Render**; rough-cut video Nov 5
 
