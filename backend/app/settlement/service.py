@@ -21,10 +21,10 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.payables import InvoiceExecution, Payout, SettlementOutbox
-from app.paypal.client import BACKOFF_BASE_S, RETRY_STATUSES, PayPalError
+from app.paypal.client import BACKOFF_BASE_S, RETRY_STATUSES, PayPalAuthError, PayPalError
 from app.paypal.payouts import PayoutBatch, PayoutCommand, PayoutMismatch, Payouts, PayoutUnresolved
 from app.settlement import halt as halt_flag
-from app.settlement import spend_ledger, transitions
+from app.settlement import po_ledger, spend_ledger, transitions
 from app.settlement.prechecks import db_recheck, invoice_recheck
 from app.vendor_sim.gateway import VendorReader
 
@@ -32,12 +32,16 @@ log = logging.getLogger("aegis.settlement")
 
 PAYOUT_RECOVERY_TTL = timedelta(minutes=30)  # PAYOUT_RECOVERY_TTL_MIN (R19)
 PROGRESSED = frozenset({"PAYOUT_SUBMITTED", "PAYOUT_SUCCEEDED", "SETTLED", "PAYOUT_FAILED"})
-UNRESOLVED = (PayPalError, PayoutUnresolved, httpx.TransportError)
+UNRESOLVED = (PayPalError, PayPalAuthError, PayoutUnresolved, httpx.TransportError)
 POST_ATTEMPTS = 3  # §9.3 crash recovery step 5: 5xx/timeout, same keys, at most 3 attempts
 
 
 class NoCommand(Exception):
     """No outbox command or execution for this ID: nothing to pay."""
+
+
+class RecheckFailed(Exception):
+    """The final check after OAuth acquisition refused the payout POST."""
 
 
 class SettlementService:
@@ -83,7 +87,10 @@ class SettlementService:
     async def _start(self, command: PayoutCommand) -> str:
         async with self._sm() as s:
             execution = await s.get(InvoiceExecution, command.execution_id)
-            reason = await invoice_recheck(self._vendor, execution)  # HTTP, before any lock
+            outbox = await _outbox(s, command.execution_id)
+            reason = await db_recheck(s, execution, outbox)
+            if reason is None:
+                reason = await invoice_recheck(self._vendor, execution)  # HTTP, before any lock
         if reason:
             return await self._freeze(command, reason)
         async with self._sm() as s, s.begin():
@@ -94,20 +101,30 @@ class SettlementService:
             reason = await db_recheck(s, execution, outbox)
             if reason is None:
                 try:
-                    await spend_ledger.reserve(
-                        s,
-                        execution_id=command.execution_id,
-                        policy_id=execution.policy_id,
-                        vendor_id=execution.vendor_id,
-                        amount_cents=command.amount_cents,
-                        now=self._clock(),
-                    )
+                    async with s.begin_nested():
+                        await spend_ledger.reserve(
+                            s,
+                            execution_id=command.execution_id,
+                            policy_id=execution.policy_id,
+                            vendor_id=execution.vendor_id,
+                            amount_cents=command.amount_cents,
+                            now=self._clock(),
+                        )
+                        await po_ledger.reserve(
+                            s,
+                            execution_id=command.execution_id,
+                            po_id=execution.po_id,
+                            amount_cents=command.amount_cents,
+                        )
                 except spend_ledger.OverCap:
                     reason = "OVER_CAP"
                 except spend_ledger.NoActiveMandate:
                     reason = "NO_ACTIVE_MANDATE"
+                except po_ledger.OverConsumption:
+                    reason = "PO_EXHAUSTED"
             if reason:
                 await transitions.apply(s, execution, "FROZEN")
+                await _release_reservations(s, command.execution_id)
                 await _set_outbox(s, command.execution_id, "FAILED", reason)
                 log.warning(
                     "frozen before payout: %s execution_id=%s", reason, command.execution_id
@@ -131,9 +148,6 @@ class SettlementService:
             payout = await _payout(s, command.execution_id)
         if payout is not None and payout.payout_batch_id:
             return await self._post_and_submit(command, known_batch_id=payout.payout_batch_id)
-        reason = await self._repost_reason(command)
-        if reason:
-            return await self._manual_review(command, reason)
         return await self._post_and_submit(command)
 
     async def _repost_reason(self, command: PayoutCommand) -> str | None:
@@ -144,10 +158,24 @@ class SettlementService:
             outbox = await _outbox(s, command.execution_id)
             if payout is None:
                 return "NO_WRITE_AHEAD_ROW"
+            if execution.status != "PAYOUT_SENDING":
+                return "EXECUTION_CHANGED"
+            if (
+                payout.receiver != command.receiver_payer_id
+                or payout.amount_cents != command.amount_cents
+                or payout.sender_batch_id != command.sender_batch_id
+            ):
+                return "WRITE_AHEAD_MISMATCH"
             if self._clock() - payout.created_at > self._ttl:
                 return "RECOVERY_TTL_EXPIRED"
             reason = await db_recheck(s, execution, outbox)
-        return reason or await invoice_recheck(self._vendor, execution)
+        if reason or (reason := await invoice_recheck(self._vendor, execution)):
+            return reason
+        # Invoice GET (and its OAuth refresh) can overlap a committed halt or master-data change.
+        async with self._sm() as s:
+            execution = await s.get(InvoiceExecution, command.execution_id)
+            outbox = await _outbox(s, command.execution_id)
+            return await db_recheck(s, execution, outbox)
 
     async def _post_and_submit(
         self, command: PayoutCommand, known_batch_id: str | None = None
@@ -157,13 +185,24 @@ class SettlementService:
             async with self._sm() as s:
                 if await halt_flag.is_halted(s):
                     return await self._manual_review(command, "HALTED_BEFORE_POST")
+
+        async def before_send() -> None:
+            if reason := await self._repost_reason(command):
+                raise RecheckFailed(reason)
+
         try:
             attempt = 1
             while batch_id is None:  # one POST per checked attempt; keys never change (R5)
                 try:
-                    batch_id = (await self._payouts.create_or_adopt(command)).payout_batch_id
+                    batch_id = (
+                        await self._payouts.create_or_adopt(command, before_send=before_send)
+                    ).payout_batch_id
                 except (PayPalError, httpx.TransportError) as err:
-                    retryable = not isinstance(err, PayPalError) or err.status in RETRY_STATUSES
+                    retryable = (
+                        not isinstance(err, PayPalError)
+                        or err.status in RETRY_STATUSES
+                        or err.status == 401
+                    )
                     if not retryable or attempt == POST_ATTEMPTS:
                         raise
                     log.warning(
@@ -173,9 +212,9 @@ class SettlementService:
                     )
                     await self._sleep(BACKOFF_BASE_S * 2 ** (attempt - 1))
                     attempt += 1
-                    if reason := await self._repost_reason(command):
-                        return await self._manual_review(command, reason)
             batch = await self._payouts.get_batch(batch_id, execution_id=command.execution_id)
+        except RecheckFailed as err:
+            return await self._manual_review(command, str(err))
         except PayoutMismatch as err:
             return await self._manual_review(
                 command, "PAYOUT_MISMATCH", halt=True, batch_id=err.payout_batch_id
@@ -211,7 +250,10 @@ class SettlementService:
     async def _freeze(self, command: PayoutCommand, reason: str) -> str:
         async with self._sm() as s, s.begin():
             execution = await _lock(s, command.execution_id)
+            if execution.status != "APPROVED_FOR_PAYMENT":
+                return execution.status
             await transitions.apply(s, execution, "FROZEN")
+            await _release_reservations(s, command.execution_id)
             await _set_outbox(s, command.execution_id, "FAILED", reason)
         log.warning("frozen before payout: %s execution_id=%s", reason, command.execution_id)
         return "FROZEN"
@@ -251,6 +293,13 @@ class SettlementService:
 async def _outbox(session: AsyncSession, execution_id: str) -> SettlementOutbox | None:
     query = select(SettlementOutbox).where(SettlementOutbox.execution_id == execution_id)
     return (await session.execute(query)).scalar_one_or_none()
+
+
+async def _release_reservations(session: AsyncSession, execution_id: str) -> None:
+    for ledger in (spend_ledger, po_ledger):
+        reserved = await ledger.open_reserve(session, execution_id)
+        if reserved is not None:
+            await ledger.release(session, reserve_entry_id=reserved.entry_id)
 
 
 async def _payout(session: AsyncSession, execution_id: str) -> Payout | None:

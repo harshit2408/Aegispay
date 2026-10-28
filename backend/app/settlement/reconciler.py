@@ -17,8 +17,8 @@ from app.models.payables import InvoiceExecution, Payout
 from app.paypal.client import PayPalError
 from app.paypal.payouts import PayoutCommand, PayoutItem, Payouts
 from app.settlement import halt as halt_flag
-from app.settlement import spend_ledger, transitions
-from app.settlement.service import _lock, _payout, _set_outbox
+from app.settlement import po_ledger, transitions
+from app.settlement.service import _lock, _payout, _release_reservations, _set_outbox
 from app.vendor_sim.gateway import VendorGateway
 
 log = logging.getLogger("aegis.settlement")
@@ -75,7 +75,11 @@ class Reconciler:
             return execution.status
         item = await self._item(payout)
         command = PayoutCommand(execution_id, payout.receiver, payout.amount_cents)
-        if not item.matches(command):
+        if (
+            not item.matches(command)
+            or item.payout_batch_id != payout.payout_batch_id
+            or (payout.payout_item_id is not None and item.payout_item_id != payout.payout_item_id)
+        ):
             return await self._manual_review(execution_id, "ITEM_MISMATCH", halt=True)
         status = item.status or ""
         if status == "SUCCESS":
@@ -125,7 +129,7 @@ class Reconciler:
             if not await transitions.apply_or_ignore(s, execution, to):
                 return execution.status
             if release:
-                await _release_open_reserve(s, execution_id)
+                await _release_reservations(s, execution_id)
             await _set_outbox(s, execution_id, "FAILED", reason)
             return to
 
@@ -136,7 +140,11 @@ class Reconciler:
             payout.item_status, payout.last_polled_at = "SUCCESS", func.now()
             if execution.status == "SETTLED":
                 return "SETTLED"
-            await transitions.apply(s, execution, "PAYOUT_SUCCEEDED")
+            if execution.status != "PAYOUT_SUCCEEDED" and not await transitions.apply_or_ignore(
+                s, execution, "PAYOUT_SUCCEEDED"
+            ):
+                return execution.status
+            await po_ledger.close_if_fully_paid(s, execution.po_id)
         return await self._settle(execution_id)
 
     async def _settle(self, execution_id: str) -> str:
@@ -178,6 +186,8 @@ class Reconciler:
                 return await self._manual_review(execution_id, "RECORD_PAYMENT_FAILED")
         async with self._sm() as s, s.begin():
             execution = await _lock(s, execution_id)
+            if execution.status != "PAYOUT_SUCCEEDED":
+                return execution.status
             await transitions.apply(s, execution, "SETTLED")
             if execution.route == "SHORT_PAY":
                 execution.short_pay_balance = "NOTICE_SENT"
@@ -204,14 +214,6 @@ class Reconciler:
                 await halt_flag.halt(s, f"{reason} execution_id={execution_id}")
         log.error("NEEDS_MANUAL_REVIEW %s execution_id=%s", reason, execution_id)
         return "NEEDS_MANUAL_REVIEW"
-
-
-async def _release_open_reserve(session: AsyncSession, execution_id: str) -> None:
-    reserve = await spend_ledger.open_reserve(session, execution_id)
-    if reserve is None:
-        log.warning("no open reservation to release execution_id=%s", execution_id)
-        return
-    await spend_ledger.release(session, reserve_entry_id=reserve.entry_id)
 
 
 async def run_forever(

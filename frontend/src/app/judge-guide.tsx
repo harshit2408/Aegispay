@@ -16,7 +16,7 @@ export function JudgeGuide() {
         <section aria-labelledby="simulation-guide">
           <h2 id="simulation-guide">What works in this preview</h2>
           <p>The cockpit contains synthetic Studio integration probes and a scripted hello-world agent. No PayPal or LLM requests run here.</p>
-          <p>Case evidence, mandate changes, settlement and supplier actions are pending their backend integrations. The supplier area is a simulator, not an independent supplier service.</p>
+          <p>The case workspace includes synthetic Evidence, Security and Money panes with local decision rehearsal. Mandate changes, settlement and supplier actions are pending their backend integrations. The supplier area is a simulator, not an independent supplier service.</p>
           <h3>Operator access</h3>
           <p>Operator sign-in and judge credentials are not configured in this shell. The authenticated demo will provide named accounts for controller, CFO, AP clerk, receiver and admin roles.</p>
         </section>

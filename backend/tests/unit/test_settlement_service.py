@@ -13,6 +13,7 @@ from app.models.core import GoodsReceipt
 from app.models.payables import (
     InvoiceExecution,
     Payout,
+    POLedger,
     SettlementControl,
     SettlementOutbox,
     SpendLedger,
@@ -142,6 +143,8 @@ async def test_happy_path_moves_to_submitted_with_frozen_values(env):
     assert payout.sender_batch_id == "AEGIS-e1"
     (entry,) = await env.rows(SpendLedger)
     assert (entry.kind, entry.amount_cents) == ("RESERVE", 48000)
+    (po_entry,) = await env.rows(POLedger)
+    assert (po_entry.kind, po_entry.amount_cents, po_entry.qty) == ("RESERVE", 48000, 100)
     (outbox,) = await env.rows(SettlementOutbox)
     assert outbox.status == "DONE"
 
@@ -178,8 +181,8 @@ BYPASS = "set local session_replication_role = replica; "
         ("update settlement_controls set halted = true", "HALTED"),
         (BYPASS + "update invoice_executions set approved_cents = 49000", "AMOUNT_CHANGED"),
         (BYPASS + "update invoice_executions set replayed = true", "REPLAYED_EXECUTION"),
-        ("update invoice_executions set grn_id = null", "NO_GRN"),
-        ("update invoice_executions set vendor_id = null", "NO_VENDOR"),
+        (BYPASS + "update invoice_executions set grn_id = null", "NO_GRN"),
+        (BYPASS + "update invoice_executions set vendor_id = null", "NO_VENDOR"),
     ],
 )
 async def test_r20_recheck_failures_freeze_before_any_reservation_or_post(env, break_it, reason):
@@ -202,7 +205,7 @@ async def test_superseded_grn_freezes(env):
                 received_qty=90,
                 accepted_qty=90,
                 rejected_qty=0,
-                recorded_by="op-ctl",
+                recorded_by="op-rcv",
                 source="SEEDED",
                 received_at=datetime(2026, 1, 2, tzinfo=UTC),
             )
@@ -294,7 +297,7 @@ async def test_payout_retry_after_5xx_rechecks_then_posts_with_same_keys(env):
     assert env.post.call_count == 2
     ids = {c.request.headers["paypal-request-id"] for c in env.post.calls}
     assert ids == {"aegis-e1-payout"}
-    assert env.invoice.call_count == 2  # the R20 invoice recheck ran again before the retry
+    assert env.invoice.call_count == 3  # initial read, pre-POST check, retry check
 
 
 async def test_payout_retry_after_ttl_does_not_post(env):

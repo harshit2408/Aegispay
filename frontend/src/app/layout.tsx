@@ -14,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <a className="skip-link" href="#main">Skip to main content</a>
-        <div className="replay-banner">REPLAY · Development preview · Synthetic Studio probes only</div>
+        <div className="replay-banner">REPLAY · Development preview · Synthetic data only</div>
         <header className="app-header">
           <Link className="brand" href="/">AEGISPAY <span>Payables workspace</span></Link>
           <NavigationLinks />

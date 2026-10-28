@@ -39,7 +39,7 @@ or database rather than creating duplicates.
 |---|---|
 | Project | `AegisPay` |
 | First environment | `sandbox` (PayPal sandbox; this label grants no security controls) |
-| Postgres service name | `aegispay-postgres` |
+| Postgres service name | `aegis-db` (the committed Blueprint name) |
 | Database name | `aegis` |
 | PostgreSQL version | **16**, matching the repository's local Compose image |
 | Region | **Singapore**, proposed for the developers in India; keep API, settlement worker and database together |
@@ -50,6 +50,16 @@ Then use **New → Postgres** ([creation form](https://dashboard.render.com/new/
 assign it to that project/environment and enter the settings above. Wait for **Available**.
 [Project instructions](https://render.com/docs/projects) and
 [database instructions](https://render.com/docs/postgresql-creating-connecting).
+
+The Blueprint's `databases:` block describes a **new** paid PostgreSQL 16 instance, using
+the current `0.1c-256mb` plan and an administrator named `aegis_owner`. Its empty
+`ipAllowList` disables public database connections. Confirm cost before applying it.
+An existing suitable database should be reused: reconcile its resource name and immutable
+database/user/version settings before applying the Blueprint, rather than creating a
+duplicate or attempting to rename its owner. The Blueprint omits region for all resources,
+so new resources default to Oregon; set the same chosen region on the database and all
+services before first creation if using Singapore. See the
+[Blueprint database reference](https://render.com/docs/blueprint-spec#database-fields).
 
 Singapore is a supported region. Render cannot change an existing resource's region in place;
 cross-region resources lose private-network connectivity. Confirm the region before creating
@@ -65,6 +75,31 @@ needs an explicit upgrade plan; it is not the final judging configuration.
 
 ## Connection and deployment boundary
 
+### Empty configuration slots and owner inputs
+
+`.env.example` keeps working local database/API URLs and includes a blank hosted-override
+worksheet using the actual `render.yaml` variable names. Its credential and AG licence
+slots are empty; the administrator-only `MIGRATION_DATABASE_URL` slot is commented out.
+Copy only the variables
+for each process into that Render service; replace local URLs rather than adding duplicate
+keys. Do not import the combined template as one shared environment group.
+
+| Where to configure | Values the owner must supply privately |
+|---|---|
+| Separate migration session | `MIGRATION_DATABASE_URL` using the database owner; never a runtime service variable |
+| API | `DATABASE_URL` and `CHECKPOINT_DB_URL` using the restricted API login; existing Vendor sandbox/webhook values and `LLM_API_KEY`; Render generates `SESSION_SECRET` |
+| Settlement worker | `SETTLEMENT_DATABASE_URL` using its restricted login; existing Treasury/Vendor sandbox credentials, account emails and webhook IDs; `AUDIT_HMAC_KEY` |
+| Frontend build | `NEXT_PUBLIC_API_URL` with the public HTTPS API origin; `NEXT_PUBLIC_AG_LICENSE_KEY` with the legitimate Studio licence |
+
+`AUDIT_ANCHOR_REPO` and `ALERT_WEBHOOK_URL` already have blank slots; their consumers remain
+P2 work. This deployment does not consume a Render API token or a separate AG Studio AI key.
+Do not paste licence keys, database URLs or passwords into chat or this document.
+
+To verify the account-dependent work, share only project/Postgres/service dashboard links,
+the selected region and plans, redeemed credit balance and expiry, and confirmation that
+the Studio licence includes the needed AI entitlement through **2026-12-15**. Confirm when
+the private values above are entered, so a licensed rebuild and hosted isolation checks can run.
+
 Use the database's **internal** host from Render services in the same workspace and region.
 Disable external database access unless required for setup; if temporarily enabled, restrict
 it to the operator's IP and require TLS. Never put connection URLs/passwords in this document.
@@ -72,6 +107,10 @@ it to the operator's IP and require TLS. Never put connection URLs/passwords in 
 
 The generated owner credential is for administration, not the application. P1-19/P1-24 must
 create the separate `aegis_api` and `aegis_settle` roles and verify grants before deployment.
+Keep runtime database variables as `sync: false` and enter those restricted login URLs
+privately. Do not use `fromDatabase` with `connectionString`: it supplies the owner login,
+which violates R22 and is rejected by the API/worker startup checks. The `aegis_owner` URL
+belongs only in the separate migration session.
 Use `postgresql+asyncpg://` for SQLAlchemy's `DATABASE_URL` and
 `SETTLEMENT_DATABASE_URL`; the API's `CHECKPOINT_DB_URL` uses `postgresql://` with the API
 role. Driver-specific TLS settings must be verified in the deployment connection test.
@@ -79,11 +118,14 @@ role. Driver-specific TLS settings must be verified in the deployment connection
 Supply only each service's PRD §7 variables. Do not attach a shared group containing all
 secrets: Treasury credentials and `AUDIT_HMAC_KEY` belong only to settlement; the LLM key
 and session secret belong only to API; frontend receives its public build variables.
-The parser subprocess gets an empty environment. Existing skeleton code does not yet
-implement the full R22 boot/grant assertions; this guide does not claim that isolation works.
+Parser subprocess isolation remains P3-14. P1 supplies API/settlement environment assertions,
+actual database-role checks and migration 0006 capability grants. Local evidence does not
+establish that the owner has configured those boundaries in the hosted account.
 
-Before P3-04, implement the settlement worker and frontend, service env assertions and grants;
-then produce `render.yaml` with one API instance, one settlement worker and the frontend.
+The committed `render.yaml` defines one API instance, one settlement worker and the frontend.
+Its resource fields follow the [Render Blueprint reference](https://render.com/docs/blueprint-spec).
+Automatic deploys are disabled in the template. Before activating it, provision the runtime
+logins and service variables below; migration credentials never belong in a runtime service.
 Use `/api/health` for readiness and the external uptime check. Keep PayPal sandbox-only and
 enable demo routes only under R24's sandbox guard.
 
@@ -108,3 +150,39 @@ Append only non-secret facts after account access and creation are confirmed:
 
 Mark P0-04 complete only when the project/database and redeemed credit balance are evidenced.
 Local tests or a Blueprint alone cannot satisfy that item.
+
+## P1-19/P1-24 role and process setup
+
+Run Alembic migrations in a separate administrator session with a database owner that can
+create roles. The migrations create `aegis_api_role` and `aegis_settlement_role` as NOLOGIN
+capabilities. Their names differ from login names so an existing local owner cannot silently
+be mistaken for an unprivileged capability. Runtime logins must be NOSUPERUSER, NOCREATEDB,
+NOCREATEROLE and NOBYPASSRLS, and inherit exactly one of those capabilities.
+
+For a new managed database, the owner creates private `aegis_api` and `aegis_settle` logins,
+grants only `aegis_api_role` to the former and `aegis_settlement_role` to the latter, and sets
+passwords privately. Then set API DATABASE_URL/CHECKPOINT_DB_URL to the API login and worker
+SETTLEMENT_DATABASE_URL to the settlement login. Do not reuse the database owner connection.
+Boot checks inspect PostgreSQL role flags and memberships, not just the URL username.
+Verify the hosted owner's role-management permissions before applying migrations; no hosted
+role provisioning is claimed by this repository change.
+
+On a **fresh local Compose volume**, local-db-init.sql supplies clearly development-only
+logins, and the one-shot migrate service applies Alembic before the API starts. The API and
+optional settlement service then use different, restricted logins. Existing volumes from the
+earlier superuser skeleton need an explicit owner-led migration of roles; do not delete a
+volume or expect init scripts to rerun automatically. Use a unique COMPOSE_PROJECT_NAME for
+disposable verification so another developer's data is preserved.
+
+The settlement profile starts `python -m app.settlement.worker`, with independent outbox,
+GET reconciliation and verified-webhook-consumer loops. It requires configured Treasury and
+Vendor sandbox credentials. It receives no LLM/session/demo/API database variables. The API
+receives no Treasury credentials, signing key or worker database URL. Do not start either
+process by loading one combined secret file; inject only its tagged PRD §7 variables.
+Settings validation errors expose field names, not credential values. SIGTERM stops the
+worker loops and closes HTTP clients and the database engine; leased commands survive a kill.
+
+P1-24 code/configuration can be reviewed locally. Hosted deployment evidence, webhook
+retargeting, licence entitlement, uptime and real sandbox S1 still require owner setup and
+their explicit acceptance checks. Audit queue consumption/external anchors and the velocity
+breaker remain P2 work; worker presence alone does not claim those controls are deployed.

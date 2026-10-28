@@ -186,6 +186,7 @@ class POLedger(Base):
         CheckConstraint(_in("kind", ("RESERVE", "RELEASE")), name="ck_poled_kind"),
         CheckConstraint("qty >= 0", name="ck_poled_qty"),
         CheckConstraint("amount_cents > 0", name="ck_poled_amount"),
+        CheckConstraint("(kind = 'RELEASE') = (reserve_entry_id IS NOT NULL)", name="ck_poled_ref"),
         UniqueConstraint("reserve_entry_id", name="uq_poled_one_release_per_reserve"),
     )
 

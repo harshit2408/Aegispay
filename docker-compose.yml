@@ -1,22 +1,32 @@
 # Local dev stack (PRD §6, §7): default postgres + api, optional frontend profile.
-# Settlement worker and DB grants land in P1-24/P1-19; they are not provisioned here.
+# Migration owner and runtime logins are separate; the settlement profile needs sandbox credentials.
 services:
   postgres:
     image: postgres:16
-    # shortcut: one local DB owner; least-privilege api/settlement grants land in P1-19.
     environment:
-      POSTGRES_USER: aegis_api
+      POSTGRES_USER: aegis_owner
       POSTGRES_PASSWORD: aegis
       POSTGRES_DB: aegis
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./backend/scripts/local-db-init.sql:/docker-entrypoint-initdb.d/001-runtime-roles.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aegis_api -d aegis"]
+      test: ["CMD-SHELL", "pg_isready -U aegis_owner -d aegis"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  migrate:
+    build: ./backend
+    command: ["python", "-m", "alembic", "-c", "alembic.ini", "upgrade", "head"]
+    environment:
+      MIGRATION_DATABASE_URL: postgresql+asyncpg://aegis_owner:aegis@postgres:5432/aegis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   api:
     build: ./backend
@@ -56,12 +66,52 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  settlement:
+    profiles: ["settlement"]
+    build: ./backend
+    command: ["python", "-m", "app.settlement.worker"]
+    stop_grace_period: 45s
+    environment:
+      SETTLEMENT_DATABASE_URL: postgresql+asyncpg://aegis_settle:aegis@postgres:5432/aegis
+      PAYPAL_BASE_URL: ${PAYPAL_BASE_URL:-https://api-m.sandbox.paypal.com}
+      TREASURY_CLIENT_ID: ${TREASURY_CLIENT_ID:-}
+      TREASURY_CLIENT_SECRET: ${TREASURY_CLIENT_SECRET:-}
+      TREASURY_ACCOUNT_EMAIL: ${TREASURY_ACCOUNT_EMAIL:-treasury@aegispay-demo.example}
+      TREASURY_WEBHOOK_ID: ${TREASURY_WEBHOOK_ID:-}
+      VENDOR_CLIENT_ID: ${VENDOR_CLIENT_ID:-}
+      VENDOR_CLIENT_SECRET: ${VENDOR_CLIENT_SECRET:-}
+      VENDOR_ACCOUNT_EMAIL: ${VENDOR_ACCOUNT_EMAIL:-supplier@aegispay-demo.example}
+      VENDOR_WEBHOOK_ID: ${VENDOR_WEBHOOK_ID:-}
+      AUDIT_HMAC_KEY: ${AUDIT_HMAC_KEY:-}
+      AUDIT_ANCHOR_REPO: ${AUDIT_ANCHOR_REPO:-}
+      ORG_HARD_MAX_SINGLE_CENTS: ${ORG_HARD_MAX_SINGLE_CENTS:-100000}
+      ORG_HARD_DAILY_CAP_CENTS: ${ORG_HARD_DAILY_CAP_CENTS:-500000}
+      ORG_HARD_VENDOR_DAILY_CAP_CENTS: ${ORG_HARD_VENDOR_DAILY_CAP_CENTS:-150000}
+      ORG_HARD_VENDOR_30D_CAP_CENTS: ${ORG_HARD_VENDOR_30D_CAP_CENTS:-1000000}
+      ORG_HARD_MAX_INVOICES_PER_VENDOR_PER_DAY: ${ORG_HARD_MAX_INVOICES_PER_VENDOR_PER_DAY:-5}
+      ORG_HARD_MAX_PRICE_VARIANCE_BPS: ${ORG_HARD_MAX_PRICE_VARIANCE_BPS:-200}
+      ORG_HARD_MAX_SHORT_PAY_DELTA_CENTS: ${ORG_HARD_MAX_SHORT_PAY_DELTA_CENTS:-20000}
+      ORG_HARD_MAX_DUAL_APPROVAL_THRESHOLD: ${ORG_HARD_MAX_DUAL_APPROVAL_THRESHOLD:-80}
+      ORG_ALLOWED_TIMEZONES: ${ORG_ALLOWED_TIMEZONES:-UTC,America/Los_Angeles,Asia/Kolkata}
+      PAYEE_COOLING_HOURS: ${PAYEE_COOLING_HOURS:-72}
+      VENDOR_NEW_DAYS: ${VENDOR_NEW_DAYS:-7}
+      VELOCITY_MAX_PAYOUTS_PER_HOUR: ${VELOCITY_MAX_PAYOUTS_PER_HOUR:-20}
+      VELOCITY_MAX_CENTS_PER_HOUR: ${VELOCITY_MAX_CENTS_PER_HOUR:-300000}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     profiles: ["frontend"]

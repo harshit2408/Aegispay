@@ -23,7 +23,10 @@ async def claim_next(session: AsyncSession, now: datetime) -> SettlementOutbox |
     """Claim one PENDING (or lease-expired CLAIMED) command; workers never share a row."""
     ready = or_(
         SettlementOutbox.status == "PENDING",
-        and_(SettlementOutbox.status == "CLAIMED", SettlementOutbox.claimed_until < now),
+        and_(
+            SettlementOutbox.status == "CLAIMED",
+            or_(SettlementOutbox.claimed_until <= now, SettlementOutbox.claimed_until.is_(None)),
+        ),
     )
     query = (
         select(SettlementOutbox)
@@ -43,11 +46,12 @@ async def claim_next(session: AsyncSession, now: datetime) -> SettlementOutbox |
         log.error("outbox command gave up execution_id=%s", row.execution_id)
         stuck = select(InvoiceExecution).where(
             InvoiceExecution.execution_id == row.execution_id,
-            InvoiceExecution.status == "PAYOUT_SENDING",
+            InvoiceExecution.status.in_(("PAYOUT_SENDING", "APPROVED_FOR_PAYMENT")),
         )
         execution = (await session.execute(stuck.with_for_update())).scalar_one_or_none()
-        if execution is not None:  # money may have moved: a human decides, reservation kept (R19)
-            await transitions.apply(session, execution, "NEEDS_MANUAL_REVIEW")
+        if execution is not None:
+            target = "NEEDS_MANUAL_REVIEW" if execution.status == "PAYOUT_SENDING" else "FROZEN"
+            await transitions.apply(session, execution, target)
         await session.flush()
     return None
 

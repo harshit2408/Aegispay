@@ -65,7 +65,7 @@ A change to any of these three = write an ADR or memory `decision` and tell the 
 | Q1 | ~~Pay by `PAYPAL_ID` instead of `EMAIL`?~~ Decided (PRD v2.1): yes, confirm in SPIKE-10 | A | SPIKE-10 | P0-19 |
 | Q2 | ~~`HIGH_RISK` approvable in demo?~~ Decided (PRD v2.1): only by 2 distinct eligible humans, not the uploader. A to confirm | A+B | Oct 27 | P1-18 |
 | Q3 | Decided 2026-10-26: OpenAI `gpt-6.1-sol` for extraction + reasoning; $1.00 per invoice execution, ≤4 requests incl. retries. See TOOLS for rationale and implementation limits. | B closeout; A implementation | Decided | P0-16 |
-| Q4 | Terminal aesthetic vs AG Studio theme base? | B | Oct 23 | P1-17 |
+| Q4 | Decided 2026-10-27: official AG Studio dark base and shared application tokens; native controls, keyboard focus and AA contrast retained. | B | Done | P1-17 |
 
 Record each answer as an ECC team memory (`kind: decision`) and in the PRD.
 
@@ -83,3 +83,7 @@ User authorized Dev B and task-specific subagents to finish all remaining P0 wor
 ## P1 completion delegation — 2026-10-27
 
 The user authorized Dev B to finish every locally achievable P1 task before the account usage window ends, batching implementation and final validation while minimizing Git calls. Dev B temporarily owns the unclaimed P1-12/P1-21/P1-22/P1-23 settlement and exit work in addition to the remaining B items. Existing P1-11 work and review gates are preserved. Real AP/finance interviews, live sandbox evidence and hosted account setup are completed only when actual evidence exists; no research or deployment success is inferred from mocks. R1–R4 changes still require the other developer to review before merge.
+
+## P1-16 research scope revision — 2026-10-27
+
+The owner explicitly substituted internet research because direct AP/finance interviews are not feasible now. P1-16 accepts three cited published AP/finance customer case profiles, a clear separation of source evidence from product inference, and limitations with an access date. PRD §1.3/§2.4 and USER_RESEARCH.md record this revision. Firsthand interviews, usability testing and permissioned participant quotes remain deferred; commercial case studies do not prove demand for AegisPay, willingness to delegate payments or an endorsement. This replaces only the P1-16 interview acceptance requirement; live S1, hosted deployment and money review gates are unchanged.

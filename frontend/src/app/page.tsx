@@ -7,7 +7,7 @@ export default function Home() {
         <p className="eyebrow">OPERATIONS / COCKPIT</p>
         <h1 id="cockpit-title">Payables cockpit</h1>
         <p>Review invoice cases, follow settlement and see what needs attention.</p>
-        <p className="pending-note">Live payables widgets are not connected yet. The Studio workspace below contains local integration probes.</p>
+        <p className="pending-note">Synthetic preview: payables ledger, mandate gauge and frozen exposure. Live API and stream connections are pending.</p>
         <p className="licence-status">
           {process.env.NEXT_PUBLIC_AG_LICENSE_KEY
             ? "Licence supplied at build; entitlement and validity through 2026-12-15 still require confirmation."

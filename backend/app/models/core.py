@@ -83,6 +83,11 @@ class VendorMaster(Base):
     __tablename__ = "vendor_master"
     __table_args__ = (
         CheckConstraint("trust_status IN ('VERIFIED','COOLING','BLOCKED')", name="ck_vendor_trust"),
+        CheckConstraint("version > 0", name="ck_vendor_version"),
+        CheckConstraint(
+            "jsonb_typeof(onboarding_evidence) = 'object' AND onboarding_evidence <> '{}'::jsonb",
+            name="ck_vendor_evidence",
+        ),
     )
 
     vendor_id: Mapped[str] = mapped_column(Text, primary_key=True)
@@ -97,7 +102,7 @@ class VendorMaster(Base):
 
 
 class VendorMasterChange(Base):
-    """Append-only payee-change history (R15). Immutability trigger lands with P1-20."""
+    """Payee-change values are immutable; only guarded status transitions are permitted (R15)."""
 
     __tablename__ = "vendor_master_changes"
     __table_args__ = (
@@ -163,7 +168,7 @@ class POVersion(_POColumns, Base):
 
 
 class GoodsReceipt(Base):
-    """The receiving leg; append-only, corrections supersede (R16). Triggers land with P1-19."""
+    """The receiving leg; append-only, corrections supersede under a PO row lock (R16)."""
 
     __tablename__ = "goods_receipts"
     __table_args__ = (
@@ -173,6 +178,7 @@ class GoodsReceipt(Base):
         CheckConstraint("source IN ('RECEIVER_SESSION','SEEDED')", name="ck_grn_source"),
         CheckConstraint("received_at <= now()", name="ck_grn_not_future"),
         CheckConstraint("accepted_qty + rejected_qty = received_qty", name="ck_grn_balance"),
+        Index("uq_grn_one_correction", "supersedes_grn_id", unique=True),
     )
 
     grn_id: Mapped[str] = mapped_column(Text, primary_key=True)

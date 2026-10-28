@@ -8,6 +8,8 @@ WORKDIR /srv
 
 COPY pyproject.toml ./
 COPY app ./app
+COPY alembic.ini ./
+COPY migrations ./migrations
 RUN pip install . \
     && useradd --create-home --uid 10001 aegis
 

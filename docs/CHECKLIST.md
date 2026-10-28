@@ -60,21 +60,21 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-07** @A `settlement/service.py` `execute(execution_id)` only (R1) + outbox worker (`SKIP LOCKED`, 2 s poll) — ef630d5, review fixes 34de277
 - [x] **P1-08** @A `settlement/reconciler.py` item-status state machine (PRD §9.3) + 15 s / 30 min poll fallback (R6) — ef630d5, review fixes 34de277
 - [x] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe — ef630d5, review fixes 34de277
-- [ ] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix (WIP B)
-- [ ] **P1-11** @B `audit/events.py` hash chain + verification (HMAC form lands in P2-26) (WIP B)
-- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP B)
+- [x] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix — 4b9ce9a
+- [x] **P1-11** @B `audit/events.py` global HMAC hash chain + verification — 46a2ecc (integrated audit foundation; anchors/runtime remain P2-26)
+- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP B) (BLOCKED: upload/decision pipeline absent; dependencies P2-01/02/05/06/07/09/10/13 and P3-13/14, then owner-configured real sandbox acceptance; see P1_COMPLETION.md)
 - [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — `4931be7` (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
-- [ ] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI (WIP B)
-- [ ] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) (WIP B)
-- [ ] **P1-16** @B Three 15-min AP/finance conversations → `docs/USER_RESEARCH.md` (due Oct 27) (WIP B)
-- [ ] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base (WIP B)
-- [ ] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config? (WIP B)
-- [ ] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22) (WIP B)
-- [ ] **P1-20** @B `vendor_master` v2.1 (payer ID, version, onboarding evidence) + append-only `vendor_master_changes` with immutability trigger (PRD §8, R15) (WIP B)
-- [ ] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17) (WIP B)
-- [ ] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19) (WIP B)
-- [ ] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20) (WIP B)
-- [ ] **P1-24** @B Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007) (WIP B)
+- [x] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI — 4b9ce9a
+- [x] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) — 4b9ce9a
+- [x] **P1-16** @B Three cited public AP/finance case profiles, evidence/inference mapping and limitations → `docs/USER_RESEARCH.md` (owner-authorized secondary-research substitution 2026-10-27; firsthand interviews deferred) — 1489339
+- [x] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base — 4b9ce9a
+- [x] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config? — 4b9ce9a
+- [x] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22) — 4b9ce9a
+- [x] **P1-20** @B `vendor_master` v2.1 (payer ID, version, onboarding evidence) + append-only `vendor_master_changes` with immutability trigger (PRD §8, R15) — 4b9ce9a
+- [x] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17) — 4b9ce9a
+- [x] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19) — 4b9ce9a
+- [x] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20) — 4b9ce9a
+- [ ] **P1-24** @B Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007) (WIP B) (local worker, guards, grants, Compose and blueprint — 4b9ce9a) (BLOCKED: owner-configured hosted Render deployment and isolation evidence pending)
 
 ## P2 — Decision engine + core UI (Oct 28 – Nov 2) · exit: **headless S1–S4 pass**; first `docs/EVAL.md` numbers
 
@@ -83,7 +83,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-03** @A Forensics `ocr_diff.py` (cut-order item 5 — keep PDF-structure checks if cut)
 - [ ] **P2-04** @A Eval set ≥ 50 labelled PDFs (held-out split, adaptive + A4 memo-injection cases, 5 runs, Wilson intervals) incl. false-positive traps in `tests/fixtures/eval/`
 - [ ] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport`
-- [ ] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9)
+- [x] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9) — f74a700
 - [ ] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed
 - [ ] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00)
 - [ ] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests
@@ -93,9 +93,9 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream
 - [ ] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution
 - [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md`
-- [ ] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case)
-- [ ] **P2-17** @B Widget: Mandate gauge (committed vs daily cap)
-- [ ] **P2-18** @B Widget: Exposure by reason (G2–G10)
+- [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — 55b2f38
+- [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — 55b2f38
+- [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — 55b2f38
 - [ ] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required
 - [ ] **P2-20** @B Mandate studio: compile → diff → activate
 - [ ] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s

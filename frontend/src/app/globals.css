@@ -72,6 +72,82 @@ p { line-height: 1.6; }
 .react-probe { height: 100%; padding: 18px; overflow: auto; }
 .react-probe h2 { margin: 0 0 12px; font-size: 20px; }
 .react-probe output { display: block; margin-top: 10px; color: var(--pp-blue); }
+.case-summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 24px; padding: 22px 0; }
+.case-summary h2 { margin: 12px 0 0; font-size: 22px; }
+.case-summary p, .muted { color: var(--pp-muted); font-size: 14px; }
+.case-metrics { display: flex; flex-wrap: wrap; gap: 28px; margin: 0; }
+.case-metrics dt { color: var(--pp-muted); font-size: 13px; }
+.case-metrics dd { margin: 5px 0 0; font-size: 26px; font-weight: 700; }
+.fixture-notice { border-left: 3px solid #ffc873; padding: 12px 16px; background: var(--pp-surface); color: #ffe1a3; }
+.case-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.case-pane { min-width: 0; padding: 24px; border: 1px solid var(--pp-border); border-radius: 10px; background: var(--pp-surface); }
+.case-pane h2 { margin-top: 6px; font-size: 25px; }
+.case-pane h3 { font-size: 17px; margin: 26px 0 10px; }
+.case-pane p, .case-pane li, .case-pane dd, .case-pane td { overflow-wrap: anywhere; }
+.case-pane .eyebrow { margin-top: 0; }
+.case-badge { display: inline-block; padding: 3px 8px; border: 1px solid var(--pp-border); border-radius: 20px; font-size: 11px; font-weight: 650; vertical-align: middle; }
+.case-badge.warning, .warning-text { color: #ffe1a3; }
+.case-badge.danger { color: #ffb6b1; border-color: #a86161; }
+.source-grid, .money-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.source-grid h3 { margin-top: 4px; }
+.invoice-render { margin: 0; }
+.invoice-render svg { width: 100%; height: auto; display: block; border-radius: 4px; }
+.invoice-render figcaption { color: var(--pp-muted); font-size: 13px; line-height: 1.6; margin-top: 8px; }
+.table-scroll { overflow-x: auto; margin: 16px 0; }
+.case-pane table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.case-pane caption { text-align: left; color: var(--pp-muted); padding: 0 0 12px; font-size: 13px; }
+.case-pane th, .case-pane td { padding: 12px 8px; text-align: left; border-bottom: 1px solid var(--pp-gridline); vertical-align: top; }
+.case-pane thead th { color: var(--pp-muted); }
+.mismatch { background: #322b22; color: #ffe1a3; }
+.case-pane label { font-size: 14px; line-height: 1.6; }
+.case-pane meter { width: 100%; height: 22px; accent-color: var(--pp-blue); margin-top: 8px; }
+.finding, .payee-panel { padding: 16px; border: 1px solid var(--pp-border); border-radius: 6px; }
+.finding { border-color: #a86161; background: #2d2027; }
+.finding > p:first-child { margin-top: 0; }
+.case-pane blockquote { margin: 12px 0; padding-left: 16px; border-left: 3px solid var(--pp-border); line-height: 1.7; overflow-wrap: anywhere; }
+.payee-panel { margin-top: 24px; }
+.payee-panel h3 { margin-top: 0; }
+.case-pane dt { color: var(--pp-muted); font-size: 13px; margin-top: 12px; }
+.case-pane dd { margin: 4px 0 0; }
+.quoted-fact { padding: 4px 0; border-bottom: 1px solid var(--pp-gridline); }
+.money-pane { grid-column: 1 / -1; }
+.money-grid { gap: 40px; }
+.gate-hash { display: block; margin-top: 8px; font-size: 12px; color: var(--pp-muted); }
+.case-pane summary { padding: 12px 0; cursor: pointer; color: var(--pp-blue); line-height: 1.6; }
+.assumptions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; }
+.assumptions dt, .assumptions dd { margin: 0; }
+.settlement-timeline { padding-left: 22px; }
+.settlement-timeline li + li { margin-top: 16px; }
+.approval-list { padding-left: 22px; }
+.approval-list p { margin: 4px 0 16px; font-size: 14px; }
+.decision-form { display: grid; gap: 10px; padding-top: 12px; }
+.decision-form select, .decision-form textarea { width: 100%; min-width: 0; padding: 11px; border: 1px solid var(--pp-border); border-radius: 5px; font: inherit; background: var(--pp-canvas); color: var(--pp-ink); }
+.decision-form textarea { resize: vertical; }
+button:disabled { opacity: 0.65; cursor: not-allowed; }
+.mock-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.local-status { padding: 14px; border-left: 3px solid var(--pp-blue); background: var(--pp-canvas); }
+.cockpit-widget { height: 100%; overflow: auto; padding: 20px; }
+.cockpit-widget h2 { font-size: 20px; margin: 0 0 10px; }
+.cockpit-widget p { margin: 10px 0; }
+.cockpit-widget meter { width: 100%; min-width: 65px; height: 22px; accent-color: var(--pp-blue); }
+.payables-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.payables-table caption { text-align: left; color: var(--pp-muted); font-size: 12px; padding: 0 0 12px; }
+.payables-table th, .payables-table td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--pp-gridline); }
+.payables-table thead th { color: var(--pp-muted); font-size: 12px; }
+.payables-table tbody tr { cursor: pointer; }
+.payables-table tbody tr:hover, .payables-table tbody tr:focus-within { background: var(--pp-highlight); }
+.ledger-secondary { display: block; color: var(--pp-muted); font-size: 12px; font-weight: 400; margin-top: 6px; }
+.ledger-money { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.triad-pills { display: flex; flex-wrap: wrap; gap: 5px; min-width: 185px; }
+.case-badge.success { color: #93dfa6; border-color: #518d60; }
+.gauge-amount { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.gauge-amount span { font-size: 14px; font-weight: 400; color: var(--pp-muted); }
+.exposure-list { list-style: none; padding: 0; }
+.exposure-list li { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--pp-gridline); }
+.exposure-list li > strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 1000px) {
+  .case-grid, .money-grid { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 680px) {
   .app-header { padding: 18px 16px; gap: 16px; }
   .workspace { padding: 0 16px 32px; }
@@ -81,4 +157,9 @@ p { line-height: 1.6; }
   .page-header { padding-top: 20px; }
   .empty-state { padding: 20px; }
   .studio-container { height: 900px; min-width: 0; }
+  .case-pane { padding: 18px; }
+  .source-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .case-metrics { gap: 18px; }
+  .case-metrics dd { font-size: 22px; }
+  .case-pane th, .case-pane td { padding: 10px 5px; }
 }
