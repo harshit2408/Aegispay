@@ -47,7 +47,11 @@ React/TypeScript review disciplines applied locally because the named ECC review
 
 Known UX limits: Studio's default view mode exposes Filters only; AI appears in edit mode. Studio 3.0 emits an `aria-hidden` focus warning after clicking its suggested prompt (the hidden prompt retains focus). This belongs to vendor chat internals; keyboard operation and a future upgrade need a full a11y pass before P3-11. This is a desktop integration probe, not S1–S4 or a mobile layout. The browser also requested a missing default favicon (404); app/Studio code had no runtime exception.
 
-## Remaining account-owner action
+## Licence check, 2026-10-28
+
+With the key in `frontend/.env.local` the dev server loaded it. Browser console showed no missing/invalid/expired diagnostics or watermark text, the custom widget rendered and the scripted agent replied in edit mode. Owner attests written confirmation of Studio + AI entitlement through 2026-12-15; that confirmation and the key are not stored in the repo. The page's "Licence supplied" line only reports a non-empty variable. The frontend Render build variable remains P1-24.
+
+## Remaining account-owner action (historical; items 1 and 3 now attested above)
 
 1. Obtain the legitimate Studio trial/entitlement **including AI**, with explicit written validity through **2026-12-15**. Do not paste the key into chat or commit it.
 2. Set `NEXT_PUBLIC_AG_LICENSE_KEY` in the frontend Render **build environment**, then rebuild. A Next public licence is included in the browser bundle as required by the vendor; PayPal/LLM credentials must never use public variables.

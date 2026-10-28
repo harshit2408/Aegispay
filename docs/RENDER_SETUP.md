@@ -142,11 +142,13 @@ Append only non-secret facts after account access and creation are confirmed:
 
 | Evidence | Verified value |
 |---|---|
-| Workspace and project resource links | Pending owner setup |
-| Environment / actual region | Pending owner setup |
-| Postgres resource link, status and version | Pending owner setup |
-| Actual compute plan and storage | Pending owner cost review |
-| Credit amount, redemption date, expiry | Pending owner redemption |
+| Workspace and project resource links | Project `My project`, environment `Production` (dashboard links not recorded; private) |
+| Environment / actual region | `Production`, Oregon (the Singapore proposal above was not used; API, worker and DB must stay in this region) |
+| Postgres resource link, status and version | `aegispay-postgres`, PostgreSQL 16, Available; migrations applied through 0007; `aegis_api`/`aegis_settle` logins created with capability roles, startup role check passes (2026-10-28) |
+| Actual compute plan and storage | Owner attests paid plans chosen; plan names not recorded |
+| Credit amount, redemption date, expiry | Owner attests credits redeemed; amount, date and expiry not recorded |
+
+API service `Aegispay` (Docker, `backend/Dockerfile`, context `./backend`) deploys from `main` and boots; settlement worker and frontend services are still P1-24.
 
 Mark P0-04 complete only when the project/database and redeemed credit balance are evidenced.
 Local tests or a Blueprint alone cannot satisfy that item.
