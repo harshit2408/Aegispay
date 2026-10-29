@@ -21,6 +21,12 @@ dependencies = [
     "python-dotenv>=1.2",
     "cryptography>=45",
     "httpx",
+    "pdfplumber>=0.11",
+    "pypdfium2>=4",
+    "pypdf>=4",
+    "pdfminer.six",
+    "pillow",
+    "pytesseract",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +37,7 @@ dev = [
     "respx",
     "aiosqlite",
     "ruff",
+    "reportlab>=4",
 ]
 
 [tool.setuptools.packages.find]
