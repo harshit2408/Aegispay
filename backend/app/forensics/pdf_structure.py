@@ -26,6 +26,7 @@ MAX_CHARS_PER_PAGE = 10_000
 MAX_RECTS_PER_PAGE = 500  # bounds chars x rects work: 10k x 500 = 5M box checks
 MAX_FORM_DEPTH = 5
 MAX_FORM_CALLS = 200
+MIN_FILL_ALPHA = 0.1  # ExtGState /ca below this renders text effectively invisible
 # Subprocess isolation and wall-clock timeout belong to P3-14.
 STANDARD_INFO_KEYS = {
     "/Title",
@@ -127,17 +128,28 @@ def page_objects(page) -> list[LTComponent]:
     return objs
 
 
-def _collect_invisible(data, resources, reader, out, mode, depth, budget) -> None:
-    """Strings shown in render mode 3/7; tracks q/Q and recurses into form XObjects."""
-    stack: list[int] = []
+def _fill_alpha(resources, name, alpha: float) -> float:
+    gstates = resources.get("/ExtGState") if resources else None
+    gs = gstates.get_object().get(name) if gstates else None
+    gs = gs.get_object() if gs is not None else None
+    ca = gs.get("/ca") if gs is not None else None
+    return float(ca) if ca is not None else alpha
+
+
+def _collect_invisible(data, resources, reader, out, mode, depth, budget, alpha=1.0) -> None:
+    """Strings shown in render mode 3/7 or with near-zero fill alpha; tracks q/Q and
+    recurses into form XObjects."""
+    stack: list[tuple[int, float]] = []
     for operands, op in ContentStream(data, reader).operations:
         if op == b"q":
-            stack.append(mode)
+            stack.append((mode, alpha))
         elif op == b"Q" and stack:
-            mode = stack.pop()
+            mode, alpha = stack.pop()
         elif op == b"Tr" and operands:
             mode = int(operands[0])
-        elif mode in (3, 7) and op in (b"Tj", b"'", b'"', b"TJ"):
+        elif op == b"gs" and operands:
+            alpha = _fill_alpha(resources, operands[0], alpha)
+        elif (mode in (3, 7) or alpha < MIN_FILL_ALPHA) and op in (b"Tj", b"'", b'"', b"TJ"):
             items = operands[0] if op == b"TJ" else operands[-1:]
             out.extend(_as_str(i) for i in items if isinstance(i, (str, bytes)))
         elif op == b"Do" and operands:
@@ -150,7 +162,7 @@ def _collect_invisible(data, resources, reader, out, mode, depth, budget) -> Non
             if xo is not None and xo.get("/Subtype") == "/Form":
                 res = xo.get("/Resources")
                 res = res.get_object() if res is not None else resources
-                _collect_invisible(xo, res, reader, out, mode, depth + 1, budget)
+                _collect_invisible(xo, res, reader, out, mode, depth + 1, budget, alpha)
 
 
 def _invisible_texts(reader: PdfReader, page_index: int) -> list[str]:

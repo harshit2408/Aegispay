@@ -198,6 +198,36 @@ def test_render_mode_restored_by_q_Q():
     assert _techniques(_pdf(draw)) == {"INVISIBLE_MODE": SECRET}
 
 
+def test_transparent_fill_alpha_is_invisible():
+    def draw(c):
+        c.saveState()
+        c.setFillAlpha(0)
+        c.drawString(20, 100, SECRET)
+        c.restoreState()
+        c.drawString(20, 60, "Visible after restore")
+
+    assert _techniques(_pdf(draw)) == {"INVISIBLE_MODE": SECRET}
+
+
+def test_form_xobject_inherits_transparent_fill():
+    def draw(c):
+        c.beginForm("f")
+        c.drawString(20, 100, SECRET)
+        c.endForm()
+        c.setFillAlpha(0.01)
+        c.doForm("f")
+
+    assert _techniques(_pdf(draw)) == {"INVISIBLE_MODE": SECRET}
+
+
+def test_half_transparent_text_not_flagged():
+    def draw(c):
+        c.setFillAlpha(0.5)
+        c.drawString(20, 100, "Watermark style note")
+
+    assert detect_pdf_structure(_pdf(draw)) == []
+
+
 def test_unmatched_invisible_text_still_reported():
     from app.forensics.pdf_structure import _mark_invisible
 
