@@ -25,12 +25,33 @@ test('environment template covers every PRD section 7 variable with empty secret
 });
 
 const composeVersion = spawnSync('docker', ['compose', 'version'], { encoding: 'utf8' });
+test('Compose reads blank placeholders from the public template as empty values', {
+  skip: composeVersion.status !== 0 && 'Docker Compose CLI not installed',
+}, () => {
+  const template = variables(read('.env.example'));
+  const env = Object.fromEntries(Object.entries(process.env)
+    .filter(([key]) => !(key in template)));
+  const result = spawnSync('docker', [
+    'compose', '--env-file', '.env.example', '--profile', 'settlement', '--profile', 'frontend',
+    'config', '--format', 'json',
+  ], { cwd: root, encoding: 'utf8', env });
+  assert.equal(result.status, 0, result.stderr);
+  const { services } = JSON.parse(result.stdout);
+  for (const [serviceName, service] of Object.entries(services)) {
+    for (const [key, value] of Object.entries(template)) {
+      if (value === '' && key in (service.environment ?? {})) {
+        assert.equal(service.environment[key], '', `${serviceName}.${key} must remain blank`);
+      }
+    }
+  }
+});
+
 test('compose excludes settlement secrets even when host env contains them', {
   skip: composeVersion.status !== 0 && 'Docker Compose CLI not installed',
 }, () => {
   const forbidden = [
     'TREASURY_CLIENT_ID', 'TREASURY_CLIENT_SECRET', 'TREASURY_ACCOUNT_EMAIL',
-    'SETTLEMENT_DATABASE_URL', 'AUDIT_HMAC_KEY', 'AUDIT_ANCHOR_REPO',
+    'SETTLEMENT_DATABASE_URL', 'AUDIT_HMAC_KEY', 'AUDIT_ANCHOR_REPO', 'AUDIT_ANCHOR_TOKEN',
     'VELOCITY_MAX_PAYOUTS_PER_HOUR', 'VELOCITY_MAX_CENTS_PER_HOUR', 'ALERT_WEBHOOK_URL',
   ];
   const result = spawnSync('docker', [

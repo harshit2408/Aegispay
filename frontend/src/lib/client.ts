@@ -30,7 +30,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   listExecutions: (): Promise<Rows> => request("/api/executions"),
-  getExecution: (id: string): Promise<CaseDetail> => request(`/api/executions/${encodeURIComponent(id)}`),
+  getExecution: (id: string, signal?: AbortSignal): Promise<CaseDetail> => request(`/api/executions/${encodeURIComponent(id)}`, { signal }),
   // The case preview never calls this method. A real session must supply its CSRF token.
   submitDecision: (id: string, decision: Decision, csrfToken: string): Promise<Receipt> => {
     if (!csrfToken.trim()) return Promise.reject(new Error("An operator session CSRF token is required"));

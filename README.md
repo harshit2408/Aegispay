@@ -99,6 +99,13 @@ Separate DB roles/grants (P1-19), the settlement worker and boot environment ass
 (P1-24), and the isolated parser (P3-14) remain scheduled work. Settlement entries in the
 template do not create a worker or a database role. Never expose this local stack as a hosted deployment.
 
+The settlement worker requires a private `AUDIT_HMAC_KEY` of at least 32 characters.
+[Audit setup and verified export](docs/AUDIT.md) explains the dedicated Git anchor repository,
+token, migration and JSON/CSV CLI. Without `AUDIT_ANCHOR_REPO`, the worker explicitly degrades
+to HMAC-only audit: external truncation detection and verified exports are unavailable.
+Case reads and the SSE client are wired, but real payment controls remain disabled until
+backend authentication, CSRF delivery and decision services are available.
+
 ## Team workflow
 
 Two developers. Dev A owns backend, PayPal, settlement and agents. Dev B owns frontend, AG Studio, data, CI and deploy. Ownership and the A↔B interface contract are in [docs/PLAN.md](docs/PLAN.md).

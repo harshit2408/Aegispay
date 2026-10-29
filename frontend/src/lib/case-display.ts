@@ -4,6 +4,16 @@ type CaseDetail = components["schemas"]["CaseDetail"];
 type Approval = components["schemas"]["ApprovalView"];
 type Operator = components["schemas"]["OperatorView"];
 
+export type CaseReadState = { data?: CaseDetail; error?: string; loading: boolean; replayed: boolean };
+
+export function caseReadState(state: CaseReadState, action:
+  { type: "loading" } | { type: "loaded"; data: CaseDetail } | { type: "failed"; error: string },
+): CaseReadState {
+  if (action.type === "loaded") return { data: action.data, loading: false, replayed: action.data.replayed };
+  if (action.type === "failed") return { error: action.error, loading: false, replayed: state.replayed };
+  return { loading: true, replayed: state.replayed };
+}
+
 export function usd(cents: number): string {
   if (!Number.isSafeInteger(cents) || cents < 0) throw new Error("Expected nonnegative safe integer cents");
   return `$${Math.trunc(cents / 100).toLocaleString("en-US")}.${String(cents % 100).padStart(2, "0")}`;
