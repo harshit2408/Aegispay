@@ -1,10 +1,13 @@
+import hashlib
 import importlib.util
+import io
 import json
 from collections import Counter
 from pathlib import Path
 
 import pypdf
 import pytest
+from pypdf.generic import DictionaryObject, StreamObject
 
 from app.eval import runner
 from app.schemas.decision import HiddenSegment
@@ -52,10 +55,40 @@ def test_manifest_invariants():
     assert all(e["paypal_note"] for e in m if e["class"] == "vendor_memo")
 
 
+def _canonical(path: Path) -> list[bytes]:
+    """PDF objects with streams decoded: Flate output differs across zlib builds."""
+    reader = pypdf.PdfReader(path)
+    out = []
+    for num in range(1, int(reader.trailer["/Size"])):
+        obj = reader.get_object(num)
+        buf = io.BytesIO()
+        if isinstance(obj, StreamObject):
+            DictionaryObject(
+                {k: v for k, v in obj.items() if k not in ("/Length", "/Filter", "/DecodeParms")}
+            ).write_to_stream(buf)
+            buf.write(obj.get_data())
+        elif obj is not None:
+            obj.write_to_stream(buf)
+        out.append(buf.getvalue())
+    return out
+
+
+def _without_hash(manifest: list[dict]) -> list[dict]:
+    return [{k: v for k, v in e.items() if k != "sha256"} for e in manifest]
+
+
+def test_manifest_hashes_match_committed_files():
+    for e in _manifest():
+        assert hashlib.sha256((EVAL / e["file"]).read_bytes()).hexdigest() == e["sha256"]
+
+
 def test_regeneration_is_deterministic(tmp_path):
     b = _builder()
     b.build(tmp_path)
-    assert json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8")) == _manifest()
+    regenerated = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert _without_hash(regenerated) == _without_hash(_manifest())
+    for e in regenerated:
+        assert _canonical(tmp_path / e["file"]) == _canonical(EVAL / e["file"]), e["file"]
 
 
 def test_runner_scores_with_stub_detector():
