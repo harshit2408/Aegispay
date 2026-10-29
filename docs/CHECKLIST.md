@@ -78,11 +78,11 @@ The [[PLAN]] explains the why; this file is the state.
 
 ## P2 — Decision engine + core UI (Oct 28 – Nov 2) · exit: **headless S1–S4 pass**; first `docs/EVAL.md` numbers
 
-- [ ] **P2-01** @A A2 Invoice Extractor: zero tools, delimited input, schema-validated, low confidence → `FREEZE` (R14) (WIP A)
-- [ ] **P2-02** @A Forensics `pdf_structure.py`: colour-match, tiny font, off-page, invisible/covered, annotation/metadata (WIP A)
-- [ ] **P2-03** @A Forensics `ocr_diff.py` (cut-order item 5 — keep PDF-structure checks if cut) (WIP A)
-- [ ] **P2-04** @A Eval set ≥ 50 labelled PDFs (held-out split, adaptive + A4 memo-injection cases, 5 runs, Wilson intervals) incl. false-positive traps in `tests/fixtures/eval/` (WIP A)
-- [ ] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport` (WIP A)
+- [x] **P2-01** @A A2 Invoice Extractor: zero tools, delimited input, schema-validated, low confidence → `FREEZE` (R14) — 04c2daf
+- [x] **P2-02** @A Forensics `pdf_structure.py`: colour-match, tiny font, off-page, invisible/covered, annotation/metadata — 04c2daf
+- [x] **P2-03** @A Forensics `ocr_diff.py` (cut-order item 5 — keep PDF-structure checks if cut) — 04c2daf
+- [x] **P2-04** @A Eval set ≥ 50 labelled PDFs (held-out split, adaptive + A4 memo-injection cases, 5 runs, Wilson intervals) incl. false-positive traps in `tests/fixtures/eval/` — 04c2daf
+- [x] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport` — 04c2daf
 - [x] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9) — f74a700
 - [ ] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed
 - [ ] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00)
