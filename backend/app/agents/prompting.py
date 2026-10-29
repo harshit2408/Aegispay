@@ -20,4 +20,7 @@ def build_messages(system_template: str, text: str) -> tuple[list[dict], str, in
     token, body = delimit(text)
     system = system_template.format(token=token)
     msgs = [{"role": "system", "content": system}, {"role": "user", "content": body}]
-    return msgs, body, len(system) + len(body) + FRAMING_TOKENS
+    # UTF-8 bytes, not characters: byte-level BPE emits at most one token per byte,
+    # while one CJK/emoji character can cost several tokens.
+    bound = len(system.encode()) + len(body.encode()) + FRAMING_TOKENS
+    return msgs, body, bound
