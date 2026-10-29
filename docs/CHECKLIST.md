@@ -103,7 +103,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16)
 - [ ] **P2-24** @A Gate G11–G14, approvals bound to `gate_hash`, resume by `approval_id` only, distinct-human count inside the gate (R11)
 - [ ] **P2-25** @A `SETTLEMENT_HALT`, velocity breaker, `ops/alerts.py` (R23)
-- [x] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21) — cbc9a27 (local PostgreSQL/Git verification; hosted publication and authenticated HTTP export remain deployment/integration work)
+- [ ] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21) — cbc9a27 (local PostgreSQL/Git verification; hosted publication and authenticated HTTP export remain deployment/integration work) (WIP B) (PR #33 review corrections)
 
 ## P3 — Agents, auth, deploy (Nov 3–6) · exit: **hosted S1–S4 green on Render**; rough-cut video Nov 5
 
