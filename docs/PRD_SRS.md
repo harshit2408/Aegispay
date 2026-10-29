@@ -342,7 +342,8 @@ PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com
 # --- Treasury (buyer) REST app: Payouts [settlement only] ---
 TREASURY_CLIENT_ID=
 TREASURY_CLIENT_SECRET=
-TREASURY_WEBHOOK_ID=                                      # [settlement, api: id only, used to verify]
+# [settlement, api: id only, used to verify]
+TREASURY_WEBHOOK_ID=
 TREASURY_ACCOUNT_EMAIL=treasury@aegispay-demo.example     # Business sandbox account behind this app
 
 # --- Vendor Simulator REST app: Invoicing [settlement: write; api: read via VendorGateway read adapter] ---
@@ -364,12 +365,16 @@ CHECKPOINT_DB_URL=postgresql://aegis_api:aegis@localhost:5432/aegis             
 
 # --- Auth [api] — operators live in the `operators` table with argon2 hashes (R18); seeded from these once ---
 SESSION_SECRET=
-OPERATOR_SEED_FILE=                 # path to a git-ignored JSON of {username, role, password}; never commit
+# path to a git-ignored JSON of {username, role, password}; never commit
+OPERATOR_SEED_FILE=
 
 # --- Audit [settlement] ---
-AUDIT_HMAC_KEY=                     # R21; never present in the api service
-AUDIT_ANCHOR_REPO=                  # git remote + branch for head-hash anchors
-AUDIT_ANCHOR_TOKEN=                 # optional dedicated HTTPS Git token; settlement only
+# R21; never present in the api service
+AUDIT_HMAC_KEY=
+# git remote + branch for head-hash anchors
+AUDIT_ANCHOR_REPO=
+# optional dedicated HTTPS Git token; settlement only
+AUDIT_ANCHOR_TOKEN=
 
 # --- Org hard limits (every mandate field is clamped to these, R13) [api, settlement] ---
 ORG_HARD_MAX_SINGLE_CENTS=100000
@@ -396,7 +401,8 @@ DEMO_REPLAY_MODE=false              # requires DEMO_ENABLED; replayed rows tagge
 
 # --- Frontend ---
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_AG_LICENSE_KEY=         # set in Render env only; never commit
+# set in Render env only; never commit
+NEXT_PUBLIC_AG_LICENSE_KEY=
 ```
 
 Secrets policy: `.env` is git-ignored; CI runs `gitleaks`; each Render service gets only its tagged variables; sandbox credentials are rotated after judging.
