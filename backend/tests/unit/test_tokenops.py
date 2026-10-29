@@ -288,6 +288,6 @@ def test_only_app_agents_imports_tokenops():
         str(path.relative_to(app_dir))
         for path in app_dir.rglob("*.py")
         if path.parent.name != "agents"
-        and re.search(r"^\s*(from|import)\s+tokenops\b", path.read_text(), re.M)
+        and re.search(r"^\s*(from|import)\s+tokenops\b", path.read_text(encoding="utf-8"), re.M)
     ]
     assert offenders == []
