@@ -2,16 +2,17 @@
 
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select, text
 
-from app.audit.anchor import AnchorUnavailable, GitAnchors, Snapshot
+from app.audit.anchor import AnchorConflict, AnchorUnavailable, GitAnchors, Snapshot
 from app.audit.events import (
     GENESIS_HASH,
     AuditIntegrityError,
     _key,
-    append_event,
+    append_events,
     lock_chain,
     verify_chain,
 )
@@ -30,6 +31,11 @@ async def verified_rows(session, *, key: bytes, snapshot: Snapshot) -> list[Exec
             .execution_options(populate_existing=True)
         )
     )
+    await _verify_rows(session, key=key, snapshot=snapshot, rows=rows)
+    return rows
+
+
+async def _verify_rows(session, *, key: bytes, snapshot: Snapshot, rows) -> None:
     receipt = await session.scalar(
         select(AuditAnchor).order_by(AuditAnchor.anchor_id.desc()).limit(1)
     )
@@ -47,7 +53,6 @@ async def verified_rows(session, *, key: bytes, snapshot: Snapshot) -> list[Exec
         verify_chain(prefix, key=key, expected_head=checkpoint.head_hash)
     # The suffix is HMAC-authenticated, but only the external prefix is anchored.
     verify_chain(rows, key=key, expected_head=rows[-1].hash if rows else GENESIS_HASH)
-    return rows
 
 
 async def _receipt(session, snapshot: Snapshot) -> None:
@@ -73,15 +78,24 @@ class AuditConsumer:
         _key(key)
         self.sessions, self.key, self.anchors = sessions, key, anchors
 
+    @asynccontextmanager
+    async def _transaction(self):
+        # Bound lock/statement waits and cooperatively cancel slow batches.
+        async with asyncio.timeout(2), self.sessions() as session, session.begin():
+            await session.execute(text("SET LOCAL lock_timeout = '250ms'"))
+            await session.execute(text("SET LOCAL statement_timeout = '1s'"))
+            yield session
+
     async def run_once(self, *, now: datetime | None = None) -> int:
         try:
-            try:
-                return await self._run_once(now=now)
-            except AuditIntegrityError:
-                if self.anchors is None:
-                    raise
-                # Refetch outside the rolled-back transaction if a publisher advanced the receipt.
-                return await self._run_once(now=now)
+            for attempt in range(3):
+                try:
+                    return await self._run_once(now=now)
+                except (AuditIntegrityError, AnchorConflict):
+                    if self.anchors is None or attempt == 2:
+                        raise
+                    # Refetch after rollback: allow a stale remote view to catch up to receipts.
+                    await asyncio.sleep(0.25 * (attempt + 1))
         except AuditIntegrityError:
             try:
                 async with self.sessions() as session, session.begin():
@@ -93,24 +107,18 @@ class AuditConsumer:
     async def _run_once(self, *, now: datetime | None = None) -> int:
         now = now or datetime.now(UTC)
         snapshot = await self.anchors.read() if self.anchors else Snapshot(None)
-        async with self.sessions() as session, session.begin():
+        async with self._transaction() as session:
             await lock_chain(session)
-            await verified_rows(session, key=self.key, snapshot=snapshot)
             # Wait for earlier INSERT transactions, without adding a lock to money producers.
             await session.execute(text("LOCK TABLE audit_queue IN SHARE ROW EXCLUSIVE MODE"))
             queued = list(
                 await session.scalars(select(AuditQueue).order_by(AuditQueue.queue_seq).limit(100))
             )
-            for row in queued:
-                await append_event(
-                    session,
-                    key=self.key,
-                    execution_id=row.execution_id,
-                    actor=row.actor,
-                    event_type=row.event_type,
-                    payload=row.payload,
-                    ts=row.ts,
-                )
+
+            async def verify(rows):
+                await _verify_rows(session, key=self.key, snapshot=snapshot, rows=rows)
+
+            await append_events(session, key=self.key, queued=queued, verify=verify)
             if queued:
                 await session.execute(
                     delete(AuditQueue).where(
@@ -123,7 +131,7 @@ class AuditConsumer:
         return len(queued)
 
     async def _publish_if_due(self, snapshot: Snapshot, now: datetime) -> None:
-        async with self.sessions() as session, session.begin():
+        async with self._transaction() as session:
             await lock_chain(session)
             rows = await verified_rows(session, key=self.key, snapshot=snapshot)
             checkpoint = snapshot.checkpoint
@@ -139,10 +147,31 @@ class AuditConsumer:
         published = await self.anchors.publish(
             snapshot, event_seq=sequence, head_hash=head, now=now
         )
-        async with self.sessions() as session, session.begin():
+        async with self._transaction() as session:
             await lock_chain(session)
             await verified_rows(session, key=self.key, snapshot=published)
             await _receipt(session, published)
+
+
+async def run_once_until_stopped(consumer: AuditConsumer, stop: asyncio.Event) -> int | None:
+    """Cancel an audit tick promptly on shutdown, including startup reads and retry backoff.
+
+    A cancelled Git thread owns no DB lock and retains its separate 15-second deadline.
+    """
+    if stop.is_set():
+        return None
+    drain = asyncio.create_task(consumer.run_once())
+    stopping = asyncio.create_task(stop.wait())
+    try:
+        done, _ = await asyncio.wait((drain, stopping), return_when=asyncio.FIRST_COMPLETED)
+        if drain in done:
+            return await drain  # Preserve a completed integrity/outage failure during shutdown.
+        return None
+    finally:
+        for task in (drain, stopping):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(drain, stopping, return_exceptions=True)
 
 
 async def run_forever(consumer: AuditConsumer, stop: asyncio.Event) -> None:
@@ -150,13 +179,16 @@ async def run_forever(consumer: AuditConsumer, stop: asyncio.Event) -> None:
         log.warning("audit_external_anchor_disabled mode=HMAC_ONLY exports=unavailable")
     while not stop.is_set():
         try:
-            await consumer.run_once()
+            await run_once_until_stopped(consumer, stop)
         except AuditIntegrityError:
             # Kill the worker before more settlement work can run on a compromised history.
             log.error("audit_integrity_failed node=audit action=stop_worker")
             raise
+        except AnchorConflict:
+            log.warning("audit_anchor_conflict node=audit action=retry")
         except AnchorUnavailable:
-            log.error("audit_anchor_unavailable node=audit action=retry")
+            log.error("audit_anchor_unavailable node=audit action=stop_worker")
+            raise
         except Exception:
             # No exception text: drivers and credential helpers may include private values.
             log.error("audit_drain_failed node=audit action=retry")

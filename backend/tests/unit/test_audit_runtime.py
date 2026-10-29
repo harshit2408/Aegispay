@@ -6,6 +6,7 @@ import io
 import json
 import os
 import subprocess
+import time
 from datetime import timedelta
 from types import SimpleNamespace
 
@@ -14,7 +15,9 @@ from pydantic import ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError
 
+from app.audit import anchor as anchor_module
 from app.audit import consumer as consumer_module
+from app.audit import events as events_module
 from app.audit.anchor import (
     AnchorConflict,
     AnchorUnavailable,
@@ -145,7 +148,37 @@ def test_git_subprocess_has_only_dedicated_auth_and_safe_environment(monkeypatch
     assert "dedicated-token" not in repr(captured["command"])
     assert captured["env"]["GIT_CONFIG_VALUE_0"].startswith("Authorization: Basic ")
     assert "core.hooksPath=" + os.devnull in captured["command"]
-    assert captured["timeout"] == 30 and captured.get("shell", False) is False
+    assert captured["timeout"] == 15 and captured.get("shell", False) is False
+
+
+async def test_git_deadline_is_shared_across_subcommands(monkeypatch):
+    elapsed, timeouts = [0], []
+    monkeypatch.setattr(anchor_module, "time", SimpleNamespace(monotonic=lambda: elapsed[0]))
+
+    def run(command, **kwargs):
+        timeouts.append(kwargs["timeout"])
+        elapsed[0] += 8
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    with pytest.raises(AnchorUnavailable, match="timed out"):
+        await GitAnchors("https://example.com/a.git").read()
+    assert timeouts == [15, 7]
+
+
+async def test_rejected_push_without_remote_movement_is_outage(anchors, monkeypatch):
+    run = anchors._git
+
+    def reject(directory, *args, **kwargs):
+        if args[0] == "push":
+            return SimpleNamespace(returncode=1, stdout="", stderr="private transport error")
+        return run(directory, *args, **kwargs)
+
+    monkeypatch.setattr(anchors, "_git", reject)
+    with pytest.raises(AnchorUnavailable) as error:
+        await anchors.publish(Snapshot(None), event_seq=0, head_hash=GENESIS, now=NOW)
+    assert not isinstance(error.value, AnchorConflict)
+    assert "private" not in str(error.value)
 
 
 async def test_remote_symlink_and_executable_hook_are_never_checked_out(anchors, tmp_path):
@@ -222,7 +255,7 @@ async def test_queue_drain_under_actual_roles_is_atomic_and_ordered(pg_sessionma
 async def test_signed_insert_failure_rolls_back_deletion_and_events(pg_sessionmaker, monkeypatch):
     await queue(pg_sessionmaker)
     await queue(pg_sessionmaker)
-    append = consumer_module.append_event
+    append = events_module._append_one
     attempts = 0
 
     async def failed(*args, **kwargs):
@@ -232,11 +265,79 @@ async def test_signed_insert_failure_rolls_back_deletion_and_events(pg_sessionma
             raise RuntimeError("injected crash")
         return await append(*args, **kwargs)
 
-    monkeypatch.setattr(consumer_module, "append_event", failed)
+    monkeypatch.setattr(events_module, "_append_one", failed)
     with pytest.raises(RuntimeError):
         await AuditConsumer(pg_sessionmaker, key=KEY, anchors=None).run_once(now=NOW)
     assert len(await rows(pg_sessionmaker, AuditQueue)) == 2
     assert await rows(pg_sessionmaker, ExecutionEvent) == []
+
+
+async def test_batch_reads_signed_prefix_once(pg_sessionmaker, monkeypatch):
+    await queue(pg_sessionmaker)
+    await AuditConsumer(pg_sessionmaker, key=KEY, anchors=None).run_once(now=NOW)
+    for _ in range(4):
+        await queue(pg_sessionmaker)
+    from sqlalchemy import event
+
+    statements = []
+    engine = pg_sessionmaker.kw["bind"].sync_engine
+
+    def capture(connection, cursor, statement, *args):
+        if "FROM execution_events" in statement:
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        assert await AuditConsumer(pg_sessionmaker, key=KEY, anchors=None).run_once(now=NOW) == 4
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    assert len(statements) == 1
+
+
+async def test_blocked_consumer_releases_waiting_producers_without_halt(pg_sessionmaker):
+    async with pg_sessionmaker() as producer, producer.begin():
+        await enqueue_event(
+            producer, execution_id="first", actor="system", event_type="FIRST", payload={}
+        )
+        worker = AuditConsumer(pg_sessionmaker, key=KEY, anchors=None)
+        started = time.monotonic()
+        drain = asyncio.create_task(worker.run_once(now=NOW))
+        # The consumer queues its exclusive table lock behind the uncommitted insert.
+        await asyncio.sleep(0.05)
+        later = asyncio.create_task(queue(pg_sessionmaker, event="SECOND"))
+        with pytest.raises(DBAPIError) as error:
+            await asyncio.wait_for(drain, 1.5)
+        assert error.value.orig.sqlstate == "55P03"
+        await asyncio.wait_for(later, 1)
+        assert time.monotonic() - started < 1.5
+        assert await rows(pg_sessionmaker, ExecutionEvent) == []
+        assert not (await rows(pg_sessionmaker, SettlementControl))[0].halted
+    assert await worker.run_once(now=NOW) == 2
+    assert [row.event_type for row in await rows(pg_sessionmaker, ExecutionEvent)] == [
+        "FIRST",
+        "SECOND",
+    ]
+
+
+async def test_batch_transaction_budget_rolls_back_partial_signing(pg_sessionmaker, monkeypatch):
+    await queue(pg_sessionmaker)
+    await queue(pg_sessionmaker)
+    append, attempts = events_module._append_one, 0
+
+    async def delayed(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            await asyncio.sleep(3)
+        return await append(*args, **kwargs)
+
+    monkeypatch.setattr(events_module, "_append_one", delayed)
+    with pytest.raises(TimeoutError):
+        await AuditConsumer(pg_sessionmaker, key=KEY, anchors=None).run_once(now=NOW)
+    assert len(await rows(pg_sessionmaker, AuditQueue)) == 2
+    assert await rows(pg_sessionmaker, ExecutionEvent) == []
+    assert not (await rows(pg_sessionmaker, SettlementControl))[0].halted
+    await asyncio.wait_for(queue(pg_sessionmaker), 1)
 
 
 async def test_drain_waits_for_prior_uncommitted_insert_and_preserves_sequence(pg_sessionmaker):
@@ -369,6 +470,61 @@ async def test_truncation_and_remote_branch_regression_are_detected(pg_sessionma
         await worker.run_once(now=NOW)
 
 
+async def test_stale_remote_reads_recover_before_durable_halt(
+    pg_sessionmaker, anchors, monkeypatch
+):
+    worker = AuditConsumer(pg_sessionmaker, key=KEY, anchors=anchors)
+    await queue(pg_sessionmaker)
+    await worker.run_once(now=NOW)
+    stale = await anchors.read()
+    await queue(pg_sessionmaker, event="SETTLED")
+    await worker.run_once(now=NOW + timedelta(minutes=1))
+    fresh = await anchors.read()
+    snapshots = iter([stale, stale, fresh])
+    delays, calls = [], []
+    sleep = asyncio.sleep
+    from app.audit.events import _CHAIN_LOCK
+
+    async def read():
+        calls.append(1)
+        return next(snapshots)
+
+    async def spaced(delay):
+        delays.append(delay)
+        # Retries do not retain a transaction or the global chain lock over backoff.
+        async with pg_sessionmaker() as session, session.begin():
+            assert await session.scalar(
+                text("SELECT pg_try_advisory_xact_lock(:lock)"), {"lock": _CHAIN_LOCK}
+            )
+        await sleep(delay)
+
+    monkeypatch.setattr(anchors, "read", read)
+    monkeypatch.setattr(consumer_module.asyncio, "sleep", spaced)
+    assert await worker.run_once(now=NOW + timedelta(minutes=2)) == 0
+    assert len(calls) == 3 and delays == [0.25, 0.5]
+    assert not (await rows(pg_sessionmaker, SettlementControl))[0].halted
+
+
+async def test_publication_race_retries_without_integrity_halt(
+    pg_sessionmaker, anchors, monkeypatch
+):
+    await queue(pg_sessionmaker)
+    publish, calls = anchors.publish, []
+
+    async def race(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise AnchorConflict("expected competing publisher")
+        return await publish(*args, **kwargs)
+
+    monkeypatch.setattr(anchors, "publish", race)
+    await AuditConsumer(pg_sessionmaker, key=KEY, anchors=anchors).run_once(now=NOW)
+    assert len(calls) == 2
+    assert len(await rows(pg_sessionmaker, ExecutionEvent)) == 1
+    assert len(await rows(pg_sessionmaker, AuditAnchor)) == 1
+    assert not (await rows(pg_sessionmaker, SettlementControl))[0].halted
+
+
 async def test_export_verifies_global_chain_before_filter_and_excludes_pending(
     pg_sessionmaker, anchors
 ):
@@ -485,7 +641,7 @@ async def test_anchor_absence_and_transport_errors_never_export_unverified_data(
     assert await rows(pg_sessionmaker, AuditAnchor) == []
 
 
-async def test_integrity_failure_stops_loop_and_transport_failure_retries(caplog):
+async def test_integrity_and_transport_failures_stop_loop_but_cas_races_retry(caplog):
     class Broken:
         anchors = None
 
@@ -504,8 +660,68 @@ async def test_integrity_failure_stops_loop_and_transport_failure_retries(caplog
             stop.set()
             raise AnchorUnavailable("secret transport URL")
 
-    await run_forever(Offline(), stop)
+    with pytest.raises(AnchorUnavailable):
+        await run_forever(Offline(), stop)
     assert "secret transport URL" not in caplog.text
+    assert "audit_anchor_unavailable node=audit action=stop_worker" in caplog.text
+    caplog.clear()
+    stop.clear()
+
+    class Racing:
+        anchors = True
+
+        async def run_once(self):
+            stop.set()
+            raise AnchorConflict("expected competing publisher")
+
+    await run_forever(Racing(), stop)
+    assert "audit_anchor_conflict" in caplog.text
+    assert "audit_anchor_unavailable" not in caplog.text
+
+
+async def test_anchor_outage_does_not_persist_integrity_halt_and_restart_verifies(
+    pg_sessionmaker, anchors, monkeypatch
+):
+    await queue(pg_sessionmaker)
+    read = anchors.read
+
+    async def unavailable():
+        raise AnchorUnavailable("private transport details")
+
+    monkeypatch.setattr(anchors, "read", unavailable)
+    with pytest.raises(AnchorUnavailable):
+        await AuditConsumer(pg_sessionmaker, key=KEY, anchors=anchors).run_once(now=NOW)
+    assert not (await rows(pg_sessionmaker, SettlementControl))[0].halted
+    assert await rows(pg_sessionmaker, ExecutionEvent) == []
+    monkeypatch.setattr(anchors, "read", read)
+    assert await AuditConsumer(pg_sessionmaker, key=KEY, anchors=anchors).run_once(now=NOW) == 1
+
+
+async def test_runtime_shutdown_cancels_anchor_read_without_integrity_halt(monkeypatch):
+    started, cancelled, stop = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    halts = []
+
+    class BlockingAnchors:
+        async def read(self):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+    def sessions():
+        pytest.fail("Shutdown during anchor read must never enter a database transaction")
+
+    async def halted(*args, **kwargs):
+        halts.append(1)
+
+    monkeypatch.setattr(consumer_module, "halt", halted)
+    consumer = AuditConsumer(sessions, key=KEY, anchors=BlockingAnchors())
+    running = asyncio.create_task(run_forever(consumer, stop))
+    await asyncio.wait_for(started.wait(), 1)
+    stop.set()
+    await asyncio.wait_for(running, 0.2)
+    assert cancelled.is_set() and halts == []
 
 
 def test_cli_refuses_unexpected_errors_without_credential_traceback(monkeypatch, capsys):

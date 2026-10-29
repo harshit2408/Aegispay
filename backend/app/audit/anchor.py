@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +16,7 @@ from urllib.parse import urlsplit
 from app.audit.events import GENESIS_HASH, AuditIntegrityError, _timestamp
 
 BRANCH = "refs/heads/audit-anchors"
+GIT_OPERATION_SECONDS = 15
 
 
 class AnchorUnavailable(RuntimeError):
@@ -72,7 +74,12 @@ class GitAnchors:
             raise ValueError("invalid dedicated audit anchor token")
         self._token = token
 
-    def _git(self, directory: str, *args: str) -> subprocess.CompletedProcess:
+    def _git(
+        self, directory: str, *args: str, deadline: float | None = None
+    ) -> subprocess.CompletedProcess:
+        remaining = GIT_OPERATION_SECONDS if deadline is None else deadline - time.monotonic()
+        if remaining <= 0:
+            raise AnchorUnavailable("audit anchor operation timed out")
         env = {
             key: os.environ[key]
             for key in ("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP")
@@ -119,30 +126,36 @@ class GitAnchors:
                 env=env,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=remaining,
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired):
             raise AnchorUnavailable("audit anchor Git command unavailable") from None
 
-    def _required(self, directory: str, *args: str) -> str:
-        result = self._git(directory, *args)
+    def _required(self, directory: str, *args: str, deadline: float) -> str:
+        result = self._git(directory, *args, deadline=deadline)
         if result.returncode:
             raise AnchorUnavailable("audit anchor Git command failed")
         return result.stdout.strip()
 
-    def _fetch(self, directory: str) -> Snapshot:
-        self._required(directory, "init", "--quiet")
-        listing = self._git(directory, "ls-remote", "--exit-code", "--refs", self.remote, BRANCH)
+    def _fetch(self, directory: str, *, deadline: float) -> Snapshot:
+        self._required(directory, "init", "--quiet", deadline=deadline)
+        listing = self._git(
+            directory, "ls-remote", "--exit-code", "--refs", self.remote, BRANCH, deadline=deadline
+        )
         if listing.returncode == 2:
             return Snapshot(None)
         if listing.returncode:
             raise AnchorUnavailable("audit anchor remote unavailable")
-        self._required(directory, "fetch", "--quiet", "--no-tags", self.remote, BRANCH)
-        self._required(directory, "update-ref", "HEAD", "FETCH_HEAD")
-        tip = self._required(directory, "rev-parse", "HEAD")
+        self._required(
+            directory, "fetch", "--quiet", "--no-tags", self.remote, BRANCH, deadline=deadline
+        )
+        self._required(directory, "update-ref", "HEAD", "FETCH_HEAD", deadline=deadline)
+        tip = self._required(directory, "rev-parse", "HEAD", deadline=deadline)
         try:
-            value = json.loads(self._required(directory, "show", "HEAD:anchor.json"))
+            value = json.loads(
+                self._required(directory, "show", "HEAD:anchor.json", deadline=deadline)
+            )
             ts = datetime.fromisoformat(value["created_at"].replace("Z", "+00:00"))
             if (
                 set(value) != {"event_seq", "head_hash", "created_at"}
@@ -155,13 +168,16 @@ class GitAnchors:
             checkpoint = Checkpoint(value["event_seq"], value["head_hash"], ts, tip)
         except (ValueError, KeyError, TypeError, AttributeError):
             raise AuditIntegrityError("external audit checkpoint is malformed") from None
-        commits = frozenset(self._required(directory, "rev-list", "HEAD").splitlines())
+        commits = frozenset(
+            self._required(directory, "rev-list", "HEAD", deadline=deadline).splitlines()
+        )
         return Snapshot(checkpoint, commits)
 
     async def read(self) -> Snapshot:
         def read():
+            deadline = time.monotonic() + GIT_OPERATION_SECONDS
             with tempfile.TemporaryDirectory(prefix="aegis-anchor-") as directory:
-                return self._fetch(directory)
+                return self._fetch(directory, deadline=deadline)
 
         return await asyncio.to_thread(read)
 
@@ -185,8 +201,9 @@ class GitAnchors:
             raise ValueError("invalid or regressing audit checkpoint")
 
         def publish():
+            deadline = time.monotonic() + GIT_OPERATION_SECONDS
             with tempfile.TemporaryDirectory(prefix="aegis-anchor-") as directory:
-                current = self._fetch(directory)
+                current = self._fetch(directory, deadline=deadline)
                 if current != previous:
                     raise AnchorConflict("audit anchor advanced before publication")
                 value = {
@@ -198,15 +215,29 @@ class GitAnchors:
                     json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n",
                     encoding="utf-8",
                 )
-                self._required(directory, "add", "--", "anchor.json")
+                self._required(directory, "add", "--", "anchor.json", deadline=deadline)
                 self._required(
-                    directory, "commit", "--quiet", "--allow-empty", "-m", "Anchor audit head"
+                    directory,
+                    "commit",
+                    "--quiet",
+                    "--allow-empty",
+                    "-m",
+                    "Anchor audit head",
+                    deadline=deadline,
                 )
-                tip = self._required(directory, "rev-parse", "HEAD")
+                tip = self._required(directory, "rev-parse", "HEAD", deadline=deadline)
                 # Normal push is compare-and-swap: never overwrite another publisher's history.
-                result = self._git(directory, "push", "--quiet", self.remote, "HEAD:" + BRANCH)
+                result = self._git(
+                    directory, "push", "--quiet", self.remote, "HEAD:" + BRANCH, deadline=deadline
+                )
                 if result.returncode:
-                    raise AnchorConflict("audit anchor publication was not confirmed; refetch")
+                    # A rejected push is a CAS race only if a fresh read confirms movement.
+                    current = self._fetch(directory, deadline=deadline)
+                    if current.checkpoint and current.checkpoint.external_ref == tip:
+                        return current  # The server accepted the push before transport failed.
+                    if current != previous:
+                        raise AnchorConflict("audit anchor advanced during publication")
+                    raise AnchorUnavailable("audit anchor publication was not confirmed")
                 checkpoint = Checkpoint(event_seq, head_hash, now, tip)
                 return Snapshot(checkpoint, previous.commits | {tip})
 

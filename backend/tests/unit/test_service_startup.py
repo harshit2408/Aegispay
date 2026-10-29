@@ -235,8 +235,13 @@ async def test_role_validation_rejects_noninherited_cross_service_membership(
         await admin.dispose()
 
 
-@pytest.mark.parametrize("failure", [None, "role", "audit"])
-async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monkeypatch, failure):
+@pytest.mark.parametrize(
+    "failure", [None, "role", "audit", "anchor", "runtime_anchor", "stop_during_audit"]
+)
+async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
+    monkeypatch, failure, caplog
+):
+    from app.audit.anchor import AnchorUnavailable
     from app.settlement import worker
 
     for field in PROJECT_VARIABLES:
@@ -285,11 +290,21 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
 
         async def run_once(self):
             events.append("audit:verify")
+            if failure == "stop_during_audit":
+                handlers[signal.SIGTERM]()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    events.append("audit:cancelled")
             if failure == "audit":
                 raise RuntimeError("audit startup verification failed")
+            if failure == "anchor":
+                raise AnchorUnavailable("private transport details")
 
     async def audit_loop(consumer, stop):
         events.append("audit:start")
+        if failure == "runtime_anchor":
+            raise AnchorUnavailable("private transport details")
         await stop.wait()
         events.append("audit:stop")
 
@@ -299,6 +314,8 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
 
         async def run_once(self):
             events.append("consumer:tick")
+            if failure == "runtime_anchor":
+                await asyncio.Event().wait()
             handlers[signal.SIGTERM]()
 
     loop = asyncio.get_running_loop()
@@ -324,6 +341,20 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
         with pytest.raises(RuntimeError, match="audit startup verification failed"):
             await worker.run()
         assert events == ["validate:settlement", "audit:verify", "dispose"]
+    elif failure == "anchor":
+        with pytest.raises(AnchorUnavailable):
+            await worker.run()
+        assert events == ["validate:settlement", "audit:verify", "dispose"]
+        assert "audit_anchor_unavailable node=audit action=stop_worker" in caplog.text
+        assert "private transport details" not in caplog.text
+    elif failure == "runtime_anchor":
+        with pytest.raises(ExceptionGroup) as error:
+            await asyncio.wait_for(worker.run(), timeout=2)
+        assert any(isinstance(exc, AnchorUnavailable) for exc in error.value.exceptions)
+        assert events[-3:] == ["close:TREASURY", "close:VENDOR", "dispose"]
+    elif failure == "stop_during_audit":
+        await asyncio.wait_for(worker.run(), timeout=0.2)
+        assert events == ["validate:settlement", "audit:verify", "audit:cancelled", "dispose"]
     else:
         await asyncio.wait_for(worker.run(), timeout=2)
         assert events.index("validate:settlement") < events.index("client:TREASURY")

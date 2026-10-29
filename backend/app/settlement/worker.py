@@ -7,7 +7,7 @@ import signal
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.audit import consumer as audit_consumer
-from app.audit.anchor import GitAnchors
+from app.audit.anchor import AnchorConflict, AnchorUnavailable, GitAnchors
 from app.audit.consumer import AuditConsumer
 from app.config import get_settlement_settings
 from app.paypal.client import PayPalClient
@@ -64,7 +64,18 @@ async def run(stop: asyncio.Event | None = None) -> None:
             else None,
         )
         # Verify anchored history before enabling any money movement.
-        await audit.run_once()
+        try:
+            await audit_consumer.run_once_until_stopped(audit, stop)
+        except AnchorConflict:
+            # Repeated publication races may delay startup, but are not an integrity incident.
+            raise
+        except AnchorUnavailable:
+            logging.getLogger("aegis.audit").error(
+                "audit_anchor_unavailable node=audit action=stop_worker"
+            )
+            raise
+        if stop.is_set():
+            return
         treasury = PayPalClient(
             app="TREASURY",
             base_url=settings.paypal_base_url,

@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useReducer, useState } from "react";
-import { APIError, api } from "@/lib/client";
 import { caseReadState } from "@/lib/case-display";
-import { subscribeToExecution } from "@/lib/sse";
+import { watchCase } from "@/lib/case-stream";
 import { CaseDetails } from "./case-preview";
 
 export function CaseLive({ executionId }: { executionId: string }) {
@@ -11,37 +10,7 @@ export function CaseLive({ executionId }: { executionId: string }) {
   const [attempt, setAttempt] = useState(0);
   const [stream, setStream] = useState("Connecting to updates…");
 
-  useEffect(() => {
-    let active = true;
-    let request: AbortController | undefined;
-    let unsubscribe: (() => void) | undefined;
-
-    async function refresh() {
-      request?.abort();
-      const controller = new AbortController();
-      request = controller;
-      dispatch({ type: "loading" });
-      try {
-        const data = await api.getExecution(executionId, controller.signal);
-        if (data.execution_id !== executionId) throw new Error("The response belongs to another case.");
-        if (active && !controller.signal.aborted) {
-          dispatch({ type: "loaded", data });
-          if (!unsubscribe) unsubscribe = subscribeToExecution(executionId, refresh, setStream);
-        }
-      } catch (error) {
-        if (!active || controller.signal.aborted) return;
-        unsubscribe?.();
-        unsubscribe = undefined;
-        const detail = error instanceof APIError && [401, 403].includes(error.status)
-          ? "Sign in with an eligible operator session to view this case."
-          : error instanceof APIError && error.status === 404 ? "Case not found."
-          : error instanceof Error ? error.message : "Case could not be loaded.";
-        dispatch({ type: "failed", error: detail });
-      }
-    }
-    void refresh();
-    return () => { active = false; request?.abort(); unsubscribe?.(); };
-  }, [executionId, attempt]);
+  useEffect(() => watchCase(executionId, dispatch, setStream), [executionId, attempt]);
 
   return <>
     {state.replayed && <div className="replay-banner">REPLAY · Recorded case data</div>}

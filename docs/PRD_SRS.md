@@ -1133,6 +1133,15 @@ class SettlementService:                                       # runs only in th
 ```
 The outbox worker and reconciler run in the `settlement` background worker (one instance; the reconciler holds an advisory lock), claiming rows with `SELECT … FOR UPDATE SKIP LOCKED` and a 60 s lease, polling every 2 s and checking `SETTLEMENT_HALT` and the velocity breaker on every tick (R23). Settlement events reach the API's SSE stream through Postgres `LISTEN/NOTIFY`.
 
+**Audit availability policy (P2-26):** when external anchoring is configured, an unavailable
+anchor stops the settlement process at startup or runtime; transport failure alone does not
+persist an integrity halt. A restart must verify the chain and external checkpoint before
+settlement resumes. A normal competing-publisher conflict may retry. Apparent rollback gets
+two spaced refetches outside the database transaction before confirmation; confirmed audit
+verification failure persists the R23 halt. Explicit HMAC-only degradation remains permitted
+under §19 for a chain without prior external receipts. See `docs/AUDIT.md` for transaction
+budgets, operator recovery and the migration/key/deployment sequence.
+
 ---
 
 ## 12. Short-Pay Decision Model (replaces v1 "EV Short-Pay")

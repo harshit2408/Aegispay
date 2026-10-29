@@ -8,7 +8,7 @@ The settlement worker drains the queue and publishes external checkpoints (R21).
 import hashlib
 import hmac
 import json
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -152,9 +152,38 @@ async def append_event(
     ts: datetime | None = None,
 ) -> ExecutionEvent:
     """Settlement-only append; caller commits/rolls back while holding the chain lock."""
-    _key(key)
     ts = ts if ts is not None else datetime.now(UTC)
-    _validate(execution_id, actor, event_type, payload, ts)
+    events = await append_events(
+        session,
+        key=key,
+        queued=[
+            AuditQueue(
+                execution_id=execution_id,
+                actor=actor,
+                event_type=event_type,
+                payload=payload,
+                ts=ts,
+            )
+        ],
+    )
+    return events[0]
+
+
+async def append_events(
+    session: AsyncSession,
+    *,
+    key: bytes,
+    queued: Iterable[AuditQueue],
+    verify: Callable[[list[ExecutionEvent]], Awaitable[None]] | None = None,
+) -> list[ExecutionEvent]:
+    """Lock and verify once per batch; additional verification cannot bypass the HMAC check.
+
+    No caller supplies the tail. It is derived from the verified rows under the transaction lock.
+    """
+    _key(key)
+    queued = list(queued)
+    for row in queued:
+        _validate(row.execution_id, row.actor, row.event_type, row.payload, row.ts)
     await lock_chain(session)
     rows = list(
         await session.scalars(
@@ -164,22 +193,34 @@ async def append_event(
         )
     )
     head = rows[-1].hash if rows else GENESIS_HASH
-    # shortcut: O(n) prefix verification; upgrade to verified checkpoints for large chains.
+    # shortcut: O(n) verification once per batch; upgrade to checkpoints for large chains.
     verify_chain(rows, key=key, expected_head=head)
+    if verify is not None:
+        await verify(rows)
+    events = []
+    for row in queued:
+        event = await _append_one(session, key=key, row=row, head=head)
+        events.append(event)
+        head = event.hash
+    return events
+
+
+async def _append_one(session: AsyncSession, *, key: bytes, row: AuditQueue, head: str):
+    """Private batch primitive; append_events owns verification and the chain lock."""
     sequence = await session.scalar(
         text("SELECT nextval(pg_get_serial_sequence('execution_events', 'event_seq'))")
     )
     # JSONB can normalize numeric notation; sign precisely what a later DB read will return.
     stored_payload = await session.scalar(
-        text("SELECT CAST(:payload AS JSONB) AS payload"), {"payload": _json(payload)}
+        text("SELECT CAST(:payload AS JSONB) AS payload"), {"payload": _json(row.payload)}
     )
     event = ExecutionEvent(
         event_seq=sequence,
-        execution_id=execution_id,
-        actor=actor,
-        event_type=event_type,
+        execution_id=row.execution_id,
+        actor=row.actor,
+        event_type=row.event_type,
         payload=stored_payload,
-        ts=ts,
+        ts=row.ts,
         prev_hash=head,
     )
     event.hash = _digest(event, key)
