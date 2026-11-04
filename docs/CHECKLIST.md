@@ -84,20 +84,20 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P2-04** @A Eval set ≥ 50 labelled PDFs (held-out split, adaptive + A4 memo-injection cases, 5 runs, Wilson intervals) incl. false-positive traps in `tests/fixtures/eval/` — 04c2daf
 - [x] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport` — 04c2daf
 - [x] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9) — f74a700
-- [ ] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed (WIP B)
-- [ ] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00) (WIP B)
+- [x] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed — 5b8986c
+- [x] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00) — 5b8986c
 - [ ] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests (WIP B)
 - [ ] **P2-10** @A `decision/graph.py` topology + `human_review` `interrupt()` + resume via `Command`; Postgres checkpointer (WIP B)
 - [ ] **P2-11** @A Property tests (hypothesis): receiver ∈ vendor master; paid ≤ accepted value; Σ reservations ≤ cap (WIP B)
 - [ ] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) (WIP B)
 - [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP B)
-- [ ] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution (WIP B)
+- [x] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution — f7fbb54
 - [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP B)
 - [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — 55b2f38
 - [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — 55b2f38
 - [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — 55b2f38
-- [ ] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required (WIP B) (BLOCKED: read-only API wiring implemented in cbc9a27; authenticated decisions and session/CSRF delivery require P2-13/P3-13)
-- [ ] **P2-20** @B Mandate studio: compile → diff → activate (WIP B)
+- [x] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required — f7fbb54
+- [x] **P2-20** @B Mandate studio: compile → diff → activate — f7fbb54
 - [ ] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s (WIP B) (BLOCKED: credentialed client and strict event contract implemented in cbc9a27; authenticated server stream P2-13/P3-13 and actual ≤1 s measurement remain)
 - [ ] **P2-22** @A `routers/vendors.py`: payee change request → second approver → cooling → effective; alerts (R15) (WIP B)
 - [ ] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16) (WIP B)
