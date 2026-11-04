@@ -11,10 +11,14 @@ export function watchCase(
   let active = true;
   let request: AbortController | undefined;
   let unsubscribe: (() => void) | undefined;
+  let queued = false;
 
   async function refresh() {
     if (!active) return;
-    request?.abort();
+    if (request) {
+      queued = true;
+      return;
+    }
     const controller = new AbortController();
     request = controller;
     dispatch({ type: "loading" });
@@ -26,7 +30,7 @@ export function watchCase(
         throw new Error("The response belongs to another case.");
       }
       if (active && !controller.signal.aborted) {
-        dispatch({ type: "loaded", data });
+        if (!queued) dispatch({ type: "loaded", data });
         if (!unsubscribe) unsubscribe = subscribeToExecution(executionId, refresh, status);
       }
     } catch (error) {
@@ -42,6 +46,12 @@ export function watchCase(
         : error instanceof APIError && error.status === 404 ? "Case not found."
         : error instanceof Error ? error.message : "Case could not be loaded.";
       dispatch({ type: "failed", error: detail });
+    } finally {
+      request = undefined;
+      if (active && queued) {
+        queued = false;
+        void refresh();
+      }
     }
   }
   void refresh();

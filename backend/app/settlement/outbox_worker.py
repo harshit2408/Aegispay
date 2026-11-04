@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.payables import InvoiceExecution, SettlementOutbox
 from app.settlement import transitions
+from app.settlement.controls import check_velocity
 from app.settlement.halt import is_halted
 from app.settlement.service import SettlementService
 
@@ -62,7 +63,10 @@ async def tick(
     now: datetime | None = None,
 ) -> bool:
     """One worker pass; True if a command was handled (so the caller can drain without sleeping)."""
-    async with sessionmaker() as s:
+    async with sessionmaker() as s, s.begin():
+        limits = getattr(service, "velocity_limits", (20, 300000))
+        if await check_velocity(s, *limits, now or datetime.now(UTC)):
+            return False
         if await is_halted(s):
             return False
     async with sessionmaker() as s, s.begin():

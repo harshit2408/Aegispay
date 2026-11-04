@@ -41,7 +41,7 @@ test("credentialed stream refreshes only its case, recovers on reconnect and clo
   const statuses: string[] = [];
   const close = subscribeToExecution("case_1", () => { refreshes += 1; }, (status) => statuses.push(status));
   const source = FakeSource.instance;
-  assert.ok(source.url.endsWith("/api/stream"));
+  assert.equal(source.url, "/api/stream");
   assert.equal(source.options?.withCredentials, true);
   source.send("message", event);
   source.send("settlement", event);

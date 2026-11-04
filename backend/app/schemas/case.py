@@ -100,14 +100,14 @@ class PayPalInvoiceView(BaseModel):
     billed_qty: int
     unit_price_cents: Cents
     total_cents: Cents
-    payee_reference: str
+    payee_reference: str | None
 
 
 class POConsumptionView(BaseModel):
     accepted_value_cents: Cents
     paid_cents: Cents
     reserved_cents: Cents
-    this_payable_cents: Cents
+    this_payable_cents: Cents | None
 
 
 class SettlementEventView(BaseModel):
@@ -128,21 +128,22 @@ class CaseDetail(BaseModel):
     execution_id: str
     status: ExecutionStatus
     replayed: bool
+    duplicate_of_execution_id: str | None = None
     uploaded_by: str
     viewer: OperatorView
-    vendor: VendorView
-    purchase_order: PurchaseOrderView
-    goods_receipt: GoodsReceiptView
-    paypal_invoice: PayPalInvoiceView
-    po_consumption: POConsumptionView
-    policy: MandatePolicy
-    extraction: InvoiceExtraction
-    forensics: ForensicsReport
-    match: MatchReport
-    risk: RiskAssessment
+    vendor: VendorView | None
+    purchase_order: PurchaseOrderView | None
+    goods_receipt: GoodsReceiptView | None
+    paypal_invoice: PayPalInvoiceView | None
+    po_consumption: POConsumptionView | None
+    policy: MandatePolicy | None
+    extraction: InvoiceExtraction | None
+    forensics: ForensicsReport | None
+    match: MatchReport | None
+    risk: RiskAssessment | None
     evidence: EvidencePack | None
     short_pay: ShortPayDecision | None
-    gate: GateDecision
+    gate: GateDecision | None
     approvals: list[ApprovalView]
     settlement_timeline: list[SettlementEventView]
     audit_anchor: AuditAnchorView
@@ -151,10 +152,10 @@ class CaseDetail(BaseModel):
 class ExecutionRow(BaseModel):
     execution_id: str
     status: ExecutionStatus
-    vendor_name: str
-    billed_cents: Cents
-    payable_cents: Cents
-    risk_score: Annotated[int, Field(ge=0, le=100)]
+    vendor_name: str | None
+    billed_cents: Cents | None
+    payable_cents: Cents | None
+    risk_score: Annotated[int, Field(ge=0, le=100)] | None
     replayed: bool
 
 

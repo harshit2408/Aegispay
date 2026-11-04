@@ -14,6 +14,49 @@
         "title": "APIError",
         "type": "object"
       },
+      "ActivationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ActivationRequest",
+        "type": "object"
+      },
+      "ActiveMandateView": {
+        "properties": {
+          "committed_today_cents": {
+            "title": "Committed Today Cents",
+            "type": "integer"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/MandatePolicy"
+          },
+          "policy_id": {
+            "title": "Policy Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy_id",
+          "version",
+          "policy",
+          "committed_today_cents"
+        ],
+        "title": "ActiveMandateView",
+        "type": "object"
+      },
       "ApprovalView": {
         "properties": {
           "action": {
@@ -100,6 +143,36 @@
         "title": "AuditAnchorView",
         "type": "object"
       },
+      "Body_upload_document_api_documents_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "paypal_invoice_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Paypal Invoice Id",
+            "type": "string"
+          },
+          "po_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Po Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "po_id",
+          "paypal_invoice_id"
+        ],
+        "title": "Body_upload_document_api_documents_post",
+        "type": "object"
+      },
       "CaseDetail": {
         "properties": {
           "approvals": {
@@ -111,6 +184,17 @@
           },
           "audit_anchor": {
             "$ref": "#/components/schemas/AuditAnchorView"
+          },
+          "duplicate_of_execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of Execution Id"
           },
           "evidence": {
             "anyOf": [
@@ -127,38 +211,108 @@
             "type": "string"
           },
           "extraction": {
-            "$ref": "#/components/schemas/InvoiceExtraction"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceExtraction"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "forensics": {
-            "$ref": "#/components/schemas/ForensicsReport"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ForensicsReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "gate": {
-            "$ref": "#/components/schemas/GateDecision"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GateDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "goods_receipt": {
-            "$ref": "#/components/schemas/GoodsReceiptView"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoodsReceiptView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "match": {
-            "$ref": "#/components/schemas/MatchReport"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "paypal_invoice": {
-            "$ref": "#/components/schemas/PayPalInvoiceView"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PayPalInvoiceView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "po_consumption": {
-            "$ref": "#/components/schemas/POConsumptionView"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/POConsumptionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "policy": {
-            "$ref": "#/components/schemas/MandatePolicy"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MandatePolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "purchase_order": {
-            "$ref": "#/components/schemas/PurchaseOrderView"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PurchaseOrderView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "replayed": {
             "title": "Replayed",
             "type": "boolean"
           },
           "risk": {
-            "$ref": "#/components/schemas/RiskAssessment"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "settlement_timeline": {
             "items": {
@@ -200,7 +354,14 @@
             "type": "string"
           },
           "vendor": {
-            "$ref": "#/components/schemas/VendorView"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VendorView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "viewer": {
             "$ref": "#/components/schemas/OperatorView"
@@ -230,6 +391,38 @@
           "audit_anchor"
         ],
         "title": "CaseDetail",
+        "type": "object"
+      },
+      "ChangeApproval": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ChangeApproval",
+        "type": "object"
+      },
+      "CompileRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "CompileRequest",
         "type": "object"
       },
       "DecisionReceipt": {
@@ -275,6 +468,31 @@
           "gate_hash"
         ],
         "title": "DecisionRequest",
+        "type": "object"
+      },
+      "DocumentReceipt": {
+        "properties": {
+          "duplicate_of_execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicate Of Execution Id"
+          },
+          "execution_id": {
+            "title": "Execution Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "execution_id",
+          "duplicate_of_execution_id"
+        ],
+        "title": "DocumentReceipt",
         "type": "object"
       },
       "EvidenceFact": {
@@ -340,28 +558,49 @@
       "ExecutionRow": {
         "properties": {
           "billed_cents": {
-            "minimum": 0.0,
-            "title": "Billed Cents",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billed Cents"
           },
           "execution_id": {
             "title": "Execution Id",
             "type": "string"
           },
           "payable_cents": {
-            "minimum": 0.0,
-            "title": "Payable Cents",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payable Cents"
           },
           "replayed": {
             "title": "Replayed",
             "type": "boolean"
           },
           "risk_score": {
-            "maximum": 100.0,
-            "minimum": 0.0,
-            "title": "Risk Score",
-            "type": "integer"
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Score"
           },
           "status": {
             "enum": [
@@ -382,8 +621,15 @@
             "type": "string"
           },
           "vendor_name": {
-            "title": "Vendor Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vendor Name"
           }
         },
         "required": [
@@ -553,6 +799,27 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HaltRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "halted": {
+            "title": "Halted",
+            "type": "boolean"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "halted",
+          "reason"
+        ],
+        "title": "HaltRequest",
+        "type": "object"
+      },
       "HiddenSegment": {
         "properties": {
           "bbox": {
@@ -683,6 +950,29 @@
         "title": "InvoiceExtraction",
         "type": "object"
       },
+      "LoginRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "operator_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operator Id",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator_id",
+          "password"
+        ],
+        "title": "LoginRequest",
+        "type": "object"
+      },
       "MandatePolicy": {
         "properties": {
           "auto_short_pay_enabled": {
@@ -757,6 +1047,68 @@
           "vendor_daily_cap_cents"
         ],
         "title": "MandatePolicy",
+        "type": "object"
+      },
+      "MandateRecord": {
+        "properties": {
+          "activated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activated At"
+          },
+          "clamped_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Clamped Fields",
+            "type": "array"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "diff": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Diff",
+            "type": "object"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/MandatePolicy"
+          },
+          "policy_id": {
+            "title": "Policy Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy_id",
+          "version",
+          "created_by",
+          "is_active",
+          "activated_at",
+          "policy",
+          "clamped_fields",
+          "diff"
+        ],
+        "title": "MandateRecord",
         "type": "object"
       },
       "MatchReport": {
@@ -979,9 +1331,16 @@
             "type": "integer"
           },
           "this_payable_cents": {
-            "minimum": 0.0,
-            "title": "This Payable Cents",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "This Payable Cents"
           }
         },
         "required": [
@@ -1004,8 +1363,15 @@
             "type": "string"
           },
           "payee_reference": {
-            "title": "Payee Reference",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee Reference"
           },
           "status": {
             "title": "Status",
@@ -1067,6 +1433,70 @@
         "title": "PurchaseOrderView",
         "type": "object"
       },
+      "ReceiptRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted_qty": {
+            "minimum": 0.0,
+            "title": "Accepted Qty",
+            "type": "integer"
+          },
+          "inspection_note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inspection Note"
+          },
+          "po_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Po Id",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "title": "Received At",
+            "type": "string"
+          },
+          "received_qty": {
+            "minimum": 0.0,
+            "title": "Received Qty",
+            "type": "integer"
+          },
+          "rejected_qty": {
+            "minimum": 0.0,
+            "title": "Rejected Qty",
+            "type": "integer"
+          },
+          "supersedes_grn_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Grn Id"
+          }
+        },
+        "required": [
+          "po_id",
+          "received_qty",
+          "accepted_qty",
+          "rejected_qty",
+          "received_at"
+        ],
+        "title": "ReceiptRequest",
+        "type": "object"
+      },
       "RiskAssessment": {
         "properties": {
           "contributions": {
@@ -1106,6 +1536,29 @@
           "points"
         ],
         "title": "RiskContribution",
+        "type": "object"
+      },
+      "SessionView": {
+        "properties": {
+          "csrf_token": {
+            "title": "Csrf Token",
+            "type": "string"
+          },
+          "operator_id": {
+            "title": "Operator Id",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operator_id",
+          "role",
+          "csrf_token"
+        ],
+        "title": "SessionView",
         "type": "object"
       },
       "SettlementEventView": {
@@ -1350,6 +1803,35 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VendorChangeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "paypal_payer_id": {
+            "pattern": "^[A-Z0-9]{13}$",
+            "title": "Paypal Payer Id",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 10,
+            "title": "Reason",
+            "type": "string"
+          },
+          "verified_paypal_email": {
+            "maxLength": 254,
+            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+            "title": "Verified Paypal Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "paypal_payer_id",
+          "verified_paypal_email",
+          "reason"
+        ],
+        "title": "VendorChangeRequest",
+        "type": "object"
+      },
       "VendorView": {
         "properties": {
           "change_approved_by": {
@@ -1427,6 +1909,123 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "me_api_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/documents": {
+      "post": {
+        "operationId": "upload_document_api_documents_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_api_documents_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/api/executions": {
       "get": {
         "operationId": "list_executions",
@@ -1444,21 +2043,11 @@
               }
             },
             "description": "Successful Response"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/APIError"
-                }
-              }
-            },
-            "description": "Case service/auth not implemented"
           }
         },
         "summary": "List Executions",
         "tags": [
-          "P1 contract (not implemented)"
+          "executions"
         ]
       }
     },
@@ -1496,21 +2085,11 @@
               }
             },
             "description": "Validation Error"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/APIError"
-                }
-              }
-            },
-            "description": "Case service/auth not implemented"
           }
         },
         "summary": "Get Execution",
         "tags": [
-          "P1 contract (not implemented)"
+          "executions"
         ]
       }
     },
@@ -1568,21 +2147,50 @@
               }
             },
             "description": "Validation Error"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/APIError"
-                }
-              }
-            },
-            "description": "Case service/auth not implemented"
           }
         },
         "summary": "Submit Decision",
         "tags": [
-          "P1 contract (not implemented)"
+          "executions"
+        ]
+      }
+    },
+    "/api/grns": {
+      "post": {
+        "operationId": "record_receipt_api_grns_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Receipt",
+        "tags": [
+          "grns"
         ]
       }
     },
@@ -1602,6 +2210,210 @@
         "summary": "Health"
       }
     },
+    "/api/mandates": {
+      "get": {
+        "operationId": "list_mandates_api_mandates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MandateRecord"
+                  },
+                  "title": "Response List Mandates Api Mandates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Mandates",
+        "tags": [
+          "mandates"
+        ]
+      }
+    },
+    "/api/mandates/active": {
+      "get": {
+        "operationId": "active_api_mandates_active_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveMandateView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Active",
+        "tags": [
+          "mandates"
+        ]
+      }
+    },
+    "/api/mandates/compile": {
+      "post": {
+        "operationId": "compile_policy_api_mandates_compile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MandateRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compile Policy",
+        "tags": [
+          "mandates"
+        ]
+      }
+    },
+    "/api/mandates/{policy_id}/versions/{version}/activate": {
+      "post": {
+        "operationId": "activate_api_mandates__policy_id__versions__version__activate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "title": "Policy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MandateRecord"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate",
+        "tags": [
+          "mandates"
+        ]
+      }
+    },
+    "/api/ops/settlement-halt": {
+      "get": {
+        "operationId": "halt_status_api_ops_settlement_halt_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Halt Status",
+        "tags": [
+          "ops"
+        ]
+      },
+      "post": {
+        "operationId": "set_halt_api_ops_settlement_halt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HaltRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Halt",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
     "/api/stream": {
       "get": {
         "operationId": "execution_stream",
@@ -1615,22 +2427,150 @@
                 }
               }
             },
-            "description": "Each SSE data field is a StreamEvent JSON object"
-          },
-          "501": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/APIError"
-                }
-              }
-            },
-            "description": "Authenticated stream not implemented"
+            "description": "Each data field is a StreamEvent"
           }
         },
         "summary": "Execution Stream",
         "tags": [
-          "Stream contract (not implemented)"
+          "stream"
+        ]
+      }
+    },
+    "/api/vendors/changes/{change_id}/approve": {
+      "post": {
+        "operationId": "approve_change_api_vendors_changes__change_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "change_id",
+            "required": true,
+            "schema": {
+              "title": "Change Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeApproval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Change",
+        "tags": [
+          "vendors"
+        ]
+      }
+    },
+    "/api/vendors/{vendor_id}/changes": {
+      "get": {
+        "operationId": "changes_api_vendors__vendor_id__changes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor_id",
+            "required": true,
+            "schema": {
+              "title": "Vendor Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Changes",
+        "tags": [
+          "vendors"
+        ]
+      },
+      "post": {
+        "operationId": "request_change_api_vendors__vendor_id__changes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor_id",
+            "required": true,
+            "schema": {
+              "title": "Vendor Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Change",
+        "tags": [
+          "vendors"
         ]
       }
     },

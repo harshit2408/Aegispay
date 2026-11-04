@@ -33,6 +33,8 @@ SHARED_VARIABLES = frozenset(
 API_VARIABLES = frozenset(
     {
         "DATABASE_URL",
+        "FRONTEND_ORIGIN",
+        "STORAGE_PATH",
         "CHECKPOINT_DB_URL",
         "LLM_PROVIDER",
         "LLM_API_KEY",

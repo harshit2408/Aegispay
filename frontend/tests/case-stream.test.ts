@@ -57,7 +57,7 @@ for (const [name, failure] of [
     const source = run.sources[0];
     source.notify();
     assert.equal(run.state().loading, true);
-    assert.equal(run.state().data, undefined);
+    assert.equal(run.state().data?.execution_id, executionId);
     await settle();
     assert.ok(run.state().error);
     assert.equal(run.state().data, undefined);
@@ -117,7 +117,8 @@ test("cleanup closes the stream, aborts pending REST and ignores late completion
   await settle();
   const source = run.sources[0];
   source.notify();
-  assert.equal(run.state().data, undefined);
+  assert.equal(run.state().loading, true);
+  assert.equal(run.state().data?.execution_id, executionId);
   const updates = run.updates;
   run.close();
   assert.equal(source.closed, true);
@@ -128,5 +129,24 @@ test("cleanup closes the stream, aborts pending REST and ignores late completion
   await settle();
   assert.equal(run.updates, updates);
   assert.equal(run.signals.length, 2);
-  assert.equal(run.state().data, undefined);
+  assert.equal(run.state().loading, true);
+});
+
+test("bursts coalesce into a fresh read without canceling an in-flight response", async (t) => {
+  let finish!: (response: Response) => void;
+  const pending = new Promise<Response>((resolve) => { finish = resolve; });
+  const run = watch(t, [currentCase(), pending, Response.json({ ...previewCase, execution_id: executionId, status: "SETTLED" })]);
+  await settle();
+  const source = run.sources[0];
+  source.notify();
+  source.notify();
+  source.notify();
+  assert.equal(run.signals.length, 2);
+  assert.equal(run.signals[1].aborted, false);
+  assert.equal(run.state().loading, true);
+  finish(currentCase());
+  await settle();
+  assert.equal(run.signals.length, 3);
+  assert.equal(run.state().data?.status, "SETTLED");
+  assert.equal(run.state().loading, false);
 });

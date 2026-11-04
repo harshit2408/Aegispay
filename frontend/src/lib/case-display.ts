@@ -11,7 +11,7 @@ export function caseReadState(state: CaseReadState, action:
 ): CaseReadState {
   if (action.type === "loaded") return { data: action.data, loading: false, replayed: action.data.replayed };
   if (action.type === "failed") return { error: action.error, loading: false, replayed: state.replayed };
-  return { loading: true, replayed: state.replayed };
+  return { data: state.data, loading: true, replayed: state.replayed };
 }
 
 export function usd(cents: number): string {
@@ -24,8 +24,10 @@ export function isEligible(viewer: Operator, uploadedBy: string): boolean {
 }
 
 export function currentApprovals(caseData: CaseDetail, approvals: Approval[]): Approval[] {
+  if (!caseData.gate) return [];
+  const gateHash = caseData.gate.gate_hash;
   const eligible = approvals.filter((approval) =>
-    !approval.void_reason && approval.gate_hash === caseData.gate.gate_hash &&
+    !approval.void_reason && approval.gate_hash === gateHash &&
     approval.action !== "REJECT" && isEligible(approval.actor, caseData.uploaded_by));
   return eligible.filter((approval, index) =>
     eligible.findIndex((other) => other.actor.operator_id === approval.actor.operator_id) === index);
@@ -35,6 +37,7 @@ export function decisionBlock(
   caseData: CaseDetail, viewer: Operator, approvals: Approval[], displayedHash: string,
   action: components["schemas"]["DecisionRequest"]["action"], reason: string,
 ): string | null {
+  if (!caseData.gate) return "No gate decision is available.";
   if (displayedHash !== caseData.gate.gate_hash) return "Case changed, review again.";
   if (!isEligible(viewer, caseData.uploaded_by)) return "Only a controller or CFO who did not upload this invoice can review.";
   if (!caseData.gate.allowed_actions.includes(action)) return "The gate does not allow this action.";

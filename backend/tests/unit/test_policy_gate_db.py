@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 
 from app.decision.policy_gate import evaluate
 from app.models.core import GoodsReceipt, MandatePolicy, Operator, VendorMaster, VendorMasterChange
@@ -41,6 +42,12 @@ async def gate_world(pg_sessionmaker):
                     operator_id="op-second",
                     display_name="Second",
                     role="controller",
+                    password_hash="x",
+                ),
+                Operator(
+                    operator_id="op-vendor-admin",
+                    display_name="Vendor admin",
+                    role="vendor_admin",
                     password_hash="x",
                 ),
                 GoodsReceipt(
@@ -106,11 +113,13 @@ async def test_hash_stable_after_votes_and_only_eligible_distinct_humans_count(
         assert first.required_approvals == 2 and first.route == "FREEZE"
         await session.rollback()
     async with pg_sessionmaker() as session, session.begin():
+        for ineligible in ("op-ctl", "op-adm", "op-rcv"):
+            with pytest.raises(IntegrityError, match="approval violates operator SoD"):
+                async with session.begin_nested():
+                    session.add(vote(ineligible, first.gate_hash))
+                    await session.flush()
         session.add_all(
             [
-                vote("op-ctl", first.gate_hash),  # uploader: excluded
-                vote("op-adm", first.gate_hash),  # administrator: excluded
-                vote("op-rcv", first.gate_hash),  # receiver: excluded
                 vote("op-cfo", first.gate_hash, consumed_at=now),  # consumed receipt still a vote
                 vote("op-second", "stale-hash"),
             ]
@@ -160,8 +169,9 @@ async def test_pending_cooling_change_blocks_before_master_update(pg_sessionmake
                 vendor_id="v1",
                 old_values={"email": "old@example.invalid"},
                 new_values={"email": "new@example.invalid"},
-                requested_by="op-adm",
+                requested_by="op-vendor-admin",
                 approved_by="op-cfo",
+                created_at=now - timedelta(minutes=1),
                 approved_at=now,
                 effective_at=now + timedelta(hours=72),
                 status="COOLING",

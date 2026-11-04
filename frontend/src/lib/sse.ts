@@ -29,7 +29,7 @@ export function parseStreamEvent(raw: string): StreamEvent | null {
 export function subscribeToExecution(
   executionId: string, refresh: () => void, status: (message: string) => void,
 ): () => void {
-  const source = new EventSource(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/stream`, { withCredentials: true });
+  const source = new EventSource("/api/stream", { withCredentials: true });
   let closed = false;
   function message(event: MessageEvent<string>) {
     if (closed) return;

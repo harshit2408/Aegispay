@@ -23,4 +23,7 @@ async def halt(session: AsyncSession, reason: str, changed_by: str = "system") -
             halted=True, halted_reason=reason[:200], changed_by=changed_by, changed_at=func.now()
         )
     )
-    log.error("SETTLEMENT_HALT set by %s: %s", changed_by, reason)
+    from app.ops.alerts import enqueue_alert
+
+    await enqueue_alert(session, "HALT")
+    log.error("SETTLEMENT_HALT reason_code=%s", reason[:200])

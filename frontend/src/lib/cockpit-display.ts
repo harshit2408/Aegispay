@@ -4,14 +4,16 @@ import { usd } from "./case-display.ts";
 type CaseDetail = components["schemas"]["CaseDetail"];
 
 export function triad(data: CaseDetail): { po: string; receipt: string; source: string } {
+  const { extraction, purchase_order: po, goods_receipt: receipt, match } = data;
+  if (!match) return { po: po ? "Pending" : "Missing", receipt: receipt ? "Pending" : "Missing", source: "Pending" };
   return {
-    po: data.extraction.po_reference === data.purchase_order.po_id && data.match.po_id === data.purchase_order.po_id &&
-      data.match.precision_ok && data.match.billed_unit_price_cents === data.match.po_unit_price_cents &&
-      data.match.billed_qty <= data.match.ordered_qty ? "Matched" : "Review",
-    receipt: !data.match.grn_id || !data.goods_receipt.grn_id ? "Missing" :
-      data.match.grn_id !== data.goods_receipt.grn_id || data.match.billed_qty <= 0 ? "Review" :
-      data.match.accepted_qty <= 0 ? "Not accepted" : data.match.accepted_qty >= data.match.billed_qty ? "Accepted" : "Partial",
-    source: !data.match.paypal_invoice_id ? "Missing" : data.match.paypal_invoice_matches_pdf ? "Matched" : "Review",
+    po: !po ? "Missing" : extraction?.po_reference === po.po_id && match.po_id === po.po_id &&
+      match.precision_ok && match.billed_unit_price_cents === match.po_unit_price_cents &&
+      match.billed_qty <= match.ordered_qty ? "Matched" : "Review",
+    receipt: !match.grn_id || !receipt?.grn_id ? "Missing" :
+      match.grn_id !== receipt.grn_id || match.billed_qty <= 0 ? "Review" :
+      match.accepted_qty <= 0 ? "Not accepted" : match.accepted_qty >= match.billed_qty ? "Accepted" : "Partial",
+    source: !match.paypal_invoice_id ? "Missing" : match.paypal_invoice_matches_pdf ? "Matched" : "Review",
   };
 }
 
@@ -34,16 +36,17 @@ const reasonCodes: Record<string, string> = {
 export function frozenExposure(cases: readonly CaseDetail[]) {
   const groups = new Map<string, { code: string; label: string; cents: number; count: number }>();
   for (const data of cases) {
-    if (data.status !== "FROZEN") continue;
-    const codes = new Set(data.gate.reasons.map((reason) => {
+    if (data.status !== "FROZEN" || !data.match) continue;
+    const { match } = data;
+    const codes = new Set((data.gate?.reasons ?? []).map((reason) => {
       const explicit = reason.match(/^(G(?:[2-9]|10))\b/)?.[1];
       return explicit ?? (Object.hasOwn(reasonCodes, reason) ? reasonCodes[reason] : "OTHER");
     }));
     if (codes.size === 0) codes.add("OTHER");
     for (const code of codes) {
       const group = groups.get(code) ?? { code, label: reasonLabels[code] ?? "Other gate reasons", cents: 0, count: 0 };
-      usd(data.match.billed_cents);
-      group.cents += data.match.billed_cents;
+      usd(match.billed_cents);
+      group.cents += match.billed_cents;
       usd(group.cents);
       group.count += 1;
       groups.set(code, group);

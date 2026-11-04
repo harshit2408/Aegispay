@@ -1,4 +1,4 @@
-"""The P1 API seam must publish types without enabling decisions or money movement."""
+"""API contract and authorization boundaries for case reads and decisions."""
 
 import json
 from pathlib import Path
@@ -46,12 +46,15 @@ def test_gate_rejects_invalid_or_coerced_cents(amount):
         )
 
 
-async def test_published_case_routes_fail_closed_without_services_or_auth():
+async def test_case_routes_require_operator_session(monkeypatch):
+    from app.db import get_session
+
+    monkeypatch.setitem(app.dependency_overrides, get_session, lambda: None)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         for path in ["/api/executions", "/api/executions/example", "/api/stream"]:
             response = await client.get(path)
-            assert response.status_code == 501
+            assert response.status_code == 401
             assert response.headers["content-type"].startswith("application/json")
         response = await client.post(
             "/api/executions/example/decisions",
@@ -61,8 +64,8 @@ async def test_published_case_routes_fail_closed_without_services_or_auth():
                 "gate_hash": "a" * 64,
             },
         )
-        assert response.status_code == 501
-        assert "not implemented" in response.json()["detail"]
+        assert response.status_code == 401
+        assert response.json()["detail"] == "session required"
         response = await client.post(
             "/api/executions/example/decisions",
             json={
@@ -72,7 +75,7 @@ async def test_published_case_routes_fail_closed_without_services_or_auth():
                 "actor": "forged",
             },
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
 
 
 def test_committed_openapi_matches_actual_server_contract():
@@ -120,5 +123,3 @@ def test_stream_contract_is_minimal_and_generated_as_sse():
     assert set(event.model_dump()) == {"type", "execution_id", "name", "status", "ts"}
     response = app.openapi()["paths"]["/api/stream"]["get"]["responses"]["200"]
     assert response["content"]["text/event-stream"]["schema"]["$ref"].endswith("/StreamEvent")
-    error = app.openapi()["paths"]["/api/stream"]["get"]["responses"]["501"]
-    assert set(error["content"]) == {"application/json"}

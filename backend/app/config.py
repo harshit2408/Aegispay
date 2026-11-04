@@ -1,6 +1,7 @@
 """Independent process settings (PRD §7, R22); environment variables only."""
 
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -37,12 +38,50 @@ class _PayPalSettings(BaseSettings):
 
 class Settings(_PayPalSettings):
     database_url: str = Field(repr=False)
+    checkpoint_db_url: str | None = Field(default=None, repr=False)
+    llm_api_key: SecretStr | None = None
+    frontend_origin: str = "http://localhost:3000"
+    storage_path: str = "/tmp/aegis-documents"
     demo_enabled: bool = False
     demo_replay_mode: bool = False
     treasury_webhook_id: str = ""
     vendor_webhook_id: str = ""
     vendor_client_id: str | None = Field(default=None, repr=False)
     vendor_client_secret: SecretStr | None = None
+    session_secret: SecretStr | None = Field(default=None, min_length=32)
+    org_hard_max_single_cents: int = Field(default=100000, ge=0)
+    org_hard_daily_cap_cents: int = Field(default=500000, ge=0)
+    org_hard_vendor_daily_cap_cents: int = Field(default=150000, ge=0)
+    org_hard_vendor_30d_cap_cents: int = Field(default=1000000, ge=0)
+    org_hard_max_invoices_per_vendor_per_day: int = Field(default=5, ge=1)
+    org_hard_max_price_variance_bps: int = Field(default=200, ge=0)
+    org_hard_max_short_pay_delta_cents: int = Field(default=20000, ge=0)
+    org_hard_max_dual_approval_threshold: int = Field(default=80, ge=0, le=100)
+    org_allowed_timezones: str = "UTC,America/New_York,Asia/Kolkata"
+    payee_cooling_hours: int = Field(default=72, ge=72)
+    vendor_new_days: int = Field(default=7, ge=0)
+
+    @field_validator("frontend_origin")
+    @classmethod
+    def frontend(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if (
+            (
+                parsed.scheme != "https"
+                and not (
+                    parsed.scheme == "http"
+                    and parsed.hostname in ("localhost", "127.0.0.1", "[::1]")
+                )
+            )
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("frontend origin must be HTTPS or local HTTP")
+        return value.rstrip("/")
 
     @field_validator("database_url")
     @classmethod
@@ -72,6 +111,24 @@ class SettlementSettings(_PayPalSettings):
     audit_hmac_key: SecretStr = Field(min_length=32)
     audit_anchor_repo: str = Field(default="", repr=False)
     audit_anchor_token: SecretStr | None = None
+    velocity_max_payouts_per_hour: int = Field(default=20, ge=1)
+    velocity_max_cents_per_hour: int = Field(default=300000, ge=1)
+    alert_webhook_url: str = Field(default="", repr=False)
+
+    @field_validator("alert_webhook_url")
+    @classmethod
+    def alert_url(cls, value: str) -> str:
+        if value:
+            parsed = urlsplit(value)
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.fragment
+            ):
+                raise ValueError("alert webhook must be HTTPS")
+        return value
 
     @field_validator("audit_anchor_repo")
     @classmethod

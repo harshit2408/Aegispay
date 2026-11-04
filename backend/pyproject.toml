@@ -9,6 +9,7 @@ description = "AegisPay backend: zero-trust agentic payables on PayPal"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi",
+    "python-multipart>=0.0.22,<1",
     "uvicorn[standard]",
     "pydantic-settings",
     "pydantic>=2",
@@ -27,6 +28,10 @@ dependencies = [
     "pdfminer.six",
     "pillow",
     "pytesseract",
+    "argon2-cffi",
+    "langgraph==1.2.16",
+    "langgraph-checkpoint-postgres==3.2.0",
+    "psycopg[binary,pool]==3.3.6",
 ]
 
 [project.optional-dependencies]

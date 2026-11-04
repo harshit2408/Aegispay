@@ -120,6 +120,7 @@ export function StudioSpike() {
   }
   return (
     <>
+      <div className="replay-banner">REPLAY · Studio preview · Synthetic data only</div>
       <div className="studio-toolbar">
         <button type="button" disabled={!ready} aria-pressed={selectedPage === "cockpit"} onClick={() => selectPage("cockpit")}>Cockpit widgets</button>
         <button type="button" disabled={!ready} aria-pressed={selectedPage === "spike"} onClick={() => selectPage("spike")}>Integration probes</button>
