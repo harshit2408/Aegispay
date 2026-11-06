@@ -7,6 +7,7 @@ or {"final": {...}}.
 
 import json
 import logging
+import re
 from collections.abc import Callable
 
 from app.agents import Halt
@@ -30,14 +31,31 @@ _SYSTEM = (
 )
 
 
+MIN_EXCERPT = 4
+_KEY = re.compile(r'"[^"]*"\s*:')
+_TOKEN = re.compile(r"[a-z0-9]{3,}")
+
+
+def _tokens(text: str) -> set[str]:
+    return set(_TOKEN.findall(text.lower()))
+
+
 def validate_citations(final: dict, outputs: dict[str, str]) -> EvidencePack:
     """Each fact must cite a real call id; its excerpt must appear verbatim in that output."""
+    if not final["facts"]:
+        raise ValueError("no facts")
     facts = []
     for f in final["facts"]:
         out = outputs[f["tool_call_id"]]  # KeyError -> invalid
-        ex = f["excerpt"]
-        if not isinstance(ex, str) or not ex or ex not in out:
+        ex, claim = f["excerpt"], f["claim"]
+        if not isinstance(ex, str) or not isinstance(claim, str) or len(ex.strip()) < MIN_EXCERPT:
+            raise ValueError("excerpt too short")
+        if ex not in out:
             raise ValueError("excerpt not found in cited tool output")
+        if not _tokens(_KEY.sub(" ", ex)):
+            raise ValueError("excerpt is only punctuation or keys")
+        if not _tokens(claim) & _tokens(ex):
+            raise ValueError("claim shares nothing with excerpt")
         facts.append(
             EvidenceFact(
                 claim=f["claim"],

@@ -8,13 +8,22 @@ import re
 from collections.abc import Callable, Iterable, Mapping
 
 WRITE_NAME = re.compile(r"create|send|cancel|update|refund|capture|payout", re.I)
+READ_NAME = re.compile(r"^(get|list|search|show)_")
+WRITE_VERBS = frozenset(
+    "create send cancel update refund capture payout payouts delete void remind post issue approve "
+    "execute disburse transfer submit mark record pay reverse remove set add".split()
+)
 VENDOR_FIELDS = frozenset({"note", "memo", "terms", "description", "name", "reference"})
 OPEN, CLOSE = "<untrusted vendor_text>", "</untrusted>"
 
 
 def assert_read_only(names: Iterable[str]) -> None:
     """R2 startup assertion: boot fails if any exposed tool name looks like a write."""
-    bad = sorted(n for n in names if WRITE_NAME.search(n))
+    bad = sorted(
+        n
+        for n in names
+        if not READ_NAME.match(n) or WRITE_NAME.search(n) or WRITE_VERBS & set(n.lower().split("_"))
+    )
     if bad:
         raise RuntimeError(f"write-capable tool names exposed to LLM: {bad}")
 
@@ -26,15 +35,17 @@ def wrap_untrusted(value: object, key: str = "") -> object:
     if isinstance(value, list):
         return [wrap_untrusted(v, key) for v in value]
     if isinstance(value, str) and key in VENDOR_FIELDS:
-        return OPEN + value.replace(CLOSE, "").replace(OPEN, "") + CLOSE
+        return OPEN + value.replace("<", "&lt;") + CLOSE
     return value
 
 
 def is_vendor_asserted(output: str, excerpt: str) -> bool:
     """True if the excerpt overlaps any wrapped vendor-text span in the tool output."""
-    for m in re.finditer(re.escape(OPEN) + ".*?" + re.escape(CLOSE), output, re.S):
-        span = m.group(0)
-        if excerpt in span or span in excerpt:
+    spans = [
+        m.span() for m in re.finditer(re.escape(OPEN) + ".*?" + re.escape(CLOSE), output, re.S)
+    ]
+    for e in re.finditer(re.escape(excerpt), output):
+        if any(e.start() < b and a < e.end() for a, b in spans):
             return True
     return False
 
