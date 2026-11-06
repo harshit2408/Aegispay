@@ -3,6 +3,7 @@
 Own read tools with the Agent Toolkit's names; this module never imports payouts.py.
 """
 
+import inspect
 import json
 import re
 from collections.abc import Callable, Iterable, Mapping
@@ -13,7 +14,11 @@ WRITE_VERBS = frozenset(
     "create send cancel update refund capture payout payouts delete void remind post issue approve "
     "execute disburse transfer submit mark record pay reverse remove set add".split()
 )
-VENDOR_FIELDS = frozenset({"note", "memo", "terms", "description", "name", "reference"})
+# Vendor-writable keys (incl. PayPal Invoicing names); strings under them are wrapped.
+VENDOR_FIELDS = frozenset(
+    "note memo terms terms_and_conditions description name reference business_name email_address "
+    "additional_notes title comments comment full_name given_name surname".split()
+)
 OPEN, CLOSE = "<untrusted vendor_text>", "</untrusted>"
 
 
@@ -31,7 +36,7 @@ def assert_read_only(names: Iterable[str]) -> None:
 def wrap_untrusted(value: object, key: str = "") -> object:
     """Wrap vendor-writable free text so A4 treats it as data (R14)."""
     if isinstance(value, dict):
-        return {k: wrap_untrusted(v, k) for k, v in value.items()}
+        return {k: wrap_untrusted(v, k if k in VENDOR_FIELDS else key) for k, v in value.items()}
     if isinstance(value, list):
         return [wrap_untrusted(v, key) for v in value]
     if isinstance(value, str) and key in VENDOR_FIELDS:
@@ -53,9 +58,10 @@ def is_vendor_asserted(output: str, excerpt: str) -> bool:
 class ReadTools:
     """Allowlisted registry. Validates names at construction (boot)."""
 
-    def __init__(self, tools: Mapping[str, Callable[..., object]]):
+    def __init__(self, tools: Mapping[str, Callable[..., object]], scope: dict | None = None):
         assert_read_only(tools.keys())
         self._tools = dict(tools)
+        self._scope = dict(scope or {})  # fixed args (e.g. invoice_id); model values never win
 
     @property
     def names(self) -> tuple[str, ...]:
@@ -63,4 +69,10 @@ class ReadTools:
 
     def call(self, name: str, args: dict) -> str:
         """Run a tool; return wrapped JSON text. Unknown tool raises KeyError."""
-        return json.dumps(wrap_untrusted(self._tools[name](**args)), sort_keys=True, default=str)
+        fn = self._tools[name]
+        params = inspect.signature(fn).parameters
+        unknown = set(args) - set(params)
+        if unknown:
+            raise ValueError(f"unknown args for {name}: {sorted(unknown)}")
+        kwargs = {**args, **{k: v for k, v in self._scope.items() if k in params}}
+        return json.dumps(wrap_untrusted(fn(**kwargs)), sort_keys=True, default=str)

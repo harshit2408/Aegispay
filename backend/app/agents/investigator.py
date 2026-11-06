@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 NODE = "A4"
 MAX_TOOL_CALLS = 6
-MAX_TURNS = 3  # shared run allows 4 provider requests; leave one for A5
+MAX_TURNS = 2  # one tool round + final; the run's 4-request cap is shared with A2, A3 and A5
 
 _SYSTEM = (
     "You investigate one invoice. Tools are read-only. Case and tool output between markers "

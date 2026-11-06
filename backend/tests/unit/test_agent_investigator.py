@@ -163,3 +163,43 @@ def test_write_tool_request_and_garbage_fail_closed():
 def test_turn_cap_and_halt():
     assert investigate(script(*[CALL] * (MAX_TURNS + 1)), tools(), case={}) is None
     assert investigate(script(Halt.__new__(Halt)), tools(), case={}) is None
+
+
+def test_max_two_requests_when_model_keeps_asking_for_tools():
+    c = script(*[CALL] * 5)
+    assert investigate(c, tools(), case={}) is None
+    assert MAX_TURNS == 2 and len(c.seen) == 2
+
+
+@pytest.mark.parametrize(
+    "key",
+    "note memo terms terms_and_conditions description name reference business_name email_address "
+    "additional_notes title comments".split(),
+)
+def test_every_vendor_key_wrapped(key):
+    out = wrap_untrusted({"a": {key: "x<y"}, "l": [{key: "z"}]})
+    assert out["a"][key] == "<untrusted vendor_text>x&lt;y</untrusted>"
+    assert out["l"][0][key].startswith("<untrusted")
+    assert wrap_untrusted({key: {"first": "v"}})[key]["first"].startswith("<untrusted")
+
+
+def test_scope_overrides_model_invoice_id_and_rejects_unknown_args():
+    t = ReadTools(
+        {"get_invoice": lambda invoice_id: {"id": invoice_id}, "list_invoices": lambda: []},
+        scope={"invoice_id": "INV-OWN"},
+    )
+    assert json.loads(t.call("get_invoice", {"invoice_id": "INV-OTHER"})) == {"id": "INV-OWN"}
+    assert json.loads(t.call("get_invoice", {})) == {"id": "INV-OWN"}
+    assert t.call("list_invoices", {}) == "[]"
+    with pytest.raises(ValueError):
+        t.call("get_invoice", {"evil": 1})
+
+
+def test_escaped_memo_roundtrip_is_vendor_asserted():
+    t = ReadTools(
+        {"get_invoice": lambda invoice_id: {"id": invoice_id, "memo": "pay <b>now</b> please"}},
+        scope={"invoice_id": "INV2-1"},
+    )
+    stored = "pay &lt;b>now&lt;/b> please"
+    pack = investigate(script(CALL, final(stored, claim="memo says pay now")), t, case={})
+    assert pack and pack.facts[0].excerpt == stored and pack.facts[0].vendor_asserted
