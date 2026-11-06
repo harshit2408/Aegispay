@@ -794,6 +794,39 @@ async def test_generic_and_timeout_failures_retry_then_halt_without_leaking_text
     assert "secret" not in caplog.text
 
 
+async def test_outage_halt_does_not_relabel_existing_halt(pg_sessionmaker):
+    from sqlalchemy import update
+
+    consumer = AuditConsumer(pg_sessionmaker, key=KEY, anchors=None)
+
+    async def set_halt(reason):
+        async with pg_sessionmaker() as session, session.begin():
+            await session.execute(
+                update(SettlementControl).values(halted=reason is not None, halted_reason=reason)
+            )
+
+    async def reason():
+        control = (await rows(pg_sessionmaker, SettlementControl))[0]
+        return control.halted, control.halted_reason
+
+    await set_halt(None)
+    await consumer.persist_halt("AUDIT_ANCHOR_UNAVAILABLE")
+    assert await reason() == (True, "AUDIT_ANCHOR_UNAVAILABLE")
+
+    # An integrity incident must not be relabelled as a routine outage or stuck drain.
+    await set_halt("AUDIT_INTEGRITY_FAILED")
+    await consumer.persist_halt("AUDIT_ANCHOR_UNAVAILABLE")
+    await consumer.persist_halt("AUDIT_DRAIN_STUCK")
+    assert await reason() == (True, "AUDIT_INTEGRITY_FAILED")
+
+    # Nor a maintenance halt; but a confirmed integrity failure supersedes any other reason.
+    await set_halt("MAINTENANCE")
+    await consumer.persist_halt("AUDIT_DRAIN_STUCK")
+    assert await reason() == (True, "MAINTENANCE")
+    await consumer.persist_halt("AUDIT_INTEGRITY_FAILED")
+    assert await reason() == (True, "AUDIT_INTEGRITY_FAILED")
+
+
 async def test_failed_halt_write_logs_exception_class_only(caplog):
     def broken():
         raise ConnectionError("password=hunter2")

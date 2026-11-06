@@ -80,6 +80,11 @@ transaction; shutdown does not wait through the tick's remaining retries.
 | `AUDIT_DRAIN_STUCK` | `run_forever` | Drain failed 10 consecutive times with a persistent error (poison row, constraint, bug), or lock/statement timeouts (SQLSTATE `55P03`/`57014`, `TimeoutError`) never cleared for 300 s. Money is unaudited. |
 | `AUDIT_ANCHOR_UNAVAILABLE` | `run_forever`, startup | Configured external anchor was unreachable. Persisting this halt is best-effort; the worker stops either way. |
 
+If settlement is already halted for another reason, `AUDIT_DRAIN_STUCK` and
+`AUDIT_ANCHOR_UNAVAILABLE` keep the existing `halted_reason` (so an integrity incident or
+maintenance halt is never relabelled as a routine outage); only `AUDIT_INTEGRITY_FAILED`
+replaces another reason.
+
 Transient lock or statement timeouts alone do not count toward the 10-failure limit; they
 halt only after 300 s without a successful drain. No halt route or clear function exists yet
 (`settlement/halt.py` only sets it). An eligible operator clears it by SQL, only after fixing
