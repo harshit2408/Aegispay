@@ -17,8 +17,10 @@ export function watchCase(
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let failures = 0;
 
-  async function refresh() {
+  // retry=true only from the backoff timer; any other trigger (first load, SSE event) restarts the budget.
+  async function refresh(retry = false) {
     if (!active) return;
+    if (!retry) failures = 0;
     clearTimeout(retryTimer);
     request?.abort();
     const controller = new AbortController();
@@ -43,7 +45,7 @@ export function watchCase(
         active = false;
         unsubscribe();
       } else if (failures < retryDelays.length) {
-        retryTimer = setTimeout(refresh, retryDelays[failures++]);
+        retryTimer = setTimeout(() => void refresh(true), retryDelays[failures++]);
       }
       const detail = error instanceof APIError && [401, 403].includes(error.status)
         ? "Your session cannot view this case. Sign in as a controller or CFO who did not upload the invoice, then retry."
@@ -53,7 +55,7 @@ export function watchCase(
     }
   }
   // Open the stream up front so a failed first load still recovers on a later event or reconnect.
-  const unsubscribe = subscribeToExecution(executionId, refresh, status, coalesceMs);
+  const unsubscribe = subscribeToExecution(executionId, () => void refresh(), status, coalesceMs);
   void refresh();
   return () => { active = false; clearTimeout(retryTimer); request?.abort(); unsubscribe(); };
 }

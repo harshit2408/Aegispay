@@ -45,9 +45,9 @@ async def apply(
     to: str,
     *,
     expected_version: int | None = None,
-    actor: str = "system",
+    actor: str,
 ) -> None:
-    """`actor` is the authenticated principal (R11); default only for settlement-internal moves."""
+    """`actor` is the authenticated principal (R11) or a `system:*` name; required, no default."""
     # flush() would autobegin, so an enqueue-time check alone cannot catch a missing transaction.
     if not session.in_transaction():
         raise ValueError("status transition requires a caller-owned transaction")
@@ -76,7 +76,7 @@ async def apply(
 
 
 async def apply_or_ignore(
-    session: AsyncSession, execution: InvoiceExecution, to: str, *, actor: str = "system"
+    session: AsyncSession, execution: InvoiceExecution, to: str, *, actor: str
 ) -> bool:
     """For late or duplicate PayPal signals: an illegal or backward move is dropped (R6)."""
     try:

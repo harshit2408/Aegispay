@@ -50,6 +50,7 @@ def validate_remote(remote: str, *, allow_local: bool = False) -> str:
         if (
             url.scheme == "https"
             and url.hostname
+            and url.port in (None, 443)  # .port raises ValueError on a malformed port
             and not url.username
             and not url.password
             and not url.query

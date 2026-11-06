@@ -7,7 +7,15 @@ import { watchCase } from "../src/lib/case-stream.ts";
 const executionId = "case_1";
 const notification = { type: "node", execution_id: executionId, name: "match", status: "done", ts: "2026-10-29T08:00:00Z" };
 const currentCase = () => Response.json({ ...previewCase, execution_id: executionId });
-const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+// Resolves once fetches and dispatches have been quiet for three consecutive ticks; no fixed settle time.
+let activity = 0;
+async function settle() {
+  for (let quiet = 0, seen = -1; quiet < 3; await sleep(5)) {
+    quiet = seen === activity ? quiet + 1 : 0;
+    seen = activity;
+  }
+}
 
 function watch(t: TestContext, replies: (Response | Error | Promise<Response>)[], delays: number[] = []) {
   const sources: FakeSource[] = [];
@@ -23,6 +31,7 @@ function watch(t: TestContext, replies: (Response | Error | Promise<Response>)[]
   const originals = ["fetch", "EventSource"].map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
   Object.defineProperty(globalThis, "EventSource", { value: FakeSource, configurable: true });
   Object.defineProperty(globalThis, "fetch", { configurable: true, value: async (_url: string, init: RequestInit) => {
+    activity += 1;
     signals.push(init.signal as AbortSignal);
     const reply = replies.shift();
     assert.ok(reply, "Unexpected REST refresh");
@@ -31,7 +40,7 @@ function watch(t: TestContext, replies: (Response | Error | Promise<Response>)[]
   } });
   let state: CaseReadState = { loading: true, replayed: false };
   let updates = 0;
-  const close = watchCase(executionId, (action) => { updates += 1; state = caseReadState(state, action); }, () => {}, delays, 0);
+  const close = watchCase(executionId, (action) => { updates += 1; activity += 1; state = caseReadState(state, action); }, () => {}, delays, 0);
   t.after(() => {
     close();
     for (const [name, descriptor] of originals) {
@@ -71,7 +80,7 @@ for (const [name, failure] of [
     assert.ok(run.state().error);
     source.dispatchEvent(new Event("open")); // initial open: no extra fetch
     await settle();
-    assert.equal(run.signals.length, 5 - 1);
+    assert.equal(run.signals.length, 4); // 5 replies minus the one the reconnect below consumes
     source.dispatchEvent(new Event("open")); // reconnect refetches
     await settle();
     assert.equal(run.state().error, undefined);
@@ -144,6 +153,39 @@ test("a transient first-load failure still opens the stream and retries with bac
   await settle();
   assert.equal(bounded.signals.length, 3);
   assert.ok(bounded.state().error);
+  await sleep(30); // no timer may fire after the budget is spent (a 4th fetch would hit the empty reply queue)
+  assert.equal(bounded.signals.length, 3);
+});
+
+test("an SSE-triggered failure does not consume the backoff budget", async (t) => {
+  const run = watch(t, [new TypeError("a"), new TypeError("b"), new TypeError("c"), new TypeError("d"), currentCase()], [1, 1]);
+  await settle(); // initial + 2 retries: budget spent
+  assert.equal(run.signals.length, 3);
+  run.sources[0].notify(); // fails, but gets a fresh budget
+  await settle(); // fails, then one retry succeeds
+  assert.equal(run.signals.length, 5);
+  assert.equal(run.state().data?.execution_id, executionId);
+});
+
+test("an SSE event during backoff refreshes at once and cancels the pending retry", async (t) => {
+  const run = watch(t, [new TypeError("a"), currentCase()], [300]);
+  await settle();
+  assert.equal(run.signals.length, 1);
+  run.sources[0].notify();
+  await settle();
+  assert.equal(run.signals.length, 2);
+  assert.equal(run.state().data?.execution_id, executionId);
+  await sleep(400); // the old 300ms retry must not fire
+  assert.equal(run.signals.length, 2);
+  assert.equal(run.state().error, undefined);
+});
+
+test("cleanup during backoff cancels the pending retry", async (t) => {
+  const run = watch(t, [new TypeError("a"), currentCase()], [200]);
+  await settle();
+  run.close();
+  await sleep(300);
+  assert.equal(run.signals.length, 1);
 });
 
 test("first connection loads once; a failed refresh keeps the previous case visible", async (t) => {

@@ -2,10 +2,12 @@
 
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select, text
+from sqlalchemy.exc import DBAPIError
 
 from app.audit.anchor import AnchorConflict, AnchorUnavailable, GitAnchors, Snapshot
 from app.audit.events import (
@@ -23,6 +25,21 @@ log = logging.getLogger("aegis.audit")
 
 # 2s retry cadence: ~20s of uninterrupted drain failure before the worker halts money movement.
 MAX_CONSECUTIVE_FAILURES = 10
+# Lock/statement timeouts under producer contention are not poison rows: halt only if they never
+# clear for this long (a wedged lock holder), not after ~20s of ordinary contention.
+TRANSIENT_WINDOW_SECONDS = 300
+_TRANSIENT_SQLSTATES = {"55P03", "57014"}  # lock_not_available, query_canceled (statement timeout)
+
+
+def is_transient(exc: BaseException) -> bool:
+    if isinstance(exc, TimeoutError):
+        return True
+    if not isinstance(exc, DBAPIError):
+        return False
+    orig = exc.orig
+    return (
+        getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    ) in _TRANSIENT_SQLSTATES
 
 
 async def verified_rows(session, *, key: bytes, snapshot: Snapshot) -> list[ExecutionEvent]:
@@ -197,10 +214,11 @@ async def run_forever(consumer: AuditConsumer, stop: asyncio.Event) -> None:
     if consumer.anchors is None:
         log.warning("audit_external_anchor_disabled mode=HMAC_ONLY exports=unavailable")
     failures = 0
+    transient_since: float | None = None
     while not stop.is_set():
         try:
             await run_once_until_stopped(consumer, stop)
-            failures = 0
+            failures, transient_since = 0, None
         except AuditIntegrityError:
             # Kill the worker before more settlement work can run on a compromised history.
             log.error("audit_integrity_failed node=audit action=stop_worker")
@@ -209,16 +227,28 @@ async def run_forever(consumer: AuditConsumer, stop: asyncio.Event) -> None:
             log.warning("audit_anchor_conflict node=audit action=retry")
         except AnchorUnavailable:
             log.error("audit_anchor_unavailable node=audit action=stop_worker")
+            await consumer.persist_halt("AUDIT_ANCHOR_UNAVAILABLE")  # best-effort, never raises
             raise
         except Exception as exc:
             # Class name only: drivers and credential helpers may include private values.
-            failures += 1
+            transient = is_transient(exc)
+            now = time.monotonic()
+            if transient:
+                transient_since = now if transient_since is None else transient_since
+            else:
+                failures += 1
             log.error(
-                "audit_drain_failed node=audit error=%s consecutive=%d action=retry",
+                "audit_drain_failed node=audit error=%s consecutive=%d transient=%s action=retry",
                 type(exc).__name__,
                 failures,
+                transient,
             )
-            if failures >= MAX_CONSECUTIVE_FAILURES:
+            stuck = (
+                now - transient_since >= TRANSIENT_WINDOW_SECONDS
+                if transient
+                else failures >= MAX_CONSECUTIVE_FAILURES
+            )
+            if stuck:
                 # A stuck drain leaves money unaudited: halt (R23) and kill the worker.
                 log.error("audit_drain_stuck node=audit action=halt_and_stop_worker")
                 await consumer.persist_halt("AUDIT_DRAIN_STUCK")

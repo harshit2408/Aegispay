@@ -2,9 +2,9 @@
 
 import asyncio
 import logging
+import shutil
 import signal
 
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.audit import consumer as audit_consumer
@@ -31,13 +31,7 @@ async def _consume(consumer: WebhookConsumer, stop: asyncio.Event) -> None:
 
 
 STARTUP_DRAIN_ATTEMPTS = 5
-_TRANSIENT_SQLSTATES = {"55P03", "57014"}  # lock_not_available, statement timeout
-
-
-def _transient(exc: BaseException) -> bool:
-    return isinstance(exc, TimeoutError) or (
-        isinstance(exc, DBAPIError) and getattr(exc.orig, "sqlstate", None) in _TRANSIENT_SQLSTATES
-    )
+_transient = audit_consumer.is_transient
 
 
 async def _startup_drain(audit: AuditConsumer, stop: asyncio.Event) -> None:
@@ -61,9 +55,21 @@ async def _startup_drain(audit: AuditConsumer, stop: asyncio.Event) -> None:
                 pass
 
 
+def _require_git(anchor_repo: str | None) -> None:
+    """The anchor needs `git`; INSTALL_GIT=0 images lack it. Fixed message, fail closed (R21)."""
+    if anchor_repo and shutil.which("git") is None:
+        logging.getLogger("aegis.audit").error(
+            "audit_anchor_git_missing node=audit action=stop_worker hint=build_with_INSTALL_GIT=1"
+        )
+        raise RuntimeError(
+            "Audit anchor requires git; build the settlement image with INSTALL_GIT=1"
+        )
+
+
 async def run(stop: asyncio.Event | None = None) -> None:
     validate_service_environment("settlement")
     settings = get_settlement_settings()
+    _require_git(settings.audit_anchor_repo)
     engine = create_async_engine(settings.settlement_database_url, pool_pre_ping=True)
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     treasury = vendor = None
@@ -106,6 +112,7 @@ async def run(stop: asyncio.Event | None = None) -> None:
             logging.getLogger("aegis.audit").error(
                 "audit_anchor_unavailable node=audit action=stop_worker"
             )
+            await audit.persist_halt("AUDIT_ANCHOR_UNAVAILABLE")  # best-effort, never raises
             raise
         if stop.is_set():
             return

@@ -1,10 +1,11 @@
-import { previewCase } from "../fixtures/case-preview.ts";
+// IDs only: importing the fixture here would ship it to every client bundle.
+const PREVIEW_IDS = ["preview", "synthetic-s3"];
 
-// Fixture data renders only when previews are enabled; production needs NEXT_PUBLIC_CASE_PREVIEW=1.
-export function previewEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return env.NEXT_PUBLIC_CASE_PREVIEW === "1" || env.NODE_ENV !== "production";
+// Literal process.env.X reads: Next inlines these in client bundles; an env object would not be.
+export function previewEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_CASE_PREVIEW === "1" || process.env.NODE_ENV !== "production";
 }
 
 export function isPreviewId(id: string, enabled = previewEnabled()): boolean {
-  return enabled && (id === "preview" || id === previewCase.execution_id);
+  return enabled && PREVIEW_IDS.includes(id);
 }

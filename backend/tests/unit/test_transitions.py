@@ -74,7 +74,7 @@ def test_every_status_in_the_table_is_a_known_status():
 @pytest.mark.parametrize(("current", "target"), sorted(PRD_PAIRS))
 async def test_allowed_pair_applies_and_bumps_version(current, target):
     ex = execution(current, version=4)
-    await apply(FakeSession(), ex, target)
+    await apply(FakeSession(), ex, target, actor="t")
     assert (ex.status, ex.row_version) == (target, 5)
 
 
@@ -94,23 +94,23 @@ async def test_allowed_pair_applies_and_bumps_version(current, target):
 async def test_illegal_or_backward_pair_is_rejected_and_leaves_row_untouched(current, target):
     ex = execution(current, version=2)
     with pytest.raises(IllegalTransition):
-        await apply(FakeSession(), ex, target)
+        await apply(FakeSession(), ex, target, actor="t")
     assert (ex.status, ex.row_version) == (current, 2)
 
 
 async def test_stale_expected_version_is_rejected():
     ex = execution("APPROVED_FOR_PAYMENT", version=3)
     with pytest.raises(StaleVersion):
-        await apply(FakeSession(), ex, "PAYOUT_SENDING", expected_version=2)
-    await apply(FakeSession(), ex, "PAYOUT_SENDING", expected_version=3)
+        await apply(FakeSession(), ex, "PAYOUT_SENDING", expected_version=2, actor="t")
+    await apply(FakeSession(), ex, "PAYOUT_SENDING", expected_version=3, actor="t")
     assert ex.status == "PAYOUT_SENDING"
 
 
 async def test_apply_or_ignore_drops_a_late_pending_after_success():
     ex = execution("PAYOUT_SUCCEEDED")
-    assert await apply_or_ignore(FakeSession(), ex, "PAYOUT_SUBMITTED") is False
+    assert await apply_or_ignore(FakeSession(), ex, "PAYOUT_SUBMITTED", actor="t") is False
     assert ex.status == "PAYOUT_SUCCEEDED"
-    assert await apply_or_ignore(FakeSession(), ex, "SETTLED") is True
+    assert await apply_or_ignore(FakeSession(), ex, "SETTLED", actor="t") is True
 
 
 async def test_actor_is_passed_through_to_the_audit_event():
@@ -119,8 +119,10 @@ async def test_actor_is_passed_through_to_the_audit_event():
     assert session.queued.actor == "operator-1"
     await apply_or_ignore(session, execution("FROZEN"), "REJECTED", actor="operator-2")
     assert session.queued.actor == "operator-2"
-    await apply(session, execution("ANALYZING"), "FROZEN")
-    assert session.queued.actor == "system"
+    with pytest.raises(TypeError):  # no default actor: attribution is never implicit
+        await apply(session, execution("ANALYZING"), "FROZEN")
+    with pytest.raises(TypeError):
+        await apply_or_ignore(session, execution("FROZEN"), "REJECTED")
 
 
 async def test_apply_outside_a_transaction_is_refused_and_leaves_row_untouched():
@@ -130,5 +132,5 @@ async def test_apply_outside_a_transaction_is_refused_and_leaves_row_untouched()
 
     ex = execution("ANALYZING", version=1)
     with pytest.raises(ValueError, match="transaction"):
-        await apply(Idle(), ex, "FROZEN")
+        await apply(Idle(), ex, "FROZEN", actor="t")
     assert (ex.status, ex.row_version) == ("ANALYZING", 1)

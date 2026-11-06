@@ -17,22 +17,24 @@ export function CaseLive({ executionId }: { executionId: string }) {
 
   const retry = <button type="button" onClick={() => {
     setStream({ message: "Connecting to updates…", closed: false });
-    setAttempt(attempt + 1);
+    setAttempt((a) => a + 1);
   }}>Retry</button>;
+  const stale = Boolean(state.data && state.error);
   return <>
     {state.replayed && <div className="replay-banner">REPLAY · Recorded case data</div>}
-    {state.data && state.error && <div className="stale-banner" role="alert">
-      Showing the last loaded case data, which may be out of date. {state.error}
-    </div>}
-    <p>{state.loading ? "Refreshing case…" : state.data ? stream.message : "Case unavailable"}</p>
-    {stream.closed && !state.error && retry}
+    {/* One stable polite live region: it only announces when its text changes. Retry stays in place to keep focus. */}
+    <div role="status" className={stale ? "stale-banner" : undefined}>
+      <p>{state.loading ? "Refreshing case…" : stale
+        ? `Warning: showing the last loaded case data, which may be out of date. ${state.error}`
+        : state.data ? stream.message : "Case unavailable"}</p>
+      {(stale || (stream.closed && !state.error)) && retry}
+    </div>
     {state.error && !state.data && <section className="empty-state" aria-labelledby="case-error-title">
       <h2 id="case-error-title">Case could not be loaded</h2>
       <p role="alert">{state.error}</p>
       <p className="locked-payee">Payee source: vendor master (locked)</p>
       {retry} <Link href="/">Back to cockpit</Link>
     </section>}
-    {state.data && state.error && retry}
     {state.data && <CaseDetails data={state.data} />}
   </>;
 }

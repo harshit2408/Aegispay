@@ -18,13 +18,13 @@ export function parseStreamEvent(raw: string): StreamEvent | null {
     if (typeof event.execution_id !== "string" || event.execution_id.length > 128 ||
       !/^[A-Za-z0-9_-]+$/.test(event.execution_id)) return null;
     const { name, status } = event;
-    for (const field of [name, status]) {
-      if (typeof field !== "string" || field.length > 64 || !/^[A-Za-z0-9_:-]+$/.test(field)) return null;
-    }
+    const isToken = (field: unknown): field is string =>
+      typeof field === "string" && field.length <= 64 && /^[A-Za-z0-9_:-]+$/.test(field);
+    if (!isToken(name) || !isToken(status)) return null;
     if (typeof event.ts !== "string" || event.ts.length > 64 ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.ts) ||
       !Number.isFinite(Date.parse(event.ts))) return null;
-    return { type, execution_id: event.execution_id, name: name as string, status: status as string, ts: event.ts };
+    return { type, execution_id: event.execution_id, name, status, ts: event.ts };
   } catch {
     return null;
   }

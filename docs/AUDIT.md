@@ -72,6 +72,23 @@ transaction; shutdown does not wait through the tick's remaining retries.
 
 ## Private setup
 
+### Halt reasons and operator clear procedure
+
+| `halted_reason` | Set by | Meaning |
+|---|---|---|
+| `AUDIT_INTEGRITY_FAILED` | audit consumer | Confirmed chain or checkpoint verification failure. |
+| `AUDIT_DRAIN_STUCK` | `run_forever` | Drain failed 10 consecutive times with a persistent error (poison row, constraint, bug), or lock/statement timeouts (SQLSTATE `55P03`/`57014`, `TimeoutError`) never cleared for 300 s. Money is unaudited. |
+| `AUDIT_ANCHOR_UNAVAILABLE` | `run_forever`, startup | Configured external anchor was unreachable. Persisting this halt is best-effort; the worker stops either way. |
+
+Transient lock or statement timeouts alone do not count toward the 10-failure limit; they
+halt only after 300 s without a successful drain. No halt route or clear function exists yet
+(`settlement/halt.py` only sets it). An eligible operator clears it by SQL, only after fixing
+the cause (restore anchor access, remove or repair the poison row, release the stuck lock
+holder) and confirming the worker verifies cleanly. Run the resume statement in the upgrade procedure below with that
+operator's identity and the exact reason, e.g. `halted_reason = 'AUDIT_ANCHOR_UNAVAILABLE'` in
+the `WHERE`, and require one returned row. Never clear `AUDIT_INTEGRITY_FAILED` this way
+without a reviewed incident record.
+
 ### Upgrade an existing Render worker
 
 The Blueprint deliberately has no owner-credential `preDeployCommand`. API and settlement
@@ -161,10 +178,11 @@ Without `AUDIT_ANCHOR_REPO`, the PRD's explicitly permitted degraded HMAC-only m
 but externally verified exports refuse to run. A missing/short HMAC key refuses worker startup.
 Removing the repo after external receipts exist is refused as lost external history, rather
 than silently downgrading a previously anchored chain.
-A configured anchor transport outage logs a generic stop-worker error and stops settlement
-both at startup and during normal operation. It does not persist an integrity halt merely for
-a transport failure. Restart only recovers after startup verifies the full chain and remote
-checkpoint again. A normal competing-publisher conflict retries on the next tick. An unavailable
+A configured anchor transport outage logs a generic stop-worker error, makes a best-effort
+attempt to persist `SETTLEMENT_HALT` with `AUDIT_ANCHOR_UNAVAILABLE` (class-name logging only),
+and stops settlement both at startup and during normal operation. It is not an integrity
+finding. Restart recovers only after startup verifies the full chain and remote checkpoint
+again, and only once an operator has cleared the halt (below). A normal competing-publisher conflict retries on the next tick. An unavailable
 remote is never replaced by a DB-derived checkpoint. Hosted availability and the authenticated
 export HTTP route remain separate integration/deployment work.
 
@@ -185,14 +203,26 @@ unless `--include-replay` is explicit. No external checkpoint, tampering or miss
 history causes a generic refusal and nonzero exit, with no credential-bearing traceback.
 
 JSON contains `anchor`, `events` and `pending_unanchored_events`. CSV repeats checkpoint
-metadata on each event row and escapes spreadsheet formula prefixes. **HMAC re-verification from CSV:** a cell that starts with `=`, `+`, `-`, `@`, tab, CR or LF is
-written with a leading `'` (formula guard). Strip exactly that one leading `'` from `actor`,
-`event_type`, `execution_id` and payload cells before recomputing the HMAC; otherwise every
-guarded row fails verification. The JSON export is unguarded and is the canonical form. An empty CSV export
-contains one metadata-only row with blank event fields, so its checkpoint and pending count
-are not lost. Exported event subsets are verified by this settlement operation against the
+metadata on each event row and escapes spreadsheet formula prefixes: a cell that starts with
+`=`, `+`, `-`, `@`, tab, CR or LF is written with a leading `'` (formula guard).
+
+HMAC re-verification from CSV: strip exactly that one leading `'` from `actor`, `event_type`,
+`execution_id` and payload cells before recomputing the HMAC; otherwise every guarded row
+fails verification. The JSON export is unguarded and is the canonical form. An empty CSV
+export contains one metadata-only row with blank event fields, so its checkpoint and pending
+count are not lost. Exported event subsets are verified by this settlement operation against the
 global chain; a subset alone cannot independently reconstruct unrelated events' HMACs.
 
 The API export endpoint and case-view download remain disabled until authenticated routing
 and a settlement-side verification seam are implemented. Tests do not establish that endpoint,
 live sandbox S1–S4, public Git branch protection or hosted credential isolation.
+
+## Git in the settlement image
+
+`backend/Dockerfile` installs `git` only when built with `INSTALL_GIT=1` (default `0`, so the
+API image has none, R22). `render.yaml` sets `INSTALL_GIT=1` on the settlement service, but
+whether Render passes service env vars to the Docker build as build args is **UNVERIFIED**.
+After the first settlement deploy, run `git --version` in the worker shell and record the
+result here. The worker also fails closed at startup when `AUDIT_ANCHOR_REPO` is set and `git`
+is missing: it logs `audit_anchor_git_missing` and exits with a fixed message, never running
+without the anchor.
