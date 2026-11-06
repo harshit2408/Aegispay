@@ -17,7 +17,9 @@ test("stream accepts only the minimal bounded contract and timezone-aware timest
   assert.equal(parseStreamEvent(" ".repeat(2049) + JSON.stringify(event)), null);
 });
 
-test("credentialed stream refreshes only its case, recovers on reconnect and closes on cleanup", (t) => {
+const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+test("credentialed stream refreshes only its case, recovers on reconnect and closes on cleanup", async (t) => {
   class FakeSource extends EventTarget {
     static CLOSED = 2;
     static instance: FakeSource;
@@ -38,32 +40,40 @@ test("credentialed stream refreshes only its case, recovers on reconnect and clo
     else Reflect.deleteProperty(globalThis, "EventSource");
   });
   let refreshes = 0;
+  let closedFlag: boolean | undefined;
   const statuses: string[] = [];
-  const close = subscribeToExecution("case_1", () => { refreshes += 1; }, (status) => statuses.push(status));
+  const close = subscribeToExecution("case_1", () => { refreshes += 1; }, (status, closed) => { statuses.push(status); closedFlag = closed; }, 0);
   const source = FakeSource.instance;
   assert.ok(source.url.endsWith("/api/stream"));
   assert.equal(source.options?.withCredentials, true);
+  source.dispatchEvent(new Event("open")); // initial open: caller already loads
   source.send("message", event);
-  source.send("settlement", event);
-  assert.equal(refreshes, 2);
+  source.send("settlement", event); // burst coalesces into one refresh
+  assert.equal(refreshes, 0);
+  await tick();
+  assert.equal(refreshes, 1);
   source.send("node", event);
   source.send("message", { ...event, execution_id: "other" });
   source.send("message", { ...event, payload: { payee: "forged" } });
+  await tick();
+  assert.equal(refreshes, 1);
+  source.dispatchEvent(new Event("open")); // reconnect
+  source.dispatchEvent(new Event("open"));
+  await tick();
   assert.equal(refreshes, 2);
-  source.dispatchEvent(new Event("open"));
-  source.dispatchEvent(new Event("open"));
-  assert.equal(refreshes, 4);
   source.dispatchEvent(new Event("error"));
   assert.match(statuses.at(-1)!, /Reconnecting/);
   source.readyState = FakeSource.CLOSED;
   source.dispatchEvent(new Event("error"));
   assert.match(statuses.at(-1)!, /unavailable/);
+  assert.equal(closedFlag, true);
   const previousStatuses = statuses.length;
   close();
   assert.equal(source.closed, true);
   source.send("message", event);
   source.dispatchEvent(new Event("open"));
   source.dispatchEvent(new Event("error"));
-  assert.equal(refreshes, 4);
+  await tick();
+  assert.equal(refreshes, 2);
   assert.equal(statuses.length, previousStatuses);
 });

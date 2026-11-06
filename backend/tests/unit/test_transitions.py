@@ -111,3 +111,24 @@ async def test_apply_or_ignore_drops_a_late_pending_after_success():
     assert await apply_or_ignore(FakeSession(), ex, "PAYOUT_SUBMITTED") is False
     assert ex.status == "PAYOUT_SUCCEEDED"
     assert await apply_or_ignore(FakeSession(), ex, "SETTLED") is True
+
+
+async def test_actor_is_passed_through_to_the_audit_event():
+    session = FakeSession()
+    await apply(session, execution("ANALYZING"), "FROZEN", actor="operator-1")
+    assert session.queued.actor == "operator-1"
+    await apply_or_ignore(session, execution("FROZEN"), "REJECTED", actor="operator-2")
+    assert session.queued.actor == "operator-2"
+    await apply(session, execution("ANALYZING"), "FROZEN")
+    assert session.queued.actor == "system"
+
+
+async def test_apply_outside_a_transaction_is_refused_and_leaves_row_untouched():
+    class Idle(FakeSession):
+        def in_transaction(self):
+            return False
+
+    ex = execution("ANALYZING", version=1)
+    with pytest.raises(ValueError, match="transaction"):
+        await apply(Idle(), ex, "FROZEN")
+    assert (ex.status, ex.row_version) == ("ANALYZING", 1)

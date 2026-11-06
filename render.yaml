@@ -59,6 +59,8 @@ services:
     dockerCommand: python -m app.settlement.worker
     autoDeployTrigger: "off"
     envVars:
+      - key: INSTALL_GIT # Docker build arg: git only in this image
+        value: "1"
       - key: SETTLEMENT_DATABASE_URL
         sync: false
       - key: PAYPAL_BASE_URL

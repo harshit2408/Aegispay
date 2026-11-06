@@ -35,3 +35,9 @@ test("case refresh forwards cancellation to fetch instead of retaining a superse
   controller.abort();
   await assert.rejects(api.getExecution("case", controller.signal), { name: "AbortError" });
 });
+
+test("an unreadable success body becomes a transient APIError, not a SyntaxError", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => new Response("<html>", { status: 200 }));
+  await assert.rejects(api.getExecution("case"), (error: unknown) =>
+    error instanceof APIError && error.status === 502 && !/JSON|Syntax/i.test(error.message));
+});

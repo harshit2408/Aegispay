@@ -148,8 +148,9 @@ the settlement service; the API refuses them, including empty values:
 | Variable | Required behavior |
 |---|---|
 | `AUDIT_HMAC_KEY` | Required, at least 32 characters; use a securely generated secret and retain it across restarts. Changing it invalidates verification of existing history. |
-| `AUDIT_ANCHOR_REPO` | Credential-free HTTPS URL of a public repository. The branch is fixed to `audit-anchors`. An existing absolute local repository is supported for local verification. |
-| `AUDIT_ANCHOR_TOKEN` | Optional dedicated repository-write token for HTTPS publication. Keep it out of URLs, Git, logs and chat. It requires an anchor repo. |
+| `AUDIT_ANCHOR_REPO` | Credential-free HTTPS URL of a public repository. The branch is fixed to `audit-anchors`. Local paths are rejected outside tests. |
+| `AUDIT_ANCHOR_TOKEN` | Optional dedicated repository-write token for HTTPS publication. Keep it out of URLs, Git, logs and chat. It requires an anchor repo and is only sent to a host in `AUDIT_ANCHOR_TOKEN_HOSTS`. |
+| `AUDIT_ANCHOR_TOKEN_HOSTS` | Comma-separated HTTPS hosts allowed to receive the token. Default `github.com`. |
 
 Protect `audit-anchors` against deletion and force pushes. Restrict the publishing credential
 to its intended repository. Configure the real remote and token privately before enabling
@@ -184,7 +185,10 @@ unless `--include-replay` is explicit. No external checkpoint, tampering or miss
 history causes a generic refusal and nonzero exit, with no credential-bearing traceback.
 
 JSON contains `anchor`, `events` and `pending_unanchored_events`. CSV repeats checkpoint
-metadata on each event row and escapes spreadsheet formula prefixes. An empty CSV export
+metadata on each event row and escapes spreadsheet formula prefixes. **HMAC re-verification from CSV:** a cell that starts with `=`, `+`, `-`, `@`, tab, CR or LF is
+written with a leading `'` (formula guard). Strip exactly that one leading `'` from `actor`,
+`event_type`, `execution_id` and payload cells before recomputing the HMAC; otherwise every
+guarded row fails verification. The JSON export is unguarded and is the canonical form. An empty CSV export
 contains one metadata-only row with blank event fields, so its checkpoint and pending count
 are not lost. Exported event subsets are verified by this settlement operation against the
 global chain; a subset alone cannot independently reconstruct unrelated events' HMACs.

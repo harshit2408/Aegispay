@@ -4,6 +4,7 @@ import asyncio
 import logging
 import signal
 
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.audit import consumer as audit_consumer
@@ -27,6 +28,37 @@ async def _consume(consumer: WebhookConsumer, stop: asyncio.Event) -> None:
             await asyncio.wait_for(stop.wait(), timeout=2)
         except TimeoutError:
             pass
+
+
+STARTUP_DRAIN_ATTEMPTS = 5
+_TRANSIENT_SQLSTATES = {"55P03", "57014"}  # lock_not_available, statement timeout
+
+
+def _transient(exc: BaseException) -> bool:
+    return isinstance(exc, TimeoutError) or (
+        isinstance(exc, DBAPIError) and getattr(exc.orig, "sqlstate", None) in _TRANSIENT_SQLSTATES
+    )
+
+
+async def _startup_drain(audit: AuditConsumer, stop: asyncio.Event) -> None:
+    """Startup may race producer locks: retry a bounded number of times, then fail."""
+    for attempt in range(1, STARTUP_DRAIN_ATTEMPTS + 1):
+        try:
+            await audit_consumer.run_once_until_stopped(audit, stop)
+            return
+        except Exception as exc:
+            if not _transient(exc) or attempt == STARTUP_DRAIN_ATTEMPTS:
+                raise
+            logging.getLogger("aegis.audit").warning(
+                "audit_startup_drain_retry node=audit error=%s attempt=%d",
+                type(exc).__name__,
+                attempt,
+            )
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=attempt)
+                return
+            except TimeoutError:
+                pass
 
 
 async def run(stop: asyncio.Event | None = None) -> None:
@@ -59,13 +91,14 @@ async def run(stop: asyncio.Event | None = None) -> None:
                 settings.audit_anchor_token.get_secret_value()
                 if settings.audit_anchor_token
                 else None,
+                token_hosts=settings.anchor_token_hosts,
             )
             if settings.audit_anchor_repo
             else None,
         )
         # Verify anchored history before enabling any money movement.
         try:
-            await audit_consumer.run_once_until_stopped(audit, stop)
+            await _startup_drain(audit, stop)
         except AnchorConflict:
             # Repeated publication races may delay startup, but are not an integrity incident.
             raise
