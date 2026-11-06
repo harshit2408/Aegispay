@@ -13,7 +13,20 @@ WRITE_VERBS = frozenset(
     "create send cancel update refund capture payout payouts delete void remind post issue approve "
     "execute disburse transfer submit mark record pay reverse remove set add".split()
 )
-VENDOR_FIELDS = frozenset({"note", "memo", "terms", "description", "name", "reference"})
+# PRD §9.5 names plus the PayPal Invoicing v2 keys that carry the same vendor-written text.
+VENDOR_FIELDS = frozenset(
+    {
+        "note",
+        "memo",
+        "terms",
+        "terms_and_conditions",
+        "description",
+        "name",
+        "business_name",
+        "additional_notes",
+        "reference",
+    }
+)
 OPEN, CLOSE = "<untrusted vendor_text>", "</untrusted>"
 
 
@@ -31,7 +44,8 @@ def assert_read_only(names: Iterable[str]) -> None:
 def wrap_untrusted(value: object, key: str = "") -> object:
     """Wrap vendor-writable free text so A4 treats it as data (R14)."""
     if isinstance(value, dict):
-        return {k: wrap_untrusted(v, k) for k, v in value.items()}
+        # Strings nested under a vendor field (e.g. name.given_name) stay untrusted.
+        return {k: wrap_untrusted(v, key if key in VENDOR_FIELDS else k) for k, v in value.items()}
     if isinstance(value, list):
         return [wrap_untrusted(v, key) for v in value]
     if isinstance(value, str) and key in VENDOR_FIELDS:
