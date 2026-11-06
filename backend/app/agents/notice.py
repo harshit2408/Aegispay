@@ -41,7 +41,7 @@ _NUMBER_WORDS = re.compile(
     r"|eighty|ninety|hundred|thousand|million|billion|dozen|percent|per\s+cent)\b",
     re.IGNORECASE,
 )
-_LINKISH = re.compile(r"://|www\.|@", re.IGNORECASE)
+_LINKISH = re.compile(r"://|www\.|@|\b[a-z0-9-]+\.[a-z]{2,}\b", re.IGNORECASE)
 
 
 class NoticeFacts(BaseModel):
@@ -77,6 +77,11 @@ def _facts_text(f: NoticeFacts) -> str:
     return f"inspection_note: {f.inspection_note}"
 
 
+def _numeric_char(c: str) -> bool:
+    # Any Unicode number (Nd/Nl/No: 5, ², ½, Ⅻ, ٥), currency sign or percent sign.
+    return unicodedata.category(c) in {"Nd", "Nl", "No", "Sc"} or c in "%\u066a\ufe6a\uff05"
+
+
 def _check(prose: str) -> None:
     if not prose.strip() or len(prose) > MAX_PROSE_CHARS:
         raise ValueError("bad length")
@@ -87,7 +92,7 @@ def _check(prose: str) -> None:
     if "delta" not in names:
         raise ValueError("amount missing")
     literal = "".join(lit for lit, _, _, _ in parsed)
-    if re.search(r"\d|%", literal) or any(unicodedata.category(c) == "Sc" for c in literal):
+    if any(_numeric_char(c) for c in literal):
         raise ValueError("literal number in prose")
     if _NUMBER_WORDS.search(literal):
         raise ValueError("number word in prose")
