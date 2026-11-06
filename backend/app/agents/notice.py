@@ -87,7 +87,10 @@ def _check(prose: str) -> None:
     if "delta" not in names:
         raise ValueError("amount missing")
     literal = "".join(lit for lit, _, _, _ in parsed)
-    if re.search(r"\d|%", literal) or any(unicodedata.category(c) == "Sc" for c in literal):
+    # Any Unicode number (Nd digits, Nl roman numerals, No fractions/superscripts) or currency.
+    if "%" in literal or any(
+        unicodedata.category(c)[0] == "N" or unicodedata.category(c) == "Sc" for c in literal
+    ):
         raise ValueError("literal number in prose")
     if _NUMBER_WORDS.search(literal):
         raise ValueError("number word in prose")

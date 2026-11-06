@@ -63,6 +63,9 @@ def test_numbers_come_from_template():
         "See https://evil.example/pay for {delta}.",  # url
         "See www.evil.example for {delta}.",
         "Mail pay@evil.example about {delta}.",  # email
+        "We withhold {delta} and \u2167 units.",  # roman numeral (Nl)
+        "We withhold {delta} and \u00bd more.",  # vulgar fraction (No)
+        "We withhold {delta} x\u00b2.",  # superscript two (No)
     ],
 )
 def test_bad_output_falls_back(bad):
