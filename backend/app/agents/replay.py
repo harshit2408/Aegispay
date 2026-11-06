@@ -6,6 +6,8 @@ from tokenops.providers.types import ModelResponse
 
 from app.config import Settings
 
+SANDBOX_URLS = ("https://api-m.sandbox.paypal.com", "https://api.sandbox.paypal.com")
+
 
 class ReplayComplete:
     """Drop-in for InvoiceRun.complete. Consumes recordings per node, in order."""
@@ -25,7 +27,12 @@ class ReplayComplete:
 
 
 def replay_complete(settings: Settings, recordings: Mapping[str, Sequence[str]]) -> ReplayComplete:
-    # Settings already refuse replay without DEMO_ENABLED or with a non-sandbox PayPal URL.
+    # Settings validate this too, but model_copy()/model_construct() skip validators,
+    # so the seam re-checks R24 itself.
     if not settings.demo_replay_mode:
         raise ValueError("replay requires DEMO_REPLAY_MODE")
+    if not settings.demo_enabled:
+        raise ValueError("replay requires DEMO_ENABLED")
+    if settings.paypal_base_url not in SANDBOX_URLS:
+        raise ValueError("replay requires sandbox PayPal")
     return ReplayComplete(recordings)
