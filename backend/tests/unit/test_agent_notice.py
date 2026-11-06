@@ -43,6 +43,13 @@ def test_numbers_come_from_template():
     assert node == "A5" and "BEGIN_DOCUMENT_" in msgs[1]["content"]
 
 
+def test_one_in_prose_is_allowed():
+    prose = "We could not reach anyone; no one was available. {delta} was withheld."
+    n = draft_notice(fake(prose), FACTS)
+    assert not n.used_fallback
+    assert "$75.00" in n.text
+
+
 @pytest.mark.parametrize(
     "bad",
     [
@@ -58,6 +65,7 @@ def test_numbers_come_from_template():
         "We withhold {delta}, ten per cent extra.",
         "We withhold {delta} plus 5 percent.",
         "We withhold {delta} dozen units.",
+        "We withhold {delta} and five more.",
         "We withhold {delta} and ₹80.",  # non-ASCII currency symbol
         "We withhold {delta} and ¥80.",
         "See https://evil.example/pay for {delta}.",  # url
