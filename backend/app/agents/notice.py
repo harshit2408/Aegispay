@@ -2,6 +2,7 @@
 
 import logging
 import re
+import unicodedata
 from collections.abc import Callable
 from string import Formatter
 from typing import Literal
@@ -33,12 +34,22 @@ _SYSTEM = (
 )
 
 
+_ID_PATTERN = r"^[A-Za-z0-9._/-]{1,64}$"  # Rust regex: $ is strict end, no trailing newline
+_NUMBER_WORDS = re.compile(
+    r"\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen"
+    r"|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy"
+    r"|eighty|ninety|hundred|thousand|million|billion|dozen|percent|per\s+cent)\b",
+    re.IGNORECASE,
+)
+_LINKISH = re.compile(r"://|www\.|@", re.IGNORECASE)
+
+
 class NoticeFacts(BaseModel):
     """The A5 whitelist. No gate reasons, thresholds or mandate values (R14)."""
 
     model_config = ConfigDict(frozen=True)
-    invoice_number: str
-    po_number: str
+    invoice_number: str = Field(pattern=_ID_PATTERN)
+    po_number: str = Field(pattern=_ID_PATTERN)
     delta_cents: Cents
     accepted_qty: int = Field(ge=0, strict=True)
     rejected_qty: int = Field(ge=0, strict=True)
@@ -76,8 +87,12 @@ def _check(prose: str) -> None:
     if "delta" not in names:
         raise ValueError("amount missing")
     literal = "".join(lit for lit, _, _, _ in parsed)
-    if re.search(r"\d|[$€£%]", literal):
+    if re.search(r"\d|%", literal) or any(unicodedata.category(c) == "Sc" for c in literal):
         raise ValueError("literal number in prose")
+    if _NUMBER_WORDS.search(literal):
+        raise ValueError("number word in prose")
+    if _LINKISH.search(literal):
+        raise ValueError("url or email in prose")
 
 
 def draft_notice(complete: Callable, facts: NoticeFacts) -> Notice:
