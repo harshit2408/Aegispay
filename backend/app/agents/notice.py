@@ -36,7 +36,7 @@ _SYSTEM = (
 
 _ID_PATTERN = r"^[A-Za-z0-9._/-]{1,64}$"  # Rust regex: $ is strict end, no trailing newline
 _NUMBER_WORDS = re.compile(
-    r"\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen"
+    r"\b(zero|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen"
     r"|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy"
     r"|eighty|ninety|hundred|thousand|million|billion|dozen|percent|per\s+cent)\b",
     re.IGNORECASE,
@@ -80,8 +80,8 @@ def _facts_text(f: NoticeFacts) -> str:
 def _check(prose: str) -> None:
     if not prose.strip() or len(prose) > MAX_PROSE_CHARS:
         raise ValueError("bad length")
-    names = {name for _, name, spec, conv in Formatter().parse(prose) if name is not None}
     parsed = list(Formatter().parse(prose))
+    names = {name for _, name, _, _ in parsed if name is not None}
     if any(spec or conv for _, _, spec, conv in parsed) or not names <= PLACEHOLDERS:
         raise ValueError("bad placeholder")
     if "delta" not in names:
