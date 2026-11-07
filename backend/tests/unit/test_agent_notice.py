@@ -74,6 +74,10 @@ def test_one_in_prose_is_allowed():
         "We withhold {delta} and \u2167 units.",  # roman numeral (Nl)
         "We withhold {delta} and \u00bd more.",  # vulgar fraction (No)
         "We withhold {delta} x\u00b2.",  # superscript two (No)
+        "Claim {delta} at evil-pay.example/claim today.",  # bare domain, no scheme
+        "Visit pay.evil.co to dispute {delta}.",  # bare subdomain
+        "We withhold {delta} plus a \u066a fee.",  # Arabic percent sign
+        "We withhold {delta} plus a \uff05 fee.",  # fullwidth percent sign
     ],
 )
 def test_bad_output_falls_back(bad):

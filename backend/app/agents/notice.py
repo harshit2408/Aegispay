@@ -41,7 +41,7 @@ _NUMBER_WORDS = re.compile(
     r"|eighty|ninety|hundred|thousand|million|billion|dozen|percent|per\s+cent)\b",
     re.IGNORECASE,
 )
-_LINKISH = re.compile(r"://|www\.|@", re.IGNORECASE)
+_LINKISH = re.compile(r"://|www\.|@|\b[a-z0-9-]+\.[a-z]{2,}\b", re.IGNORECASE)  # incl. bare domains
 
 
 class NoticeFacts(BaseModel):
@@ -87,8 +87,9 @@ def _check(prose: str) -> None:
     if "delta" not in names:
         raise ValueError("amount missing")
     literal = "".join(lit for lit, _, _, _ in parsed)
-    # Any Unicode number (Nd digits, Nl roman numerals, No fractions/superscripts) or currency.
-    if "%" in literal or any(
+    # Any Unicode number (Nd digits, Nl roman numerals, No fractions/superscripts), currency
+    # or percent sign (ASCII, Arabic, small, fullwidth).
+    if any(c in "%\u066a\ufe6a\uff05" for c in literal) or any(
         unicodedata.category(c)[0] == "N" or unicodedata.category(c) == "Sc" for c in literal
     ):
         raise ValueError("literal number in prose")
