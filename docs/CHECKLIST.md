@@ -107,11 +107,11 @@ The [[PLAN]] explains the why; this file is the state.
 
 ## P3 — Agents, auth, deploy (Nov 3–6) · exit: **hosted S1–S4 green on Render**; rough-cut video Nov 5
 
-- [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2)
-- [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow
+- [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2) (WIP A)
+- [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow (WIP A)
 - [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only (WIP B)
 - [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health`
-- [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag
+- [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag (WIP A)
 - [ ] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order)
 - [ ] **P3-07** @B Widget: Settlement timeline with PayPal IDs, verified / simulated badges
 - [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator)
