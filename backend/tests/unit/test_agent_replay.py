@@ -43,3 +43,13 @@ def test_missing_recording_fails_closed():
     assert r.freeze_reason is not None
     with pytest.raises(LookupError):
         c("A3", [], input_token_bound=1)
+
+
+def test_seam_rechecks_r24_when_validators_are_bypassed():
+    ok = settings(demo_enabled=True, demo_replay_mode=True)
+    for update in (
+        {"demo_enabled": False},
+        {"paypal_base_url": "https://api-m.paypal.com"},
+    ):
+        with pytest.raises(ValueError):
+            replay_complete(ok.model_copy(update=update), {})
