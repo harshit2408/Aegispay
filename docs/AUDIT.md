@@ -48,10 +48,19 @@ authenticated prefix, then verifies the unanchored suffix. Database `audit_ancho
 receipts only. They may reject remote-history rollback but never replace external trust.
 If verification sees an apparent rollback, it rolls back the transaction and refetches up to
 two more times, after 250 ms and 500 ms, allowing a competing publication to become visible.
+A receipt ahead of, or missing from, the remote snapshot (`StaleAnchor`) is still stale after
+those retries: it is treated as an anchor outage, not tamper (below). HMAC or prefix mismatch
+is tamper: it persists the halt at once.
 Confirmed integrity failure persists `SETTLEMENT_HALT` with `AUDIT_INTEGRITY_FAILED` in a new
 transaction and stops the worker. If the database is unavailable, halt persistence can fail;
 the worker still stops and logs only a generic failure. Repair does not clear a persisted halt.
 An eligible operator must review the incident before resuming settlement.
+
+Outage policy, identical at startup and runtime: Git outages (`AnchorUnavailable`) and
+`StaleAnchor` are retried every 2 s and counted from the first failure; after
+`TRANSIENT_WINDOW_SECONDS` (300 s) the worker persists `AUDIT_ANCHOR_UNAVAILABLE` and stops.
+Any success resets the window. `AnchorConflict` (publication race) is retried and never halts.
+An existing halt reason is kept, never relabelled.
 
 A checkpoint is due on startup with no checkpoint, every hour, and when a newly signed event
 has type `SETTLED`. The next audit tick observes committed settlement events; polling is two

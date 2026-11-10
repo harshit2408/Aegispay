@@ -345,6 +345,7 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
             await worker.run()
         assert events == ["validate:settlement", "audit:verify", "dispose"]
     elif failure == "anchor":
+        monkeypatch.setattr(worker.audit_consumer, "TRANSIENT_WINDOW_SECONDS", 0)
         with pytest.raises(AnchorUnavailable):
             await worker.run()
         assert events == ["validate:settlement", "audit:verify", "dispose"]
@@ -366,3 +367,49 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
         assert {"outbox:stop", "poller:stop", "consumer:tick"} <= set(events)
         assert events[-3:] == ["close:TREASURY", "close:VENDOR", "dispose"]
     assert handlers == {}
+
+
+async def test_startup_retries_anchor_outage_within_window_then_raises(monkeypatch):
+    from app.audit import consumer as audit_consumer
+    from app.audit.anchor import AnchorConflict, AnchorUnavailable
+    from app.settlement import worker
+
+    clock = [0.0]
+    monkeypatch.setattr(worker.time, "monotonic", lambda: clock[0])
+
+    async def no_wait(awaitable, timeout):
+        awaitable.close()
+        clock[0] += audit_consumer.TRANSIENT_WINDOW_SECONDS / 3
+        raise TimeoutError
+
+    monkeypatch.setattr(worker.asyncio, "wait_for", no_wait)
+    for error in (AnchorUnavailable("x"), audit_consumer.StaleAnchor("x")):
+        clock[0], calls = 0.0, []
+
+        async def drain(audit, stop, error=error, calls=calls):
+            calls.append(1)
+            if len(calls) < 3:
+                raise error
+            return None
+
+        monkeypatch.setattr(audit_consumer, "run_once_until_stopped", drain)
+        await worker._startup_drain(object(), asyncio.Event())
+        assert len(calls) == 3  # recovered inside the window
+
+        clock[0], calls[:] = 0.0, []
+
+        async def down(audit, stop, error=error, calls=calls):
+            calls.append(1)
+            raise error
+
+        monkeypatch.setattr(audit_consumer, "run_once_until_stopped", down)
+        with pytest.raises(type(error)):
+            await worker._startup_drain(object(), asyncio.Event())
+        assert len(calls) == 4
+
+    async def conflict(audit, stop):
+        raise AnchorConflict("race")
+
+    monkeypatch.setattr(audit_consumer, "run_once_until_stopped", conflict)
+    with pytest.raises(AnchorConflict):
+        await worker._startup_drain(object(), asyncio.Event())
