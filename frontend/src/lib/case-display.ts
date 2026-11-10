@@ -5,13 +5,15 @@ type Approval = components["schemas"]["ApprovalView"];
 type Operator = components["schemas"]["OperatorView"];
 
 export type CaseReadState = { data?: CaseDetail; error?: string; loading: boolean; replayed: boolean };
+// A transient failure keeps `data` (shown as stale); a terminal one drops it.
 
 export function caseReadState(state: CaseReadState, action:
-  { type: "loading" } | { type: "loaded"; data: CaseDetail } | { type: "failed"; error: string },
+  { type: "loading" } | { type: "loaded"; data: CaseDetail } | { type: "failed"; error: string; terminal?: boolean },
 ): CaseReadState {
   if (action.type === "loaded") return { data: action.data, loading: false, replayed: action.data.replayed };
-  if (action.type === "failed") return { error: action.error, loading: false, replayed: state.replayed };
-  return { loading: true, replayed: state.replayed };
+  const data = state.data;
+  if (action.type === "failed") return { data: action.terminal ? undefined : data, error: action.error, loading: false, replayed: state.replayed };
+  return { data, loading: true, replayed: state.replayed };
 }
 
 export function usd(cents: number): string {

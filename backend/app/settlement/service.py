@@ -123,7 +123,7 @@ class SettlementService:
                 except po_ledger.OverConsumption:
                     reason = "PO_EXHAUSTED"
             if reason:
-                await transitions.apply(s, execution, "FROZEN")
+                await transitions.apply(s, execution, "FROZEN", actor="system:settlement")
                 await _release_reservations(s, command.execution_id)
                 await _set_outbox(s, command.execution_id, "FAILED", reason)
                 log.warning(
@@ -139,7 +139,7 @@ class SettlementService:
                     amount_cents=command.amount_cents,
                 )
             )
-            await transitions.apply(s, execution, "PAYOUT_SENDING")
+            await transitions.apply(s, execution, "PAYOUT_SENDING", actor="system:settlement")
         return await self._post_and_submit(command)
 
     async def _recover(self, command: PayoutCommand) -> str:
@@ -244,7 +244,7 @@ class SettlementService:
             payout.paypal_amount_cents = item.amount_cents
             payout.batch_status = batch.batch_status
             payout.item_status = item.status
-            await transitions.apply(s, execution, "PAYOUT_SUBMITTED")
+            await transitions.apply(s, execution, "PAYOUT_SUBMITTED", actor="system:settlement")
             await _set_outbox(s, command.execution_id, "DONE", None)
 
     async def _freeze(self, command: PayoutCommand, reason: str) -> str:
@@ -252,7 +252,7 @@ class SettlementService:
             execution = await _lock(s, command.execution_id)
             if execution.status != "APPROVED_FOR_PAYMENT":
                 return execution.status
-            await transitions.apply(s, execution, "FROZEN")
+            await transitions.apply(s, execution, "FROZEN", actor="system:settlement")
             await _release_reservations(s, command.execution_id)
             await _set_outbox(s, command.execution_id, "FAILED", reason)
         log.warning("frozen before payout: %s execution_id=%s", reason, command.execution_id)
@@ -272,7 +272,9 @@ class SettlementService:
             payout = await _payout(s, command.execution_id)
             if payout is not None and batch_id and payout.payout_batch_id is None:
                 payout.payout_batch_id = batch_id
-            if not await transitions.apply_or_ignore(s, execution, "NEEDS_MANUAL_REVIEW"):
+            if not await transitions.apply_or_ignore(
+                s, execution, "NEEDS_MANUAL_REVIEW", actor="system:settlement"
+            ):
                 return execution.status
             await _set_outbox(s, command.execution_id, "FAILED", reason)
             if halt:

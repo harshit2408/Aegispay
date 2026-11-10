@@ -2,18 +2,26 @@ import { APIError, api } from "./client.ts";
 import type { caseReadState } from "./case-display.ts";
 import { subscribeToExecution } from "./sse.ts";
 
+export const RETRY_DELAYS_MS = [1000, 2000, 4000]; // bounded: after these, the user must press Retry
+
 // Own the REST request and stream together so teardown also cancels pending reads.
 export function watchCase(
   executionId: string,
   dispatch: (action: Parameters<typeof caseReadState>[1]) => void,
-  status: (message: string) => void,
+  status: (message: string, closed?: boolean) => void,
+  retryDelays: readonly number[] = RETRY_DELAYS_MS,
+  coalesceMs?: number,
 ): () => void {
   let active = true;
   let request: AbortController | undefined;
-  let unsubscribe: (() => void) | undefined;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let failures = 0;
 
-  async function refresh() {
+  // retry=true only from the backoff timer; any other trigger (first load, SSE event) restarts the budget.
+  async function refresh(retry = false) {
     if (!active) return;
+    if (!retry) failures = 0;
+    clearTimeout(retryTimer);
     request?.abort();
     const controller = new AbortController();
     request = controller;
@@ -26,8 +34,8 @@ export function watchCase(
         throw new Error("The response belongs to another case.");
       }
       if (active && !controller.signal.aborted) {
+        failures = 0;
         dispatch({ type: "loaded", data });
-        if (!unsubscribe) unsubscribe = subscribeToExecution(executionId, refresh, status);
       }
     } catch (error) {
       if (!active || controller.signal.aborted) return;
@@ -35,15 +43,19 @@ export function watchCase(
         (error.status === 501 || error.status < 500 && ![408, 429].includes(error.status));
       if (terminal) {
         active = false;
-        unsubscribe?.();
+        unsubscribe();
+      } else if (failures < retryDelays.length) {
+        retryTimer = setTimeout(() => void refresh(true), retryDelays[failures++]);
       }
       const detail = error instanceof APIError && [401, 403].includes(error.status)
-        ? "Sign in with an eligible operator session to view this case."
+        ? "Your session cannot view this case. Sign in as a controller or CFO who did not upload the invoice, then retry."
         : error instanceof APIError && error.status === 404 ? "Case not found."
         : error instanceof Error ? error.message : "Case could not be loaded.";
-      dispatch({ type: "failed", error: detail });
+      dispatch({ type: "failed", error: detail, terminal });
     }
   }
+  // Open the stream up front so a failed first load still recovers on a later event or reconnect.
+  const unsubscribe = subscribeToExecution(executionId, () => void refresh(), status, coalesceMs);
   void refresh();
-  return () => { active = false; request?.abort(); unsubscribe?.(); };
+  return () => { active = false; clearTimeout(retryTimer); request?.abort(); unsubscribe(); };
 }

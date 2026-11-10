@@ -173,17 +173,21 @@ async def append_events(
     session: AsyncSession,
     *,
     key: bytes,
-    queued: Iterable[AuditQueue],
+    queued: Iterable[AuditQueue] | Callable[[], Awaitable[Iterable[AuditQueue]]],
     verify: Callable[[list[ExecutionEvent]], Awaitable[None]] | None = None,
 ) -> list[ExecutionEvent]:
     """Lock and verify once per batch; additional verification cannot bypass the HMAC check.
 
+    `queued` may be an async callable, awaited only after verification so a caller can take a
+    short table lock for the claim without holding it across the O(n) chain verification.
+
     No caller supplies the tail. It is derived from the verified rows under the transaction lock.
     """
     _key(key)
-    queued = list(queued)
-    for row in queued:
-        _validate(row.execution_id, row.actor, row.event_type, row.payload, row.ts)
+    claim = queued if callable(queued) else None
+    if claim is None:
+        queued = list(queued)
+        _validate_all(queued)
     await lock_chain(session)
     rows = list(
         await session.scalars(
@@ -197,12 +201,20 @@ async def append_events(
     verify_chain(rows, key=key, expected_head=head)
     if verify is not None:
         await verify(rows)
+    if claim is not None:
+        queued = list(await claim())
+        _validate_all(queued)
     events = []
     for row in queued:
         event = await _append_one(session, key=key, row=row, head=head)
         events.append(event)
         head = event.hash
     return events
+
+
+def _validate_all(queued: list[AuditQueue]) -> None:
+    for row in queued:
+        _validate(row.execution_id, row.actor, row.event_type, row.payload, row.ts)
 
 
 async def _append_one(session: AsyncSession, *, key: bytes, row: AuditQueue, head: str):

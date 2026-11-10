@@ -45,7 +45,12 @@ async def apply(
     to: str,
     *,
     expected_version: int | None = None,
+    actor: str,
 ) -> None:
+    """`actor` is the authenticated principal (R11) or a `system:*` name; required, no default."""
+    # flush() would autobegin, so an enqueue-time check alone cannot catch a missing transaction.
+    if not session.in_transaction():
+        raise ValueError("status transition requires a caller-owned transaction")
     if expected_version is not None and execution.row_version != expected_version:
         raise StaleVersion(execution.execution_id)
     if to not in ALLOWED.get(execution.status, frozenset()):
@@ -64,16 +69,18 @@ async def apply(
     await enqueue_event(
         session,
         execution_id=execution.execution_id,
-        actor="system",
+        actor=actor,
         event_type=to,
         payload={"from_status": previous, "to_status": to, "row_version": execution.row_version},
     )
 
 
-async def apply_or_ignore(session: AsyncSession, execution: InvoiceExecution, to: str) -> bool:
+async def apply_or_ignore(
+    session: AsyncSession, execution: InvoiceExecution, to: str, *, actor: str
+) -> bool:
     """For late or duplicate PayPal signals: an illegal or backward move is dropped (R6)."""
     try:
-        await apply(session, execution, to)
+        await apply(session, execution, to, actor=actor)
     except IllegalTransition:
         return False
     return True

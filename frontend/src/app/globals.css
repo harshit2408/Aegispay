@@ -66,6 +66,7 @@ h1 { font-size: clamp(1.5rem, 3vw, 2.2rem); margin: 5px 0 10px; }
 p { line-height: 1.6; }
 .eyebrow { font-size: 12px; letter-spacing: 0.1em; color: var(--pp-blue); }
 .replay-banner { position: sticky; top: 0; z-index: 10; padding: 9px 20px; background: #ffe1a3; color: #29200b; font-weight: 700; text-align: center; }
+.stale-banner { padding: 9px 20px; background: #fde7e7; color: #4a1010; font-weight: 600; }
 .licence-status { color: var(--pp-muted); font-size: 14px; }
 .studio-toolbar { padding: 8px 0 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .studio-container { height: 720px; min-height: 500px; width: 100%; overflow: auto; }

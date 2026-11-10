@@ -248,7 +248,7 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
         monkeypatch.delenv(field, raising=False)
     settings = SettlementSettings(_env_file=None, **settlement_values())
     monkeypatch.setattr(worker, "get_settlement_settings", lambda: settings)
-    events, handlers = [], {}
+    events, handlers, halts = [], {}, []
 
     class Engine:
         async def dispose(self):
@@ -287,6 +287,9 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
     class Audit:
         def __init__(self, *args, **kwargs):
             pass
+
+        async def persist_halt(self, reason):
+            halts.append(reason)
 
         async def run_once(self):
             events.append("audit:verify")
@@ -347,6 +350,7 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
         assert events == ["validate:settlement", "audit:verify", "dispose"]
         assert "audit_anchor_unavailable node=audit action=stop_worker" in caplog.text
         assert "private transport details" not in caplog.text
+        assert halts == ["AUDIT_ANCHOR_UNAVAILABLE"]
     elif failure == "runtime_anchor":
         with pytest.raises(ExceptionGroup) as error:
             await asyncio.wait_for(worker.run(), timeout=2)

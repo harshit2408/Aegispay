@@ -25,7 +25,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       typeof body?.detail === "string" ? body.detail : `API request failed (${response.status})`;
     throw new APIError(response.status, detail);
   }
-  return response.json() as Promise<T>;
+  // A 2xx with an unparsable body is a transient server fault, not a raw SyntaxError for the user.
+  return response.json().catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === "AbortError") throw error; // caller cancelled
+    throw new APIError(502, "The server sent an unreadable response.");
+  }) as Promise<T>;
 }
 
 export const api = {

@@ -1,6 +1,6 @@
 import { CasePreview } from "./case-preview";
 import { CaseLive } from "./case-live";
-import { previewCase } from "@/fixtures/case-preview";
+import { isPreviewId } from "@/lib/preview";
 
 export default async function CaseWorkspace({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,7 +11,7 @@ export default async function CaseWorkspace({ params }: { params: Promise<{ id: 
         <h1 id="case-title">Case workspace</h1>
         <p>Review the evidence, security findings and payment decision for one invoice.</p>
       </section>
-      {id === "preview" || id === previewCase.execution_id ? <CasePreview /> : <CaseLive key={id} executionId={id} />}
+      {isPreviewId(id) ? <CasePreview /> : <CaseLive key={id} executionId={id} />}
     </>
   );
 }

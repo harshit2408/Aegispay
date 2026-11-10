@@ -77,7 +77,10 @@ services:
 
   settlement:
     profiles: ["settlement"]
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        INSTALL_GIT: "1"
     command: ["python", "-m", "app.settlement.worker"]
     stop_grace_period: 45s
     environment:
