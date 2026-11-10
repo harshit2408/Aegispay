@@ -71,6 +71,7 @@ jobs:
       TREASURY_CLIENT_ID: verify-only-treasury
       VENDOR_CLIENT_ID: verify-only-vendor
       VENDOR_CLIENT_SECRET: verify-only-vendor-secret
+      SESSION_SECRET: synthetic-ci-session-secret-at-least-32-bytes
     steps:
       - uses: actions/checkout@v4
       - name: Build and start isolated stack

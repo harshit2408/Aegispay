@@ -111,7 +111,12 @@ def test_metadata_custom_key():
 
 def test_embedded_javascript():
     w = PdfWriter(clone_from=PdfReader(io.BytesIO(_pdf(lambda c: None))))
-    w.add_js("app.alert(1)")
+    w.root_object[NameObject("/OpenAction")] = DictionaryObject(
+        {
+            NameObject("/S"): NameObject("/JavaScript"),
+            NameObject("/JS"): TextStringObject("app.alert(1)"),
+        }
+    )
     out = io.BytesIO()
     w.write(out)
     assert "METADATA" in _techniques(out.getvalue())
