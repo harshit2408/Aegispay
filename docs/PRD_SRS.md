@@ -422,6 +422,26 @@ CREATE TABLE operators (                 -- R18: named people, one role each
     locked_until    TIMESTAMPTZ
 );
 
+-- R25: opaque session token hashes, HMAC login buckets, R23 transactional alerts.
+CREATE TABLE operator_sessions (
+    token_hash TEXT PRIMARY KEY,
+    operator_id TEXT NOT NULL REFERENCES operators(operator_id),
+    created_at TIMESTAMPTZ NOT NULL, last_seen_at TIMESTAMPTZ NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE auth_attempts (
+    bucket_key TEXT PRIMARY KEY, -- HMAC(IP) or HMAC(account), no raw identifiers
+    window_started TIMESTAMPTZ NOT NULL,
+    attempts INTEGER NOT NULL CHECK (attempts >= 0)
+);
+CREATE TABLE ops_alerts (
+    alert_id TEXT PRIMARY KEY,
+    event TEXT NOT NULL CHECK (event IN ('HALT','VENDOR_CHANGE','MANDATE_ACTIVATED',
+      'WEBHOOK_SIGNATURE_FAILURE','APPROVAL_OUTSIDE_HOURS')),
+    execution_id TEXT, created_at TIMESTAMPTZ NOT NULL, delivered_at TIMESTAMPTZ
+);
+-- API appends alerts; settlement delivers HTTPS outside DB locks, or records log-only delivery.
+
 -- Mandates are immutable and versioned. Exactly one active version.
 CREATE TABLE mandate_policies (
     policy_id                    TEXT        NOT NULL,
@@ -460,7 +480,7 @@ CREATE TABLE vendor_master (             -- current row = latest effective chang
     onboarding_evidence     JSONB NOT NULL,              -- how the PayPal identity was verified (e.g. payer-id lookup)
     payee_last_changed_at   TIMESTAMPTZ
 );
--- Only the settlement DB role and routers/vendors.py (via an effective change) may UPDATE vendor_master.
+-- Only settlement may UPDATE vendor_master; the API requests/approves changes, never edits master.
 
 CREATE TABLE vendor_master_changes (     -- append-only history of payee changes (R15)
     change_id         TEXT PRIMARY KEY,
@@ -682,7 +702,7 @@ CREATE TABLE webhook_events (
 ```
 
 **Allowed execution transitions (R6)** — anything else is rejected and logged:
-`RECEIVED→ANALYZING`; `ANALYZING→FROZEN|DUPLICATE_BLOCKED|APPROVED_FOR_PAYMENT`; `FROZEN→APPROVED_FOR_PAYMENT|REJECTED|FROZEN`; `APPROVED_FOR_PAYMENT→PAYOUT_SENDING|FROZEN`; `PAYOUT_SENDING→PAYOUT_SUBMITTED|PAYOUT_FAILED|NEEDS_MANUAL_REVIEW`; `PAYOUT_SUBMITTED→PAYOUT_SUCCEEDED|PAYOUT_FAILED|FROZEN(STALE_PAYEE)|NEEDS_MANUAL_REVIEW`; `PAYOUT_SUCCEEDED→SETTLED|NEEDS_MANUAL_REVIEW`; `SETTLED→NEEDS_MANUAL_REVIEW` (late reversal).
+`RECEIVED→ANALYZING`; `ANALYZING→FROZEN|DUPLICATE_BLOCKED|APPROVED_FOR_PAYMENT`; `FROZEN→APPROVED_FOR_PAYMENT|REJECTED|DUPLICATE_BLOCKED|FROZEN`; `APPROVED_FOR_PAYMENT→PAYOUT_SENDING|FROZEN`; `PAYOUT_SENDING→PAYOUT_SUBMITTED|PAYOUT_FAILED|NEEDS_MANUAL_REVIEW`; `PAYOUT_SUBMITTED→PAYOUT_SUCCEEDED|PAYOUT_FAILED|FROZEN(STALE_PAYEE)|NEEDS_MANUAL_REVIEW`; `PAYOUT_SUCCEEDED→SETTLED|NEEDS_MANUAL_REVIEW`; `SETTLED→NEEDS_MANUAL_REVIEW` (late reversal).
 
 Removed from v1: `daily_spent_usd` (derived from `spend_ledger`), `paypal_capture_tx_id` / `tracking_number` / `carrier` on POs (ADR-003), `warehouse_*` columns on POs (now `goods_receipts`), the `WEBHOOK_VERIFIED` status (verification is a property of webhook events, not an execution status), and the duplicate price source on `vendor_master`.
 

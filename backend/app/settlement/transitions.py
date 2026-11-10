@@ -18,7 +18,7 @@ log = logging.getLogger("aegis.settlement")
 ALLOWED: dict[str, frozenset[str]] = {
     "RECEIVED": frozenset({"ANALYZING"}),
     "ANALYZING": frozenset({"FROZEN", "DUPLICATE_BLOCKED", "APPROVED_FOR_PAYMENT"}),
-    "FROZEN": frozenset({"APPROVED_FOR_PAYMENT", "REJECTED", "FROZEN"}),
+    "FROZEN": frozenset({"APPROVED_FOR_PAYMENT", "DUPLICATE_BLOCKED", "REJECTED", "FROZEN"}),
     "APPROVED_FOR_PAYMENT": frozenset({"PAYOUT_SENDING", "FROZEN"}),
     "PAYOUT_SENDING": frozenset({"PAYOUT_SUBMITTED", "PAYOUT_FAILED", "NEEDS_MANUAL_REVIEW"}),
     "PAYOUT_SUBMITTED": frozenset(

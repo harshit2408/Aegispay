@@ -38,16 +38,16 @@ export function PayablesLedger({ cases, paidByExecution }: Pick<CockpitContext, 
           return <tr key={data.execution_id} onClick={(event) => {
             if (!(event.target as HTMLElement).closest("a")) event.currentTarget.querySelector("a")?.click();
           }}>
-            <th scope="row"><Link href={href}>{data.extraction.vendor_invoice_number ?? data.execution_id}</Link>
-              <span className="ledger-secondary">{data.purchase_order.po_id}</span></th>
-            <td>{data.vendor.name}</td>
+            <th scope="row"><Link href={href}>{data.extraction?.vendor_invoice_number ?? data.execution_id}</Link>
+              <span className="ledger-secondary">{data.purchase_order?.po_id ?? "PO unavailable"}</span></th>
+            <td>{data.vendor?.name ?? "Unavailable"}</td>
             <td><div className="triad-pills">{Object.entries(match).map(([name, state]) =>
               <span key={name} className={`case-badge ${["Matched", "Accepted"].includes(state) ? "success" : "warning"}`}>
                 {name === "po" ? "PO" : name === "receipt" ? "Receipt" : "Source"}: {state}
               </span>)}</div></td>
-            <td className="ledger-money">{usd(data.match.billed_cents)} → {paid === undefined ? "Unavailable" : usd(paid)}</td>
-            <td><meter min={0} max={100} low={30} high={70} optimum={0} value={data.risk.score} aria-label={`Risk ${data.risk.score} of 100`} />
-              <span className="ledger-secondary">{data.risk.score}/100</span></td>
+            <td className="ledger-money">{data.match ? usd(data.match.billed_cents) : "Unavailable"} → {paid === undefined ? "Unavailable" : usd(paid)}</td>
+            <td>{data.risk ? <><meter min={0} max={100} low={30} high={70} optimum={0} value={data.risk.score} aria-label={`Risk ${data.risk.score} of 100`} />
+              <span className="ledger-secondary">{data.risk.score}/100</span></> : "Pending"}</td>
             <td><span className="case-badge warning">{data.status.replaceAll("_", " ")}</span></td>
           </tr>;
         })}</tbody>

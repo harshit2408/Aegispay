@@ -15,7 +15,7 @@ from app.config import get_settlement_settings
 from app.paypal.client import PayPalClient
 from app.paypal.payouts import Payouts
 from app.service_security import validate_database_role, validate_service_environment
-from app.settlement import outbox_worker, reconciler
+from app.settlement import controls, outbox_worker, reconciler
 from app.settlement.reconciler import Reconciler
 from app.settlement.service import SettlementService
 from app.settlement.webhook_consumer import WebhookConsumer
@@ -78,6 +78,15 @@ def _require_git(anchor_repo: str | None) -> None:
         raise RuntimeError(
             "Audit anchor requires git; build the settlement image with INSTALL_GIT=1"
         )
+
+
+async def _controls(sessions, settings, stop):
+    while not stop.is_set():
+        await controls.run_once(sessions, settings)
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=2)
+        except TimeoutError:
+            pass
 
 
 async def run(stop: asyncio.Event | None = None) -> None:
@@ -144,13 +153,19 @@ async def run(stop: asyncio.Event | None = None) -> None:
         )
         payouts = Payouts(treasury)
         gateway = VendorGateway(Invoicing(vendor))
+        await controls.run_once(sessions, settings)
         service = SettlementService(sessions, payouts, gateway)
+        service.velocity_limits = (
+            settings.velocity_max_payouts_per_hour,
+            settings.velocity_max_cents_per_hour,
+        )
         poller = Reconciler(sessions, payouts, gateway)
         consumer = WebhookConsumer(sessions, poller)
         async with asyncio.TaskGroup() as tasks:
             tasks.create_task(outbox_worker.run_forever(sessions, service, stop))
             tasks.create_task(reconciler.run_forever(poller, sessions, stop))
             tasks.create_task(_consume(consumer, stop))
+            tasks.create_task(_controls(sessions, settings, stop))
             tasks.create_task(audit_consumer.run_forever(audit, stop))
     finally:
         stop.set()

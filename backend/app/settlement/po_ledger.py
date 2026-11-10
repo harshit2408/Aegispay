@@ -61,16 +61,20 @@ async def reserve(
         > await accepted_value_cents(session, po)
     ):
         raise OverConsumption(po_id)
-    entry = POLedger(
-        po_id=po_id,
-        execution_id=execution_id,
-        kind="RESERVE",
-        qty=(amount_cents + po.unit_price_cents - 1) // po.unit_price_cents,
-        amount_cents=amount_cents,
-    )
-    session.add(entry)
-    await session.flush()
-    return entry.entry_id
+    # The API role can reserve, but cannot insert a release reference.
+    return (
+        await session.execute(
+            pg_insert(POLedger)
+            .values(
+                po_id=po_id,
+                execution_id=execution_id,
+                kind="RESERVE",
+                qty=(amount_cents + po.unit_price_cents - 1) // po.unit_price_cents,
+                amount_cents=amount_cents,
+            )
+            .returning(POLedger.entry_id)
+        )
+    ).scalar_one()
 
 
 async def release(session: AsyncSession, *, reserve_entry_id: int) -> int:

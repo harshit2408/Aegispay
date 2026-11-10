@@ -226,6 +226,8 @@ async def run_forever(
 ) -> None:
     """Poll until `stop`. A session-level advisory lock keeps a deploy overlap from running two."""
     async with sessionmaker() as lock_session:
+        # Keep the checked-out session lock without blocking concurrent checkpoint indexes.
+        await lock_session.connection(execution_options={"isolation_level": "AUTOCOMMIT"})
         query = select(func.pg_try_advisory_lock(LOCK_KEY))
         if not (await lock_session.execute(query)).scalar():
             log.warning("another reconciler holds the advisory lock; exiting")

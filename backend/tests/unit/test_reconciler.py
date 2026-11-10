@@ -341,6 +341,17 @@ async def test_only_one_reconciler_holds_the_advisory_lock(env):
     first_stop, second_stop = asyncio.Event(), asyncio.Event()
     first = asyncio.create_task(run_forever(env.rec, env.sm, first_stop, poll_s=0.05))
     await asyncio.sleep(0.3)  # let the first take the lock
+    async with env.sm() as session:
+        assert (
+            await session.scalar(
+                text(
+                    "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() "
+                    "AND state='idle in transaction' "
+                    "AND query LIKE 'SELECT pg_try_advisory_lock%'"
+                )
+            )
+            == 0
+        )
     await asyncio.wait_for(run_forever(env.rec, env.sm, second_stop, poll_s=0.05), timeout=3)
     assert not first.done()  # the second exited at once; the first is still polling
     first_stop.set()

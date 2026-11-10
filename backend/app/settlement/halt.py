@@ -15,12 +15,28 @@ async def is_halted(session: AsyncSession) -> bool:
     return control is None or control.halted  # a missing row fails closed
 
 
-async def halt(session: AsyncSession, reason: str, changed_by: str = "system") -> None:
-    await session.execute(
+async def halt(
+    session: AsyncSession, reason: str, changed_by: str = "system", *, supersede: bool = False
+) -> None:
+    """Idempotent: an existing halt keeps its first reason/actor and raises no new alert.
+
+    supersede=True is for a confirmed audit-integrity failure only: it replaces any other
+    halt reason so the incident is never hidden behind a routine one.
+    """
+    guard = [SettlementControl.id]
+    if not supersede:
+        guard.append(SettlementControl.halted.is_(False))
+    changed = await session.scalar(
         update(SettlementControl)
-        .where(SettlementControl.id)
+        .where(*guard)
         .values(
             halted=True, halted_reason=reason[:200], changed_by=changed_by, changed_at=func.now()
         )
+        .returning(SettlementControl.id)
     )
-    log.error("SETTLEMENT_HALT set by %s: %s", changed_by, reason)
+    log.error("SETTLEMENT_HALT reason_code=%s", reason[:200])
+    if changed is None:
+        return
+    from app.ops.alerts import enqueue_alert
+
+    await enqueue_alert(session, "HALT")

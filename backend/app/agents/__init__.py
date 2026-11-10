@@ -74,6 +74,7 @@ class InvoiceRun:
         self._active = True
         self._calling = False
         self._thread = get_ident()
+        self._nodes = frozenset({"A2", "A3", "A4", "A5"})
 
     @property
     def spent_micros(self) -> int:
@@ -92,7 +93,7 @@ class InvoiceRun:
         session = current_session()
         if session is None or session.trace_id != self._bound.attr.trace_id:
             raise RuntimeError("invoice completion called from a different run scope")
-        if node not in {"A2", "A3", "A4", "A5"}:
+        if node not in self._nodes:
             raise ValueError("invoice completion node must be A2, A3, A4 or A5")
         if type(input_token_bound) is not int or not 0 < input_token_bound <= 272_000:
             raise ValueError("trusted input_token_bound must be an integer in 1..272000")
@@ -231,3 +232,11 @@ def invoice_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRu
             yield run
         finally:
             run._active = False
+
+
+@contextmanager
+def mandate_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRun]:
+    """A1 has its own authoring execution and cannot consume an invoice's allowance."""
+    with invoice_run(execution_id, dispatch=dispatch) as run:
+        run._nodes = frozenset({"A1"})
+        yield run

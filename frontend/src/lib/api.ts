@@ -1,4 +1,123 @@
 export interface paths {
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Login */
+        post: operations["login_api_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/demo/forensics-detector": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Detector */
+        post: operations["detector_api_demo_forensics_detector_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/demo/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset */
+        post: operations["reset_api_demo_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/demo/scenarios/{scenario_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Scenario */
+        post: operations["run_scenario_api_demo_scenarios__scenario_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Document */
+        post: operations["upload_document_api_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/executions": {
         parameters: {
             query?: never;
@@ -50,6 +169,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/grns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Receipt */
+        post: operations["record_receipt_api_grns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -67,6 +203,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mandates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Mandates */
+        get: operations["list_mandates_api_mandates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mandates/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active */
+        get: operations["active_api_mandates_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mandates/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Compile Policy */
+        post: operations["compile_policy_api_mandates_compile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mandates/{policy_id}/versions/{version}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate */
+        post: operations["activate_api_mandates__policy_id__versions__version__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ops/settlement-halt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Halt Status */
+        get: operations["halt_status_api_ops_settlement_halt_get"];
+        put?: never;
+        /** Set Halt */
+        post: operations["set_halt_api_ops_settlement_halt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stream": {
         parameters: {
             query?: never;
@@ -78,6 +300,41 @@ export interface paths {
         get: operations["execution_stream"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vendors/changes/{change_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Change */
+        post: operations["approve_change_api_vendors_changes__change_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vendors/{vendor_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Changes */
+        get: operations["changes_api_vendors__vendor_id__changes_get"];
+        put?: never;
+        /** Request Change */
+        post: operations["request_change_api_vendors__vendor_id__changes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -144,6 +401,21 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** ActivationRequest */
+        ActivationRequest: {
+            /** Reason */
+            reason: string;
+        };
+        /** ActiveMandateView */
+        ActiveMandateView: {
+            /** Committed Today Cents */
+            committed_today_cents: number;
+            policy: components["schemas"]["MandatePolicy"];
+            /** Policy Id */
+            policy_id: string;
+            /** Version */
+            version: number;
+        };
         /** ApprovalView */
         ApprovalView: {
             /**
@@ -170,26 +442,37 @@ export interface components {
             /** Verified */
             verified: boolean;
         };
+        /** Body_upload_document_api_documents_post */
+        Body_upload_document_api_documents_post: {
+            /** File */
+            file: string;
+            /** Paypal Invoice Id */
+            paypal_invoice_id: string;
+            /** Po Id */
+            po_id: string;
+        };
         /** CaseDetail */
         CaseDetail: {
             /** Approvals */
             approvals: components["schemas"]["ApprovalView"][];
             audit_anchor: components["schemas"]["AuditAnchorView"];
+            /** Duplicate Of Execution Id */
+            duplicate_of_execution_id?: string | null;
             evidence: components["schemas"]["EvidencePack"] | null;
             /** Execution Id */
             execution_id: string;
-            extraction: components["schemas"]["InvoiceExtraction"];
-            forensics: components["schemas"]["ForensicsReport"];
-            gate: components["schemas"]["GateDecision"];
-            goods_receipt: components["schemas"]["GoodsReceiptView"];
-            match: components["schemas"]["MatchReport"];
-            paypal_invoice: components["schemas"]["PayPalInvoiceView"];
-            po_consumption: components["schemas"]["POConsumptionView"];
-            policy: components["schemas"]["MandatePolicy"];
-            purchase_order: components["schemas"]["PurchaseOrderView"];
+            extraction: components["schemas"]["InvoiceExtraction"] | null;
+            forensics: components["schemas"]["ForensicsReport"] | null;
+            gate: components["schemas"]["GateDecision"] | null;
+            goods_receipt: components["schemas"]["GoodsReceiptView"] | null;
+            match: components["schemas"]["MatchReport"] | null;
+            paypal_invoice: components["schemas"]["PayPalInvoiceView"] | null;
+            po_consumption: components["schemas"]["POConsumptionView"] | null;
+            policy: components["schemas"]["MandatePolicy"] | null;
+            purchase_order: components["schemas"]["PurchaseOrderView"] | null;
             /** Replayed */
             replayed: boolean;
-            risk: components["schemas"]["RiskAssessment"];
+            risk: components["schemas"]["RiskAssessment"] | null;
             /** Settlement Timeline */
             settlement_timeline: components["schemas"]["SettlementEventView"][];
             short_pay: components["schemas"]["ShortPayDecision"] | null;
@@ -200,8 +483,18 @@ export interface components {
             status: "RECEIVED" | "ANALYZING" | "FROZEN" | "REJECTED" | "DUPLICATE_BLOCKED" | "APPROVED_FOR_PAYMENT" | "PAYOUT_SENDING" | "PAYOUT_SUBMITTED" | "PAYOUT_SUCCEEDED" | "PAYOUT_FAILED" | "SETTLED" | "NEEDS_MANUAL_REVIEW";
             /** Uploaded By */
             uploaded_by: string;
-            vendor: components["schemas"]["VendorView"];
+            vendor: components["schemas"]["VendorView"] | null;
             viewer: components["schemas"]["OperatorView"];
+        };
+        /** ChangeApproval */
+        ChangeApproval: {
+            /** Reason */
+            reason: string;
+        };
+        /** CompileRequest */
+        CompileRequest: {
+            /** Text */
+            text: string;
         };
         /** DecisionReceipt */
         DecisionReceipt: {
@@ -219,6 +512,29 @@ export interface components {
             gate_hash: string;
             /** Reason */
             reason: string;
+        };
+        /** DemoControlView */
+        DemoControlView: {
+            /** Detector Enabled */
+            detector_enabled: boolean;
+            /** Previous Run Id */
+            previous_run_id: string | null;
+            /** Replayed */
+            replayed: boolean;
+            /** Run Id */
+            run_id: string;
+        };
+        /** DetectorRequest */
+        DetectorRequest: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** DocumentReceipt */
+        DocumentReceipt: {
+            /** Duplicate Of Execution Id */
+            duplicate_of_execution_id: string | null;
+            /** Execution Id */
+            execution_id: string;
         };
         /** EvidenceFact */
         EvidenceFact: {
@@ -246,22 +562,22 @@ export interface components {
         /** ExecutionRow */
         ExecutionRow: {
             /** Billed Cents */
-            billed_cents: number;
+            billed_cents: number | null;
             /** Execution Id */
             execution_id: string;
             /** Payable Cents */
-            payable_cents: number;
+            payable_cents: number | null;
             /** Replayed */
             replayed: boolean;
             /** Risk Score */
-            risk_score: number;
+            risk_score: number | null;
             /**
              * Status
              * @enum {string}
              */
             status: "RECEIVED" | "ANALYZING" | "FROZEN" | "REJECTED" | "DUPLICATE_BLOCKED" | "APPROVED_FOR_PAYMENT" | "PAYOUT_SENDING" | "PAYOUT_SUBMITTED" | "PAYOUT_SUCCEEDED" | "PAYOUT_FAILED" | "SETTLED" | "NEEDS_MANUAL_REVIEW";
             /** Vendor Name */
-            vendor_name: string;
+            vendor_name: string | null;
         };
         /** ForensicsReport */
         ForensicsReport: {
@@ -320,6 +636,13 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** HaltRequest */
+        HaltRequest: {
+            /** Halted */
+            halted: boolean;
+            /** Reason */
+            reason: string;
+        };
         /** HiddenSegment */
         HiddenSegment: {
             /** Bbox */
@@ -362,6 +685,13 @@ export interface components {
             unit_price_cents: number;
             /** Vendor Invoice Number */
             vendor_invoice_number: string | null;
+        };
+        /** LoginRequest */
+        LoginRequest: {
+            /** Operator Id */
+            operator_id: string;
+            /** Password */
+            password: string;
         };
         /** MandatePolicy */
         MandatePolicy: {
@@ -410,6 +740,28 @@ export interface components {
             short_pay_assumptions: components["schemas"]["ShortPayAssumptions"];
             /** Vendor Daily Cap Cents */
             vendor_daily_cap_cents: number;
+            /** Version */
+            version: number;
+        };
+        /** MandateRecord */
+        MandateRecord: {
+            /** Activated At */
+            activated_at: string | null;
+            /** Clamped Fields */
+            clamped_fields: string[];
+            /** Created By */
+            created_by: string;
+            /** Diff */
+            diff: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Is Active */
+            is_active: boolean;
+            policy: components["schemas"]["MandatePolicy"];
+            /** Policy Id */
+            policy_id: string;
             /** Version */
             version: number;
         };
@@ -485,7 +837,7 @@ export interface components {
             /** Reserved Cents */
             reserved_cents: number;
             /** This Payable Cents */
-            this_payable_cents: number;
+            this_payable_cents: number | null;
         };
         /** PayPalInvoiceView */
         PayPalInvoiceView: {
@@ -494,7 +846,7 @@ export interface components {
             /** Invoice Id */
             invoice_id: string;
             /** Payee Reference */
-            payee_reference: string;
+            payee_reference: string | null;
             /** Status */
             status: string;
             /** Total Cents */
@@ -515,6 +867,26 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ReceiptRequest */
+        ReceiptRequest: {
+            /** Accepted Qty */
+            accepted_qty: number;
+            /** Inspection Note */
+            inspection_note?: string | null;
+            /** Po Id */
+            po_id: string;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Received Qty */
+            received_qty: number;
+            /** Rejected Qty */
+            rejected_qty: number;
+            /** Supersedes Grn Id */
+            supersedes_grn_id?: string | null;
+        };
         /** RiskAssessment */
         RiskAssessment: {
             /** Contributions */
@@ -528,6 +900,15 @@ export interface components {
             finding: string;
             /** Points */
             points: number;
+        };
+        /** SessionView */
+        SessionView: {
+            /** Csrf Token */
+            csrf_token: string;
+            /** Operator Id */
+            operator_id: string;
+            /** Role */
+            role: string;
         };
         /** SettlementEventView */
         SettlementEventView: {
@@ -633,6 +1014,15 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VendorChangeRequest */
+        VendorChangeRequest: {
+            /** Paypal Payer Id */
+            paypal_payer_id: string;
+            /** Reason */
+            reason: string;
+            /** Verified Paypal Email */
+            verified_paypal_email: string;
+        };
         /** VendorView */
         VendorView: {
             /** Change Approved By */
@@ -661,6 +1051,194 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login_api_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_api_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"];
+                };
+            };
+        };
+    };
+    detector_api_demo_forensics_detector_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetectorRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoControlView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_api_demo_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoControlView"];
+                };
+            };
+        };
+    };
+    run_scenario_api_demo_scenarios__scenario_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scenario_id: "S1" | "S2" | "S3" | "S4";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_document_api_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_document_api_documents_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentReceipt"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_executions: {
         parameters: {
             query?: never;
@@ -677,15 +1255,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExecutionRow"][];
-                };
-            };
-            /** @description Case service/auth not implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["APIError"];
                 };
             };
         };
@@ -717,15 +1286,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Case service/auth not implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["APIError"];
                 };
             };
         };
@@ -772,13 +1332,37 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
-            /** @description Case service/auth not implemented */
-            501: {
+        };
+    };
+    record_receipt_api_grns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["APIError"];
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -803,6 +1387,168 @@ export interface operations {
             };
         };
     };
+    list_mandates_api_mandates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MandateRecord"][];
+                };
+            };
+        };
+    };
+    active_api_mandates_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveMandateView"];
+                };
+            };
+        };
+    };
+    compile_policy_api_mandates_compile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompileRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MandateRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_api_mandates__policy_id__versions__version__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                policy_id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MandateRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    halt_status_api_ops_settlement_halt_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    set_halt_api_ops_settlement_halt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HaltRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     execution_stream: {
         parameters: {
             query?: never;
@@ -812,7 +1558,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Each SSE data field is a StreamEvent JSON object */
+            /** @description Each data field is a StreamEvent */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -821,13 +1567,105 @@ export interface operations {
                     "text/event-stream": components["schemas"]["StreamEvent"];
                 };
             };
-            /** @description Authenticated stream not implemented */
-            501: {
+        };
+    };
+    approve_change_api_vendors_changes__change_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeApproval"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["APIError"];
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    changes_api_vendors__vendor_id__changes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_change_api_vendors__vendor_id__changes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

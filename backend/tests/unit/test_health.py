@@ -12,7 +12,7 @@ async def test_health_ok():
     async with _client() as c:
         r = await c.get("/api/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "db": True}
+    assert r.json() == {"status": "ok", "db": True, "demo_enabled": False, "replay_mode": False}
 
 
 async def test_health_503_on_broken_db_without_leaking_error(monkeypatch):

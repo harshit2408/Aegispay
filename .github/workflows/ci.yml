@@ -71,13 +71,14 @@ jobs:
       TREASURY_CLIENT_ID: verify-only-treasury
       VENDOR_CLIENT_ID: verify-only-vendor
       VENDOR_CLIENT_SECRET: verify-only-vendor-secret
+      SESSION_SECRET: synthetic-ci-session-secret-at-least-32-bytes
     steps:
       - uses: actions/checkout@v4
       - name: Build and start isolated stack
         run: docker compose --env-file .env.example --profile settlement up --build --detach --wait --wait-timeout 90 postgres api settlement
       - name: Verify DB health and runtime secret isolation
         run: |
-          curl --fail --silent http://127.0.0.1:18000/api/health | python -c 'import json,sys; assert json.load(sys.stdin) == {"status": "ok", "db": True}'
+          curl --fail --silent http://127.0.0.1:18000/api/health | python -c 'import json,sys; assert json.load(sys.stdin) == {"status": "ok", "db": True, "demo_enabled": False, "replay_mode": False}'
           docker compose --env-file .env.example exec -T api python -c 'import os; assert "TREASURY_CLIENT_SECRET" not in os.environ; assert "AUDIT_HMAC_KEY" not in os.environ; assert os.getuid() != 0'
           docker compose --env-file .env.example --profile settlement exec -T settlement python -c 'import os; assert "DATABASE_URL" not in os.environ; assert "LLM_API_KEY" not in os.environ; assert "SESSION_SECRET" not in os.environ; assert os.getuid() != 0'
           docker compose --env-file .env.example --profile settlement stop settlement

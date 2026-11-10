@@ -8,7 +8,7 @@ inside the write-ahead transaction; the invoice check is an HTTP read, so it run
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.core import GoodsReceipt, PurchaseOrder, VendorMaster
+from app.models.core import GoodsReceipt, PurchaseOrder, VendorMaster, VendorMasterChange
 from app.models.payables import InvoiceExecution, SettlementOutbox
 from app.settlement import po_ledger
 from app.settlement.halt import is_halted
@@ -29,7 +29,12 @@ async def db_recheck(
     vendor = await session.get(VendorMaster, execution.vendor_id) if execution.vendor_id else None
     if vendor is None:
         return "NO_VENDOR"
-    if vendor.trust_status != "VERIFIED":
+    cooling = await session.scalar(
+        select(VendorMasterChange.change_id).where(
+            VendorMasterChange.vendor_id == vendor.vendor_id, VendorMasterChange.status == "COOLING"
+        )
+    )
+    if cooling or vendor.trust_status != "VERIFIED":
         return "VENDOR_NOT_VERIFIED"
     if vendor.version != command.vendor_version or vendor.version != execution.vendor_version:
         return "VENDOR_VERSION_CHANGED"

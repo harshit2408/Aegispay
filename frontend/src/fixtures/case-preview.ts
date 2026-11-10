@@ -1,7 +1,8 @@
 import type { components } from "../lib/api.ts";
 
 // Synthetic P1 fixture; these values are never sent to an API or payment service.
-export const previewCase: components["schemas"]["CaseDetail"] = {
+export const previewCase = {
+  duplicate_of_execution_id: null,
   execution_id: "synthetic-s3", status: "FROZEN", replayed: true, uploaded_by: "mock-uploader",
   viewer: { operator_id: "mock-controller", role: "controller" },
   vendor: {
@@ -77,7 +78,7 @@ export const previewCase: components["schemas"]["CaseDetail"] = {
     { status: "SETTLED", occurred_at: null, paypal_id: null, verified: false, simulated: true },
   ],
   audit_anchor: { verified: false, anchored_at: null, head_hmac: null },
-};
+} satisfies components["schemas"]["CaseDetail"];
 
 export const mockReviewers: components["schemas"]["OperatorView"][] = [
   previewCase.viewer, { operator_id: "mock-cfo", role: "cfo" },

@@ -122,11 +122,18 @@ p { line-height: 1.6; }
 .approval-list { padding-left: 22px; }
 .approval-list p { margin: 4px 0 16px; font-size: 14px; }
 .decision-form { display: grid; gap: 10px; padding-top: 12px; }
-.decision-form select, .decision-form textarea { width: 100%; min-width: 0; padding: 11px; border: 1px solid var(--pp-border); border-radius: 5px; font: inherit; background: var(--pp-canvas); color: var(--pp-ink); }
+.decision-form input, .decision-form select, .decision-form textarea { width: 100%; min-width: 0; padding: 11px; border: 1px solid var(--pp-border); border-radius: 5px; font: inherit; background: var(--pp-canvas); color: var(--pp-ink); }
 .decision-form textarea { resize: vertical; }
 button:disabled { opacity: 0.65; cursor: not-allowed; }
 .mock-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .local-status { padding: 14px; border-left: 3px solid var(--pp-blue); background: var(--pp-canvas); }
+.session-panel { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0; padding: 14px 18px; border: 1px solid var(--pp-border); border-radius: 8px; }
+.session-panel p { margin: 0; }
+.session-panel details { width: min(100%, 420px); }
+.session-panel summary { cursor: pointer; color: var(--pp-blue); padding: 8px 0; }
+.mandate-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; margin-top: 20px; }
+.mandate-grid pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.mandate-grid details summary { cursor: pointer; padding: 12px 0; }
 .cockpit-widget { height: 100%; overflow: auto; padding: 20px; }
 .cockpit-widget h2 { font-size: 20px; margin: 0 0 10px; }
 .cockpit-widget p { margin: 10px 0; }
@@ -147,7 +154,7 @@ button:disabled { opacity: 0.65; cursor: not-allowed; }
 .exposure-list li { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--pp-gridline); }
 .exposure-list li > strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 1000px) {
-  .case-grid, .money-grid { grid-template-columns: minmax(0, 1fr); }
+  .case-grid, .money-grid, .mandate-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 680px) {
   .app-header { padding: 18px 16px; gap: 16px; }

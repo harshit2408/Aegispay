@@ -332,6 +332,11 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
     monkeypatch.setattr(worker, "validate_database_role", validate)
     monkeypatch.setattr(worker, "PayPalClient", Client)
     monkeypatch.setattr(worker, "WebhookConsumer", Consumer)
+
+    async def controls_once(sessions, settings):
+        events.append("controls:tick")
+
+    monkeypatch.setattr(worker.controls, "run_once", controls_once)
     monkeypatch.setattr(worker, "AuditConsumer", Audit)
     monkeypatch.setattr(worker.audit_consumer, "run_forever", audit_loop)
     monkeypatch.setattr(worker.outbox_worker, "run_forever", outbox)
@@ -364,6 +369,7 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
         await asyncio.wait_for(worker.run(), timeout=2)
         assert events.index("validate:settlement") < events.index("client:TREASURY")
         assert events.index("audit:verify") < events.index("client:TREASURY")
+        assert events.index("controls:tick") < events.index("outbox:start")
         assert {"outbox:stop", "poller:stop", "consumer:tick"} <= set(events)
         assert events[-3:] == ["close:TREASURY", "close:VENDOR", "dispose"]
     assert handlers == {}
