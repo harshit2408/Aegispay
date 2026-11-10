@@ -18,7 +18,7 @@ from app.audit.events import (
     lock_chain,
     verify_chain,
 )
-from app.models.payables import AuditAnchor, AuditQueue, ExecutionEvent
+from app.models.payables import AuditAnchor, AuditQueue, ExecutionEvent, SettlementControl
 from app.settlement.halt import halt
 
 log = logging.getLogger("aegis.audit")
@@ -123,6 +123,21 @@ class AuditConsumer:
     async def persist_halt(self, reason: str) -> None:
         try:
             async with self.sessions() as session, session.begin():
+                control = await session.get(
+                    SettlementControl, True, with_for_update=True, populate_existing=True
+                )
+                if (
+                    control is not None
+                    and control.halted
+                    and reason != "AUDIT_INTEGRITY_FAILED"
+                    and control.halted_reason != reason
+                ):
+                    # Keep the recorded cause: an outage or stuck drain must not relabel an
+                    # integrity incident or maintenance halt into one cleared by routine SQL.
+                    log.warning(
+                        "audit_halt_already_set node=audit reason=%s action=keep_existing", reason
+                    )
+                    return
                 await halt(session, reason, changed_by="system:audit")
         except Exception as exc:  # class name only: driver text may carry private values
             log.error(
