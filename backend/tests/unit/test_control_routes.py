@@ -214,8 +214,20 @@ async def test_runtime_api_has_no_vendor_master_write_grant(controls, pg_session
         assert not await session.scalar(
             text("SELECT has_any_column_privilege('aegis_api_role','vendor_master','UPDATE')")
         )
-        assert await session.scalar(
+        assert not await session.scalar(
             text("SELECT has_table_privilege('aegis_settlement_role','vendor_master','UPDATE')")
+        )
+        assert await session.scalar(
+            text(
+                "SELECT has_column_privilege('aegis_settlement_role',"
+                "'vendor_master','paypal_payer_id','UPDATE')"
+            )
+        )
+        assert not await session.scalar(
+            text(
+                "SELECT has_column_privilege('aegis_settlement_role',"
+                "'vendor_master','onboarding_evidence','UPDATE')"
+            )
         )
 
 

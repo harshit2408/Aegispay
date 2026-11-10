@@ -7,7 +7,6 @@ from sqlalchemy import insert, select, text
 from app.decision.policy_gate import GateUnavailable, evaluate
 from app.models.core import MandatePolicy, Operator, PurchaseOrder, VendorMaster
 from app.models.payables import Approval, InvoiceExecution, SettlementControl, SettlementOutbox
-from app.paypal.invoicing import OPEN_STATUSES
 from app.schemas.decision import (
     AegisState,
     ForensicsReport,
@@ -16,6 +15,7 @@ from app.schemas.decision import (
     RiskAssessment,
 )
 from app.schemas.decision import MandatePolicy as Policy
+from app.vendor_sim.gateway import OPEN_STATUSES
 
 
 async def approve_for_payment(

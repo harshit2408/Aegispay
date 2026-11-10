@@ -110,6 +110,12 @@ class VendorMasterChange(Base):
             "status IN ('REQUESTED','COOLING','EFFECTIVE','REJECTED')", name="ck_vmc_status"
         ),
         CheckConstraint("approved_by IS NULL OR approved_by <> requested_by", name="ck_vmc_sod"),
+        Index(
+            "uq_vendor_pending_change",
+            "vendor_id",
+            unique=True,
+            postgresql_where=text("status IN ('REQUESTED','COOLING')"),
+        ),
     )
 
     change_id: Mapped[str] = mapped_column(Text, primary_key=True)

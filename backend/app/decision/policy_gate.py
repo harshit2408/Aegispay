@@ -68,7 +68,7 @@ def _decision(
     """All conditions contribute; hard blocks cannot be overridden by votes."""
     payable = min(match.billed_cents, match.accepted_value_cents, match.po_remaining_cents)
     checks = [
-        (bool(match.duplicate_of), "DUPLICATE", 99),
+        (bool(match.duplicate_of), "DUPLICATE_BLOCKED", 99),
         (committed + payable > policy.daily_cap_cents, "OVER_DAILY_CAP", 99),
         (halted, "HALTED", 99),
         (
@@ -127,16 +127,21 @@ def _decision(
             reasons, required = ["NEEDS_REVIEW"], 1
     if reasons and required != 99 and risk.score >= policy.dual_approval_risk_threshold:
         required = 2
-    allowed = ["APPROVE", "SHORT_PAY", "REJECT"] if required in (1, 2) else []
+    allowed = (
+        ["APPROVE", "SHORT_PAY", "REJECT"]
+        if required in (1, 2)
+        else ["REJECT"]
+        if required == 99
+        else []
+    )
+    actions = {actor: action for actor, action in votes}
     if match.duplicate_of:
-        route = "DUPLICATE_BLOCKED"
-    elif required in (1, 2):
-        actions = {actor: action for actor, action in votes}
-        if "REJECT" in actions.values():
-            route, allowed = "REJECTED", []
-        elif len(actions) >= required:
-            route = "SHORT_PAY" if "SHORT_PAY" in actions.values() else "AUTO_SETTLE"
-            allowed = []
+        route, allowed = "DUPLICATE_BLOCKED", []
+    elif "REJECT" in actions.values():
+        route, allowed = "REJECTED", []
+    elif required in (1, 2) and len(actions) >= required:
+        route = "SHORT_PAY" if "SHORT_PAY" in actions.values() else "AUTO_SETTLE"
+        allowed = []
     return GateDecision(
         route=route,
         payable_cents=payable,

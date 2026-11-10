@@ -174,6 +174,40 @@ async def test_replay_without_recorded_reader_cannot_use_live_vendor(
         await graph.ainvoke({"execution_id": EXECUTION}, CONFIG, durability="sync")
         latest = await graph.aget_state(CONFIG)
         assert latest.values["gate"].reasons == ["SOURCE_READER_UNAVAILABLE"]
-        assert latest.values["gate"].allowed_actions == []
+        assert latest.values["gate"].allowed_actions == ["REJECT"]
         reader.get_invoice.assert_not_awaited()
+        approve.assert_not_awaited()
+
+
+@pytest.mark.parametrize("failure", ["analyze", "reader"])
+async def test_failed_evidence_only_allows_rejection(pg_url, pg_sessionmaker, seeded_case, failure):
+    from sqlalchemy import func, select
+
+    from app.decision.dispatch import Dispatcher
+    from app.models.payables import InvoiceExecution, SettlementOutbox
+    from app.schemas.case import DecisionRequest
+
+    async with AsyncPostgresSaver.from_conn_string(postgres_dsn(pg_url)) as saver:
+        await saver.setup()
+        overrides = (
+            {"reader": None}
+            if failure == "reader"
+            else {"analyze": AsyncMock(side_effect=ValueError("unavailable"))}
+        )
+        graph, _, _, approve = graph_for(saver, pg_sessionmaker, **overrides)
+        dispatcher = Dispatcher(graph, pg_sessionmaker, postgres_dsn(pg_url))
+        await dispatcher.run(EXECUTION)
+        snapshot = await dispatcher.snapshot(EXECUTION)
+        gate = snapshot.values["gate"]
+        assert gate.allowed_actions == ["REJECT"] and gate.payable_cents == 0
+        decision = DecisionRequest(
+            action="REJECT",
+            reason="Cannot verify supplier evidence",
+            gate_hash=gate.gate_hash,
+        )
+        await dispatcher.decide(EXECUTION, "op-cfo", decision)
+        async with pg_sessionmaker() as session:
+            execution = await session.get(InvoiceExecution, EXECUTION)
+            assert execution.status == "REJECTED"
+            assert await session.scalar(select(func.count()).select_from(SettlementOutbox)) == 0
         approve.assert_not_awaited()

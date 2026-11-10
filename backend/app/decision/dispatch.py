@@ -7,9 +7,10 @@ from uuid import uuid4
 
 from langgraph.types import Command
 from psycopg import AsyncConnection
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.audit.events import enqueue_event
+from app.decision.graph import ResumeRejected
 from app.models.core import Operator
 from app.models.payables import Approval, InvoiceDocument, InvoiceExecution
 
@@ -52,7 +53,9 @@ class Dispatcher:
     @asynccontextmanager
     async def _locked(self, execution_id):
         # Use a dedicated unpooled connection. Closing it releases the session lock.
-        async with await AsyncConnection.connect(self.lock_dsn, autocommit=True) as conn:
+        async with await AsyncConnection.connect(
+            self.lock_dsn, autocommit=True, application_name="aegis-dispatch"
+        ) as conn:
             await conn.execute(
                 "SELECT pg_advisory_lock(hashtextextended(%s, 914))", (execution_id,)
             )
@@ -93,21 +96,55 @@ class Dispatcher:
     async def snapshot(self, execution_id):
         return await self.graph.aget_state(await self._config(execution_id))
 
+    async def recover_startup(self, run_case):
+        async with self.sessions() as session:
+            approvals = (
+                select(Approval.approval_id)
+                .where(
+                    Approval.execution_id == InvoiceExecution.execution_id,
+                    or_(Approval.consumed_at.is_(None), InvoiceExecution.status == "FROZEN"),
+                )
+                .exists()
+            )
+            cases = (
+                await session.scalars(
+                    select(InvoiceExecution.execution_id)
+                    .where(
+                        or_(
+                            InvoiceExecution.status.in_(("RECEIVED", "ANALYZING")),
+                            approvals,
+                        )
+                    )
+                    .order_by(InvoiceExecution.created_at, InvoiceExecution.execution_id)
+                )
+            ).all()
+        for execution_id in cases:
+            await run_case(execution_id)
+
+    async def _continue(self, execution_id):
+        snapshot = await self.snapshot(execution_id)
+        if snapshot.next and all(
+            not task.interrupts and task.name != "human_review" for task in snapshot.tasks
+        ):
+            await self.graph.ainvoke(None, await self._config(execution_id), durability="sync")
+
     async def run(self, execution_id):
         async with self._locked(execution_id):
             await self._recover(execution_id)
             snapshot = await self.snapshot(execution_id)
-            config = await self._config(execution_id)
             if not snapshot.values:
-                await self.graph.ainvoke({"execution_id": execution_id}, config, durability="sync")
-            elif snapshot.next and all(
-                not (task.interrupts or task.error) for task in snapshot.tasks
-            ):
-                await self.graph.ainvoke(None, config, durability="sync")
+                await self.graph.ainvoke(
+                    {"execution_id": execution_id},
+                    await self._config(execution_id),
+                    durability="sync",
+                )
+            else:
+                await self._continue(execution_id)
 
     async def decide(self, execution_id, actor_id, decision):
         async with self._locked(execution_id):
             await self._recover(execution_id)
+            await self._continue(execution_id)
             snapshot = await self.snapshot(execution_id)
             async with self.sessions.begin() as session:
                 case = await session.get(InvoiceExecution, execution_id, with_for_update=True)
@@ -134,6 +171,13 @@ class Dispatcher:
                     )
                 )
                 if approval is not None:
+                    if (
+                        approval.voided_at is None
+                        and approval.consumed_at is not None
+                        and approval.action == decision.action
+                        and approval.reason == decision.reason
+                    ):
+                        return approval.approval_id
                     raise DecisionConflict("This operator already voted on the current gate")
                 approval = Approval(
                     approval_id=str(uuid4()),
@@ -167,7 +211,6 @@ class Dispatcher:
                     select(Approval)
                     .where(
                         Approval.execution_id == execution_id,
-                        Approval.voided_at.is_(None),
                         Approval.consumed_at.is_(None),
                     )
                     .order_by(Approval.created_at)
@@ -180,6 +223,8 @@ class Dispatcher:
         execution_id = approval.execution_id
         binding = _binding(approval)
         if snapshot.values.get("resume_receipts", {}).get(approval.approval_id) != binding:
+            if approval.voided_at is not None:
+                return
             try:
                 interrupt, checkpoint = _pending(snapshot, execution_id)
             except DecisionConflict:
@@ -191,35 +236,50 @@ class Dispatcher:
             ):
                 await self._void(approval, "Pending checkpoint changed")
                 raise DecisionConflict("Case changed; review again")
-            if checkpoint != approval.resume_checkpoint_id:
-                original_config = await self._config(execution_id)
-                original_config["configurable"]["checkpoint_id"] = approval.resume_checkpoint_id
-                original = await self.graph.aget_state(original_config)
-                try:
-                    original_interrupt, _ = _pending(original, execution_id)
-                except DecisionConflict:
-                    await self._void(approval, "Original checkpoint unavailable")
-                    raise
-                if original_interrupt.id != interrupt.id:
-                    await self._void(approval, "Original interrupt changed")
-                    raise DecisionConflict("Case changed; review again")
+            ancestor = snapshot
+            while checkpoint != approval.resume_checkpoint_id:
+                if ancestor.parent_config is None:
+                    await self._void(approval, "Original checkpoint is not an ancestor")
+                    raise DecisionConflict("Case review lineage is unavailable")
+                ancestor = await self.graph.aget_state(ancestor.parent_config)
+                checkpoint = ancestor.config["configurable"]["checkpoint_id"]
+            try:
+                original_interrupt, _ = _pending(ancestor, execution_id)
+            except DecisionConflict:
+                await self._void(approval, "Original checkpoint unavailable")
+                raise
+            if (
+                original_interrupt.id != interrupt.id
+                or ancestor.tasks[0].id != snapshot.tasks[0].id
+                or original_interrupt.value["gate_hash"] != approval.gate_hash
+            ):
+                await self._void(approval, "Original interrupt changed")
+                raise DecisionConflict("Case changed; review again")
             config = await self._config(execution_id)
             config["configurable"]["resume_binding"] = binding
             try:
                 await self.graph.ainvoke(
                     Command(resume=approval.approval_id), config, durability="sync"
                 )
-            except ValueError:
+            except ResumeRejected:
+                await self._void(
+                    approval, "Graph rejected pending approval; manual review required"
+                )
+                raise DecisionConflict("Case requires manual review") from None
+            except Exception:
                 latest = await self.snapshot(execution_id)
-                if latest.values.get("resume_receipts", {}).get(approval.approval_id) != binding:
-                    await self._void(approval, "Graph rejected pending approval")
-                    raise DecisionConflict("Case requires manual review") from None
+                if latest.values.get("resume_receipts", {}).get(approval.approval_id) == binding:
+                    await self._consume(approval)
+                raise
             snapshot = await self.snapshot(execution_id)
         if snapshot.values.get("resume_receipts", {}).get(approval.approval_id) != binding:
             raise DispatchUnavailable("Approval receipt is unavailable")
+        await self._consume(approval)
+
+    async def _consume(self, approval):
         async with self.sessions.begin() as session:
             current = await session.get(Approval, approval.approval_id, with_for_update=True)
-            if current.consumed_at is None:
+            if current is not None and current.consumed_at is None:
                 current.consumed_at = datetime.now(UTC)
 
     async def _void(self, approval, reason):

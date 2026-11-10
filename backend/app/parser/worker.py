@@ -21,15 +21,25 @@ def restrict() -> None:
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
     class Filter(ctypes.Structure):
-        _fields_ = [("code", ctypes.c_ushort), ("jt", ctypes.c_ubyte),
-                    ("jf", ctypes.c_ubyte), ("k", ctypes.c_uint)]
+        _fields_ = [
+            ("code", ctypes.c_ushort),
+            ("jt", ctypes.c_ubyte),
+            ("jf", ctypes.c_ubyte),
+            ("k", ctypes.c_uint),
+        ]
 
     class Program(ctypes.Structure):
         _fields_ = [("length", ctypes.c_ushort), ("filters", ctypes.POINTER(Filter))]
 
     # Check the syscall ABI before numbers; reject x32 and networking/io_uring syscalls.
-    rules = [(0x20, 0, 0, 4), (0x15, 1, 0, 0xC000003E), (0x06, 0, 0, 0x80000000),
-             (0x20, 0, 0, 0), (0x35, 0, 1, 0x40000000), (0x06, 0, 0, 0x80000000)]
+    rules = [
+        (0x20, 0, 0, 4),
+        (0x15, 1, 0, 0xC000003E),
+        (0x06, 0, 0, 0x80000000),
+        (0x20, 0, 0, 0),
+        (0x35, 0, 1, 0x40000000),
+        (0x06, 0, 0, 0x80000000),
+    ]
     for syscall in (*range(41, 56), 288, 299, 307, 425):
         rules.extend([(0x15, 0, 1, syscall), (0x06, 0, 0, 0x00050000 | errno.EPERM)])
     rules.append((0x06, 0, 0, 0x7FFF0000))

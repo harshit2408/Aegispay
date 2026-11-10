@@ -33,10 +33,19 @@ def _parse(pdf: bytes, detector: bool) -> ParsedDocument:
         with tempfile.TemporaryDirectory(prefix="aegis-parser-") as directory:
             with tempfile.TemporaryFile() as output:
                 result = subprocess.run(
-                    [sys.executable, "-I", str(Path(__file__).with_name("worker.py")),
-                     "on" if detector else "off"],
-                    input=pdf, stdout=output, stderr=subprocess.DEVNULL,
-                    env={}, cwd=directory, timeout=15, check=False,
+                    [
+                        sys.executable,
+                        "-I",
+                        str(Path(__file__).with_name("worker.py")),
+                        "on" if detector else "off",
+                    ],
+                    input=pdf,
+                    stdout=output,
+                    stderr=subprocess.DEVNULL,
+                    env={},
+                    cwd=directory,
+                    timeout=15,
+                    check=False,
                 )
                 if result.returncode:
                     raise ParseUnavailable("PDF parsing failed closed")

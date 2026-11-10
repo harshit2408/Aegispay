@@ -40,7 +40,7 @@ def _failed_gate(state: GraphState, reason: str) -> GateDecision:
         payable_cents=0,
         reasons=[reason],
         required_approvals=99,
-        allowed_actions=[],
+        allowed_actions=["REJECT"],
         policy_id=state["policy_id"],
         policy_version=state["policy_version"],
         gate_hash=_hash(
@@ -250,6 +250,46 @@ def build_graph(
                     type(exc).__name__,
                 )
                 gate = _failed_gate(state, "GATE_UNAVAILABLE")
+        if gate.route == "FREEZE" and gate.required_approvals == 99:
+            async with sessions() as session:
+                rejected = (
+                    await session.execute(
+                        select(Approval)
+                        .join(Operator, Operator.operator_id == Approval.actor)
+                        .join(
+                            InvoiceExecution, InvoiceExecution.execution_id == Approval.execution_id
+                        )
+                        .join(
+                            InvoiceDocument,
+                            InvoiceDocument.document_id == InvoiceExecution.document_id,
+                        )
+                        .where(
+                            Approval.execution_id == state["execution_id"],
+                            Approval.gate_hash == gate.gate_hash,
+                            Approval.action == "REJECT",
+                            Approval.voided_at.is_(None),
+                            Operator.disabled.is_(False),
+                            Operator.role.in_(("controller", "cfo")),
+                            Operator.operator_id != InvoiceDocument.uploaded_by,
+                        )
+                    )
+                ).scalars()
+                for vote in rejected:
+                    binding = {
+                        "execution_id": vote.execution_id,
+                        "checkpoint_id": vote.resume_checkpoint_id,
+                        "interrupt_id": vote.resume_interrupt_id,
+                        "gate_hash": vote.gate_hash,
+                    }
+                    if state.get("resume_receipts", {}).get(vote.approval_id) == binding:
+                        gate = gate.model_copy(
+                            update={
+                                "route": "REJECTED",
+                                "required_approvals": 0,
+                                "allowed_actions": [],
+                            }
+                        )
+                        break
         if gate.route == "FREEZE":
             await persist_result(state, gate, "FROZEN")
         return {"gate": gate}

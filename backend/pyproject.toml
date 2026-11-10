@@ -9,7 +9,10 @@ description = "AegisPay backend: zero-trust agentic payables on PayPal"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi",
+    "starlette",
+    "langchain-core",
     "python-multipart>=0.0.22,<1",
+    "reportlab>=4",
     "uvicorn[standard]",
     "pydantic-settings",
     "pydantic>=2",
@@ -42,7 +45,6 @@ dev = [
     "respx",
     "aiosqlite",
     "ruff",
-    "reportlab>=4",
 ]
 
 [tool.setuptools.packages.find]

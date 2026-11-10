@@ -8,19 +8,28 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from sqlalchemy import or_, select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.cors import CORSMiddleware
 
 from app.agents.provider import mandate_completion, postgres_dsn
 from app.config import get_settings
 from app.db import get_session, get_sessionmaker
-from app.models.payables import Approval, InvoiceExecution
 from app.paypal.client import PayPalClient
-from app.paypal.invoicing import Invoicing
-from app.routers import auth, contracts, documents, grns, mandates, ops, stream, vendors, webhooks
+from app.routers import (
+    auth,
+    contracts,
+    demo,
+    documents,
+    grns,
+    mandates,
+    ops,
+    stream,
+    vendors,
+    webhooks,
+)
 from app.service_security import validate_database_role, validate_service_environment
-from app.vendor_sim.gateway import VendorReader
+from app.vendor_sim.gateway import Invoicing, VendorReader
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +87,16 @@ async def lifespan(app: FastAPI):
                     "vendor_new_days": settings.vendor_new_days,
                     "max_vendor_invoices": settings.org_hard_max_invoices_per_vendor_per_day,
                 }
+                from app.demo.runtime import ReplayReader
+
                 graph = build_graph(
                     saver,
                     sessions=sessions,
                     analyze=build_analyzer(sessions, settings),
                     reader=reader,
+                    replay_reader=ReplayReader(sessions, settings.storage_path)
+                    if settings.demo_replay_mode
+                    else None,
                     transition=apply,
                     approve=partial(approve_for_payment, sessions, apply, reserve, **gate_settings),
                     **gate_settings,
@@ -97,28 +111,8 @@ async def lifespan(app: FastAPI):
                     except Exception:
                         logger.exception("case dispatch stopped execution_id=%s", execution_id)
 
-                async def recover():
-                    async with sessions() as session:
-                        cases = (
-                            await session.scalars(
-                                select(InvoiceExecution.execution_id).where(
-                                    or_(
-                                        InvoiceExecution.status.in_(("RECEIVED", "ANALYZING")),
-                                        InvoiceExecution.execution_id.in_(
-                                            select(Approval.execution_id).where(
-                                                Approval.voided_at.is_(None),
-                                                Approval.consumed_at.is_(None),
-                                            )
-                                        ),
-                                    )
-                                )
-                            )
-                        ).all()
-                    for execution_id in cases:
-                        await run_case(execution_id)
-
                 app.state.run_case = run_case
-                recovery = asyncio.create_task(recover())
+                recovery = asyncio.create_task(dispatcher.recover_startup(run_case))
             else:
                 recovery = None
             try:
@@ -180,7 +174,7 @@ class ConfiguredCORS:
 app = FastAPI(title="AegisPay API", lifespan=lifespan)
 app.add_middleware(RequestLimits)
 app.add_middleware(ConfiguredCORS)
-for router in (auth, contracts, documents, grns, mandates, ops, stream, vendors, webhooks):
+for router in (auth, contracts, demo, documents, grns, mandates, ops, stream, vendors, webhooks):
     app.include_router(router.router)
 app.include_router(webhooks.simulator_router)
 

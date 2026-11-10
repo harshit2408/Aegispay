@@ -17,6 +17,9 @@ class EventStreamResponse(StreamingResponse):
     media_type = "text/event-stream"
 
 
+HEARTBEAT_SECONDS = 15
+
+
 router = APIRouter(prefix="/api", tags=["stream"], dependencies=[Depends(require_operator)])
 
 
@@ -31,11 +34,14 @@ async def execution_stream(request: Request):
     token = token_hash(request.cookies[COOKIE])
 
     async def events():
-        # Short leases force reconnects after identity changes and bound idle DB connections.
+        # Heartbeats retain the connection while periodically rechecking idle sessions.
         async with await AsyncConnection.connect(state.runtime_dsn, autocommit=True) as conn:
             await conn.execute("LISTEN aegis_status")
             yield ": connected\n\n"
-            async for notification in conn.notifies(timeout=20):
+            while not await request.is_disconnected():
+                notification = None
+                async for pending in conn.notifies(timeout=HEARTBEAT_SECONDS, stop_after=1):
+                    notification = pending
                 async with state.sessions() as session:
                     login = await session.get(OperatorSession, token)
                     operator = await session.get(Operator, login.operator_id) if login else None
@@ -47,6 +53,9 @@ async def execution_stream(request: Request):
                     or utc(login.last_seen_at) + IDLE_TTL <= now
                 ):
                     return
+                if notification is None:
+                    yield ": keepalive\n\n"
+                    continue
                 try:
                     event = StreamEvent.model_validate_json(notification.payload)
                 except ValidationError:

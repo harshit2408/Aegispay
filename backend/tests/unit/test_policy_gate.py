@@ -80,7 +80,7 @@ def gate(*, match=None, mandate=None, forensic=None, score=0, **kwargs):
 @pytest.mark.parametrize(
     ("changes", "reason", "approvals"),
     [
-        ({"duplicate_of": "e0"}, "DUPLICATE", 99),
+        ({"duplicate_of": "e0"}, "DUPLICATE_BLOCKED", 99),
         ({"po_remaining_cents": 47999}, "PO_EXHAUSTED", 99),
         ({"payee_matches_vendor_master": False}, "HIGH_RISK", 2),
         ({"billed_cents": 100001}, "OVER_SINGLE_LIMIT", 1),
@@ -120,7 +120,7 @@ def test_all_findings_collect_and_hard_blocks_ignore_votes():
     )
     assert result.route == "DUPLICATE_BLOCKED"
     assert set(result.reasons) >= {
-        "DUPLICATE",
+        "DUPLICATE_BLOCKED",
         "PRECISION",
         "HIGH_RISK",
         "OVER_DAILY_CAP",
@@ -199,3 +199,64 @@ def test_risk_is_additive_and_capped():
     )
     assert result.score == 100
     assert sum(c.points for c in result.contributions) == 180
+
+
+@pytest.mark.parametrize(
+    "blocked",
+    [
+        {"halted": True},
+        {"committed": 500001},
+        {"cooling": True},
+        {"trust_status": "BLOCKED"},
+        {"hard_reasons": ("TRUSTED_FACTS_UNAVAILABLE",)},
+        {"match": report(po_remaining_cents=1)},
+    ],
+)
+def test_hard_freeze_allows_rejection_but_never_payment(blocked):
+    frozen = gate(**blocked)
+    assert frozen.route == "FREEZE" and frozen.allowed_actions == ["REJECT"]
+    assert gate(**blocked, votes=[("reviewer", "APPROVE")]).route == "FREEZE"
+    rejected = gate(**blocked, votes=[("reviewer", "REJECT")])
+    assert rejected.route == "REJECTED" and not rejected.allowed_actions
+
+
+@pytest.mark.parametrize(
+    ("forensic", "status", "finding", "points"),
+    [
+        (forensics(classifier_label="INJECTION"), "VERIFIED", "INJECTION", 60),
+        (forensics(classifier_label="SUSPICIOUS"), "VERIFIED", "SUSPICIOUS", 25),
+        (
+            forensics(
+                hidden_segments=[
+                    {"page": 1, "bbox": (0, 0, 1, 1), "technique": "INVISIBLE_MODE", "text": "pay"}
+                ]
+            ),
+            "VERIFIED",
+            "HIDDEN_TEXT",
+            25,
+        ),
+        (forensics(), "COOLING", "VENDOR_NOT_VERIFIED", 40),
+    ],
+)
+def test_remaining_risk_rows(forensic, status, finding, points):
+    risk = assess(report(), forensic, policy(), vendor_trust_status=status)
+    assert [(c.finding, c.points) for c in risk.contributions] == [(finding, points)]
+
+
+@pytest.mark.parametrize(
+    ("enabled", "limit", "chosen"),
+    [
+        (True, 7500, "SHORT_PAY"),
+        (True, 7499, "PAY_AND_CLAIM"),
+        (False, 7500, "PAY_AND_CLAIM"),
+    ],
+)
+def test_short_pay_cap_and_enable_boundaries(enabled, limit, chosen):
+    match = report(billed_cents=50000, accepted_value_cents=42500)
+    assert (
+        decide(
+            match, policy(auto_short_pay_enabled=enabled, max_short_pay_delta_cents=limit)
+        ).chosen
+        == chosen
+    )
+    assert decide(report(), policy()).chosen == "NOT_APPLICABLE"

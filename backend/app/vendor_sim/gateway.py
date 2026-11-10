@@ -7,7 +7,17 @@ write credentials exist (settlement, demo seeder); it is never reachable from an
 
 from datetime import date
 
-from app.paypal.invoicing import Invoice, InvoiceSpec, Invoicing
+from app.paypal.invoicing import OPEN_STATUSES, Invoice, InvoiceItem, InvoiceSpec, Invoicing
+
+__all__ = [
+    "OPEN_STATUSES",
+    "Invoice",
+    "InvoiceItem",
+    "InvoiceSpec",
+    "Invoicing",
+    "VendorReader",
+    "VendorGateway",
+]
 
 
 class VendorReader:

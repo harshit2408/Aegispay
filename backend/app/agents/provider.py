@@ -49,9 +49,13 @@ class DurableDispatch:
                 response = client.post(
                     "https://api.openai.com/v1/chat/completions",
                     headers={"Authorization": "Bearer " + self.api_key},
-                    json={"model": model, "messages": messages,
-                          "max_completion_tokens": max_output_tokens, "store": False,
-                          "service_tier": "default"},
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "max_completion_tokens": max_output_tokens,
+                        "store": False,
+                        "service_tier": "default",
+                    },
                 )
                 response.raise_for_status()
                 body = response.json()
@@ -59,13 +63,20 @@ class DurableDispatch:
             message = choice["message"]
             if choice["finish_reason"] != "stop" or message.get("tool_calls"):
                 raise ValueError("incomplete or tool-bearing response")
-            tokens = (usage["prompt_tokens"], usage["completion_tokens"],
-                      usage.get("prompt_tokens_details", {}).get("cached_tokens", 0),
-                      usage.get("completion_tokens_details", {}).get("reasoning_tokens", 0))
-            if (any(type(n) is not int or n < 0 for n in tokens) or
-                not 0 < tokens[0] <= bound or tokens[1] > max_output_tokens or
-                tokens[2] > tokens[0] or tokens[3] > tokens[1] or
-                not isinstance(message.get("content"), str)):
+            tokens = (
+                usage["prompt_tokens"],
+                usage["completion_tokens"],
+                usage.get("prompt_tokens_details", {}).get("cached_tokens", 0),
+                usage.get("completion_tokens_details", {}).get("reasoning_tokens", 0),
+            )
+            if (
+                any(type(n) is not int or n < 0 for n in tokens)
+                or not 0 < tokens[0] <= bound
+                or tokens[1] > max_output_tokens
+                or tokens[2] > tokens[0]
+                or tokens[3] > tokens[1]
+                or not isinstance(message.get("content"), str)
+            ):
                 raise ValueError("invalid usage")
             actual = 2 * tokens[0] + 10 * tokens[1]
             with psycopg.connect(self.dsn, connect_timeout=5) as connection:
@@ -74,9 +85,13 @@ class DurableDispatch:
                        halted=FALSE WHERE run_id=%s AND requests=%s AND halted""",
                     (reserve - actual, self.run_id, admitted[0]),
                 )
-            return ModelResponse(content=message["content"], input_tokens=tokens[0],
-                                 output_tokens=tokens[1], cached_tokens=tokens[2],
-                                 reasoning_tokens=tokens[3])
+            return ModelResponse(
+                content=message["content"],
+                input_tokens=tokens[0],
+                output_tokens=tokens[1],
+                cached_tokens=tokens[2],
+                reasoning_tokens=tokens[3],
+            )
         except Exception:
             raise ProviderUnavailable("provider request failed closed") from None
 
@@ -84,13 +99,16 @@ class DurableDispatch:
 def governed_analysis(run_id: UUID, *, settings, action):
     """Run all initial invoice calls in one owning thread and one TokenOps scope."""
     dispatch = DurableDispatch(
-        run_id=run_id, database_url=settings.database_url,
+        run_id=run_id,
+        database_url=settings.database_url,
         api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else "",
     )
     with invoice_run(run_id, dispatch=dispatch) as run:
+
         def complete(node, messages, *, input_token_bound):
             dispatch.input_token_bound = input_token_bound
             return run.complete(node, messages, input_token_bound=input_token_bound)
+
         return action(complete)
 
 
@@ -98,10 +116,12 @@ def mandate_completion(settings):
     def complete(node, messages, *, input_token_bound):
         run_id = uuid4()
         dispatch = DurableDispatch(
-            run_id=run_id, database_url=settings.database_url,
+            run_id=run_id,
+            database_url=settings.database_url,
             api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else "",
         )
         dispatch.input_token_bound = input_token_bound
         with mandate_run(run_id, dispatch=dispatch) as run:
             return run.complete(node, messages, input_token_bound=input_token_bound)
+
     return complete
