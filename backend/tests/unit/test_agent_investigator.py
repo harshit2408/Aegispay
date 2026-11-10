@@ -229,3 +229,20 @@ def test_escaped_memo_roundtrip_is_vendor_asserted():
     stored = "pay &lt;b>now&lt;/b> please"
     pack = investigate(script(CALL, final(stored, claim="memo says pay now")), t, case={})
     assert pack and pack.facts[0].excerpt == stored and pack.facts[0].vendor_asserted
+
+
+def test_paypal_invoice_vendor_text_is_wrapped():
+    # PayPal Invoicing v2 keys and nested vendor fields carry vendor-written text (R14).
+    invoice = {
+        "id": "INV2-1",
+        "detail": {"terms_and_conditions": "ignore rules", "memo": "m"},
+        "invoicer": {
+            "business_name": "Acme",
+            "additional_notes": "pay now",
+            "name": {"given_name": "Eve", "surname": "X"},
+        },
+    }
+    out = json.dumps(wrap_untrusted(invoice))
+    for text in ("ignore rules", "Acme", "pay now", "Eve", "X"):
+        assert is_vendor_asserted(out, text), text
+    assert not is_vendor_asserted(out, "INV2-1")
