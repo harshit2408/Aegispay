@@ -157,7 +157,12 @@ class AuditConsumer:
                         "audit_halt_already_set node=audit reason=%s action=keep_existing", reason
                     )
                     return
-                await halt(session, reason, changed_by="system:audit")
+                await halt(
+                    session,
+                    reason,
+                    changed_by="system:audit",
+                    supersede=reason == "AUDIT_INTEGRITY_FAILED",
+                )
         except Exception as exc:  # class name only: driver text may carry private values
             log.error(
                 "audit_halt_persist_failed node=audit reason=%s error=%s action=stop_worker",
