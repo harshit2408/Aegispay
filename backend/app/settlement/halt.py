@@ -16,14 +16,18 @@ async def is_halted(session: AsyncSession) -> bool:
 
 
 async def halt(session: AsyncSession, reason: str, changed_by: str = "system") -> None:
-    await session.execute(
+    """Idempotent: an existing halt keeps its first reason/actor and raises no new alert."""
+    changed = await session.scalar(
         update(SettlementControl)
-        .where(SettlementControl.id)
+        .where(SettlementControl.id, SettlementControl.halted.is_(False))
         .values(
             halted=True, halted_reason=reason[:200], changed_by=changed_by, changed_at=func.now()
         )
+        .returning(SettlementControl.id)
     )
+    log.error("SETTLEMENT_HALT reason_code=%s", reason[:200])
+    if changed is None:
+        return
     from app.ops.alerts import enqueue_alert
 
     await enqueue_alert(session, "HALT")
-    log.error("SETTLEMENT_HALT reason_code=%s", reason[:200])

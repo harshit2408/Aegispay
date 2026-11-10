@@ -97,6 +97,8 @@ async def login(body: LoginRequest, request: Request, response: Response, sessio
         if operator is not None and not (
             operator.locked_until and utc(operator.locked_until) > now
         ):
+            if operator.locked_until:  # expired lock: start a fresh count, not a 1-strike relock
+                operator.failed_logins, operator.locked_until = 0, None
             operator.failed_logins += 1
             if operator.failed_logins >= 5:
                 operator.locked_until = now + timedelta(minutes=15)

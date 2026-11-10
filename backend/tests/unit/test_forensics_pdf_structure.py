@@ -4,7 +4,7 @@ import io
 
 import pytest
 from pypdf import PdfReader, PdfWriter
-from pypdf.generic import DictionaryObject, NameObject, TextStringObject
+from pypdf.generic import ArrayObject, DictionaryObject, NameObject, TextStringObject
 from reportlab.lib.colors import white
 from reportlab.pdfgen import canvas
 
@@ -109,14 +109,25 @@ def test_metadata_custom_key():
     assert _techniques(out.getvalue()) == {"METADATA": SECRET}
 
 
-def test_embedded_javascript():
+@pytest.mark.parametrize("open_action", [False, True])
+def test_embedded_javascript(open_action):
     w = PdfWriter(clone_from=PdfReader(io.BytesIO(_pdf(lambda c: None))))
-    w.root_object[NameObject("/OpenAction")] = DictionaryObject(
+    # Document-level JavaScript name tree, built by hand: PdfWriter.add_js was removed in pypdf 7.
+    action = DictionaryObject(
         {
             NameObject("/S"): NameObject("/JavaScript"),
             NameObject("/JS"): TextStringObject("app.alert(1)"),
         }
     )
+    if open_action:
+        w.root_object[NameObject("/OpenAction")] = action
+    else:
+        js_tree = DictionaryObject(
+            {NameObject("/Names"): ArrayObject([TextStringObject("js"), w._add_object(action)])}
+        )
+        w.root_object[NameObject("/Names")] = DictionaryObject(
+            {NameObject("/JavaScript"): w._add_object(js_tree)}
+        )
     out = io.BytesIO()
     w.write(out)
     assert "METADATA" in _techniques(out.getvalue())

@@ -206,6 +206,34 @@ async def test_ops_role_and_alert_outbox(controls, pg_sessionmaker):
         assert (await session.scalar(select(OpsAlert))).event == "HALT"
 
 
+async def test_admin_can_halt_but_only_cfo_resumes(controls, pg_sessionmaker):
+    _, client, identity = controls
+    identity["id"] = "op-adm"
+    body = {"reason": "Investigating incident"}
+    assert (
+        await client.post("/api/ops/settlement-halt", json=body | {"halted": True})
+    ).status_code == 200
+    assert (
+        await client.post("/api/ops/settlement-halt", json=body | {"halted": False})
+    ).status_code == 403
+    identity["id"] = "op-cfo"
+    assert (
+        await client.post("/api/ops/settlement-halt", json=body | {"halted": False})
+    ).status_code == 200
+
+
+async def test_repeated_system_halt_keeps_first_reason_and_alerts_once(controls, pg_sessionmaker):
+    from app.settlement.halt import halt
+
+    for reason in ("VELOCITY_BREAKER", "VENDOR_CHANGE_CONFLICT", "VELOCITY_BREAKER"):
+        async with pg_sessionmaker() as session, session.begin():
+            await halt(session, reason)
+    async with pg_sessionmaker() as session:
+        control = await session.get(SettlementControl, True)
+        assert control.halted and control.halted_reason == "VELOCITY_BREAKER"
+        assert len((await session.scalars(select(OpsAlert))).all()) == 1
+
+
 async def test_runtime_api_has_no_vendor_master_write_grant(controls, pg_sessionmaker):
     async with pg_sessionmaker() as session:
         assert not await session.scalar(

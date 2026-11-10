@@ -28,6 +28,9 @@ async def set_halt(
     session: Annotated[AsyncSession, Depends(get_session)],
     actor: Annotated[Operator, Depends(roles("cfo", "admin"))],
 ):
+    if not body.halted and actor.role != "cfo":
+        # R18: admin may halt in an emergency, but only the CFO resumes payouts.
+        raise HTTPException(403, "only cfo can resume settlement")
     row = await session.get(SettlementControl, True, with_for_update=True)
     if row is None:
         raise HTTPException(503, "settlement controls unavailable")
