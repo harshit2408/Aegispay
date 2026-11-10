@@ -71,6 +71,12 @@ def test_one_in_prose_is_allowed():
         "See https://evil.example/pay for {delta}.",  # url
         "See www.evil.example for {delta}.",
         "Mail pay@evil.example about {delta}.",  # email
+        "We withhold {delta} and ²⁰ more.",  # superscript digits (No)
+        "We withhold {delta} and ½ more.",  # vulgar fraction (No)
+        "We withhold {delta} and Ⅻ more.",  # roman numeral (Nl)
+        "We withhold {delta} and ٥ more.",  # Arabic-Indic digit (Nd)
+        "We withhold {delta} plus ５％.",  # fullwidth digit and percent
+        "See evil-pay.example/claim for {delta}.",  # bare domain, no scheme
     ],
 )
 def test_bad_output_falls_back(bad):
