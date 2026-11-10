@@ -250,3 +250,42 @@ async def test_runtime_roles_can_do_their_assigned_work(pg_sessionmaker):
         await po_ledger.release(s, reserve_entry_id=goods)
         assert await po_ledger.committed_cents(s, "PO-1042") == 0
         await s.execute(text("DELETE FROM audit_queue"))
+
+
+async def test_api_role_cannot_insert_a_precooled_vendor_change(pg_sessionmaker):
+    """R15/R22: a compromised API cannot back-date a change past the 72h cooling."""
+    await history(pg_sessionmaker)
+    async with pg_sessionmaker() as s, s.begin():
+        await s.execute(text("UPDATE vendor_master_changes SET status='REJECTED'"))
+    with pytest.raises(IntegrityError):
+        async with pg_sessionmaker() as s, s.begin():
+            await s.execute(text("SET LOCAL ROLE aegis_api_role"))
+            await s.execute(
+                text(
+                    "INSERT INTO vendor_master_changes(change_id,vendor_id,old_values,new_values,"
+                    "requested_by,approved_by,approved_at,effective_at,status,created_at) "
+                    "VALUES('c2','v1','{}','{}','op-va','op-cfo',now()-interval '73 hours',"
+                    "now()-interval '1 hour','COOLING',now()-interval '80 hours')"
+                )
+            )
+
+
+async def test_api_role_vendor_change_times_come_from_the_server_clock(pg_sessionmaker):
+    await history(pg_sessionmaker)
+    async with pg_sessionmaker() as s, s.begin():
+        await s.execute(text("SET LOCAL ROLE aegis_api_role"))
+        await s.execute(
+            text(
+                "UPDATE vendor_master_changes SET status='COOLING', approved_by='op-cfo', "
+                "approved_at=now()-interval '80 hours', effective_at=now()-interval '1 hour'"
+            )
+        )
+        row = (
+            await s.execute(
+                text(
+                    "SELECT approved_at=now(), effective_at>=now()+interval '72 hours' "
+                    "FROM vendor_master_changes"
+                )
+            )
+        ).one()
+    assert tuple(row) == (True, True)
