@@ -90,7 +90,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P2-10** @A `decision/graph.py` topology + `human_review` `interrupt()` + resume via `Command`; Postgres checkpointer — b4e4f5f (integration f7fbb54)
 - [x] **P2-11** @A Property tests (hypothesis): receiver ∈ vendor master; paid ≤ accepted value; Σ reservations ≤ cap — b4e4f5f (integration f7fbb54)
 - [x] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) — b4e4f5f (integration f7fbb54)
-- [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP B) (PARTIAL: authenticated replay routes verified b4e4f5f; live reset owner orchestration and full PRD health probes remain)
+- [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP A, taken over from B) (PARTIAL: authenticated replay routes verified b4e4f5f; live reset owner orchestration and full PRD health probes remain)
 - [x] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution — f7fbb54
 - [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP B) (PARTIAL: local replay S1–S4 and first EVAL numbers b4e4f5f; real sandbox payout/invoice acceptance and browser S1–S4 remain)
 - [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — 55b2f38
@@ -119,8 +119,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-10** @B Custom dark theme shared by Studio and the app
 - [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework
 - [ ] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance)
-- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP B)
-- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP B)
+- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
+- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
 - [ ] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24)
 - [ ] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6)
 
