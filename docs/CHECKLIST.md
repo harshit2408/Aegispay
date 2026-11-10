@@ -86,23 +86,23 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9) — f74a700
 - [x] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed — 5b8986c
 - [x] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00) — 5b8986c
-- [ ] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests (WIP B)
-- [ ] **P2-10** @A `decision/graph.py` topology + `human_review` `interrupt()` + resume via `Command`; Postgres checkpointer (WIP B)
-- [ ] **P2-11** @A Property tests (hypothesis): receiver ∈ vendor master; paid ≤ accepted value; Σ reservations ≤ cap (WIP B)
-- [ ] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) (WIP B)
-- [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP B)
+- [x] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests — b4e4f5f (integration f7fbb54)
+- [x] **P2-10** @A `decision/graph.py` topology + `human_review` `interrupt()` + resume via `Command`; Postgres checkpointer — b4e4f5f (integration f7fbb54)
+- [x] **P2-11** @A Property tests (hypothesis): receiver ∈ vendor master; paid ≤ accepted value; Σ reservations ≤ cap — b4e4f5f (integration f7fbb54)
+- [x] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) — b4e4f5f (integration f7fbb54)
+- [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP B) (PARTIAL: authenticated replay routes verified b4e4f5f; live reset owner orchestration and full PRD health probes remain)
 - [x] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution — f7fbb54
-- [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP B)
+- [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP B) (PARTIAL: local replay S1–S4 and first EVAL numbers b4e4f5f; real sandbox payout/invoice acceptance and browser S1–S4 remain)
 - [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — 55b2f38
 - [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — 55b2f38
 - [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — 55b2f38
 - [x] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required — f7fbb54
 - [x] **P2-20** @B Mandate studio: compile → diff → activate — f7fbb54
-- [ ] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s (WIP B) (BLOCKED: credentialed client and strict event contract implemented in cbc9a27; authenticated server stream P2-13/P3-13 and actual ≤1 s measurement remain)
-- [ ] **P2-22** @A `routers/vendors.py`: payee change request → second approver → cooling → effective; alerts (R15) (WIP B)
-- [ ] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16) (WIP B)
-- [ ] **P2-24** @A Gate G11–G14, approvals bound to `gate_hash`, resume by `approval_id` only, distinct-human count inside the gate (R11) (WIP B)
-- [ ] **P2-25** @A `SETTLEMENT_HALT`, velocity breaker, `ops/alerts.py` (R23) (WIP B)
+- [x] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s — b4e4f5f (authenticated TCP SSE commit-to-HTTP 33.4 ms locally; frontend credentialed client in cbc9a27)
+- [x] **P2-22** @A `routers/vendors.py`: payee change request → second approver → cooling → effective; alerts (R15) — b4e4f5f (integration f7fbb54)
+- [x] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16) — b4e4f5f (integration f7fbb54)
+- [x] **P2-24** @A Gate G11–G14, approvals bound to `gate_hash`, resume by `approval_id` only, distinct-human count inside the gate (R11) — b4e4f5f (integration f7fbb54)
+- [x] **P2-25** @A `SETTLEMENT_HALT`, velocity breaker, `ops/alerts.py` (R23) — b4e4f5f (integration f7fbb54)
 - [x] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21) — cbc9a27; PR #33 review corrections f2f2735 (local PostgreSQL/Git verification; hosted publication and authenticated HTTP export remain deployment/integration work)
 
 ## P3 — Agents, auth, deploy (Nov 3–6) · exit: **hosted S1–S4 green on Render**; rough-cut video Nov 5
