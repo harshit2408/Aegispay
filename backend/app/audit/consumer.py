@@ -31,6 +31,23 @@ TRANSIENT_WINDOW_SECONDS = 300
 _TRANSIENT_SQLSTATES = {"55P03", "57014"}  # lock_not_available, query_canceled (statement timeout)
 
 
+class StaleAnchor(AuditIntegrityError):
+    """Receipt is ahead of / missing from the remote snapshot: a lagging read, not proven tamper.
+
+    Tamper (HMAC/prefix mismatch) stays a plain AuditIntegrityError and halts at once.
+    """
+
+
+def is_anchor_outage(exc: BaseException) -> bool:
+    """One policy (runtime and startup): retry, halt only after TRANSIENT_WINDOW_SECONDS.
+
+    AnchorConflict is a publication race against a reachable remote: retried, never halted.
+    """
+    return isinstance(exc, StaleAnchor) or (
+        isinstance(exc, AnchorUnavailable) and not isinstance(exc, AnchorConflict)
+    )
+
+
 def is_transient(exc: BaseException) -> bool:
     if isinstance(exc, TimeoutError):
         return True
@@ -65,7 +82,7 @@ async def _verify_rows(session, *, key: bytes, snapshot: Snapshot, rows) -> None
         or receipt.external_ref not in snapshot.commits
         or receipt.event_seq > checkpoint.event_seq
     ):
-        raise AuditIntegrityError("external audit history regressed or disappeared")
+        raise StaleAnchor("external audit history regressed or disappeared")
     if checkpoint:
         prefix = [row for row in rows if row.event_seq <= checkpoint.event_seq]
         if (prefix[-1].event_seq if prefix else 0) != checkpoint.event_seq:
@@ -116,6 +133,8 @@ class AuditConsumer:
                         raise
                     # Refetch after rollback: allow a stale remote view to catch up to receipts.
                     await asyncio.sleep(0.25 * (attempt + 1))
+        except StaleAnchor:
+            raise  # transient until the outage window expires; the loop owns the halt decision
         except AuditIntegrityError:
             await self.persist_halt("AUDIT_INTEGRITY_FAILED")
             raise
@@ -225,25 +244,37 @@ async def run_once_until_stopped(consumer: AuditConsumer, stop: asyncio.Event) -
         await asyncio.gather(drain, stopping, return_exceptions=True)
 
 
+async def _anchor_outage(consumer, exc: BaseException, since: float | None) -> float:
+    now = time.monotonic()
+    since = now if since is None else since
+    log.warning("audit_anchor_unavailable node=audit error=%s action=retry", type(exc).__name__)
+    if now - since >= TRANSIENT_WINDOW_SECONDS:
+        log.error("audit_anchor_unavailable node=audit action=stop_worker")
+        await consumer.persist_halt("AUDIT_ANCHOR_UNAVAILABLE")  # best-effort, never raises
+        raise exc
+    return since
+
+
 async def run_forever(consumer: AuditConsumer, stop: asyncio.Event) -> None:
     if consumer.anchors is None:
         log.warning("audit_external_anchor_disabled mode=HMAC_ONLY exports=unavailable")
     failures = 0
     transient_since: float | None = None
+    anchor_since: float | None = None
     while not stop.is_set():
         try:
             await run_once_until_stopped(consumer, stop)
-            failures, transient_since = 0, None
+            failures, transient_since, anchor_since = 0, None, None
+        except StaleAnchor as exc:
+            anchor_since = await _anchor_outage(consumer, exc, anchor_since)
         except AuditIntegrityError:
             # Kill the worker before more settlement work can run on a compromised history.
             log.error("audit_integrity_failed node=audit action=stop_worker")
             raise
         except AnchorConflict:
             log.warning("audit_anchor_conflict node=audit action=retry")
-        except AnchorUnavailable:
-            log.error("audit_anchor_unavailable node=audit action=stop_worker")
-            await consumer.persist_halt("AUDIT_ANCHOR_UNAVAILABLE")  # best-effort, never raises
-            raise
+        except AnchorUnavailable as exc:
+            anchor_since = await _anchor_outage(consumer, exc, anchor_since)
         except Exception as exc:
             # Class name only: drivers and credential helpers may include private values.
             transient = is_transient(exc)

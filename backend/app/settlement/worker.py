@@ -4,6 +4,7 @@ import asyncio
 import logging
 import shutil
 import signal
+import time
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -36,11 +37,24 @@ _transient = audit_consumer.is_transient
 
 async def _startup_drain(audit: AuditConsumer, stop: asyncio.Event) -> None:
     """Startup may race producer locks: retry a bounded number of times, then fail."""
-    for attempt in range(1, STARTUP_DRAIN_ATTEMPTS + 1):
+    attempt, outage_since = 0, None
+    while (attempt := attempt + 1) <= STARTUP_DRAIN_ATTEMPTS:
         try:
             await audit_consumer.run_once_until_stopped(audit, stop)
             return
         except Exception as exc:
+            if audit_consumer.is_anchor_outage(exc):
+                # Same bounded grace as runtime (docs/AUDIT.md); not counted as an attempt.
+                now = time.monotonic()
+                outage_since = now if outage_since is None else outage_since
+                if now - outage_since >= audit_consumer.TRANSIENT_WINDOW_SECONDS:
+                    raise
+                attempt -= 1
+                try:
+                    await asyncio.wait_for(stop.wait(), timeout=2)
+                    return
+                except TimeoutError:
+                    continue
             if not _transient(exc) or attempt == STARTUP_DRAIN_ATTEMPTS:
                 raise
             logging.getLogger("aegis.audit").warning(
@@ -108,7 +122,7 @@ async def run(stop: asyncio.Event | None = None) -> None:
         except AnchorConflict:
             # Repeated publication races may delay startup, but are not an integrity incident.
             raise
-        except AnchorUnavailable:
+        except (AnchorUnavailable, audit_consumer.StaleAnchor):
             logging.getLogger("aegis.audit").error(
                 "audit_anchor_unavailable node=audit action=stop_worker"
             )

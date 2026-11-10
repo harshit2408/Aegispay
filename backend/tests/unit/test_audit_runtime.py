@@ -25,7 +25,7 @@ from app.audit.anchor import (
     Snapshot,
     validate_remote,
 )
-from app.audit.consumer import AuditConsumer, run_forever
+from app.audit.consumer import AuditConsumer, StaleAnchor, run_forever
 from app.audit.events import AuditIntegrityError, enqueue_event, verify_chain
 from app.audit.export import export_events
 from app.config import SettlementSettings
@@ -522,15 +522,95 @@ async def test_truncation_and_remote_branch_regression_are_detected(pg_sessionma
     await queue(pg_sessionmaker, event="SETTLED")
     await worker.run_once(now=NOW + timedelta(minutes=1))
     git(anchors.remote, "update-ref", "refs/heads/audit-anchors", first.checkpoint.external_ref)
-    with pytest.raises(AuditIntegrityError, match="regressed"):
+    # Receipt ahead of the remote view is a StaleAnchor: no durable halt from run_once.
+    with pytest.raises(StaleAnchor, match="regressed"):
         await worker.run_once(now=NOW)
+    assert not (await rows(pg_sessionmaker, SettlementControl))[0].halted
+    git(anchors.remote, "update-ref", "-d", "refs/heads/audit-anchors")
+    with pytest.raises(StaleAnchor, match="disappeared"):
+        await worker.run_once(now=NOW)
+
+
+async def test_real_tamper_still_halts_immediately(pg_sessionmaker, anchors):
+    await queue(pg_sessionmaker)
+    worker = AuditConsumer(pg_sessionmaker, key=KEY, anchors=anchors)
+    await worker.run_once(now=NOW)
+    async with pg_sessionmaker() as session, session.begin():
+        await session.execute(text("ALTER TABLE execution_events DISABLE TRIGGER USER"))
+        await session.execute(text("UPDATE execution_events SET hash = repeat('0', 64)"))
+        await session.execute(text("ALTER TABLE execution_events ENABLE TRIGGER USER"))
+    with pytest.raises(AuditIntegrityError) as error:
+        await worker.run_once(now=NOW)
+    assert not isinstance(error.value, StaleAnchor)
     control = (await rows(pg_sessionmaker, SettlementControl))[0]
     assert control.halted and control.halted_reason == "AUDIT_INTEGRITY_FAILED"
-    assert control.changed_by == "system:audit"
-    # Remove the remote entirely while DB receipts still exist.
-    git(anchors.remote, "update-ref", "-d", "refs/heads/audit-anchors")
-    with pytest.raises(AuditIntegrityError, match="disappeared"):
-        await worker.run_once(now=NOW)
+
+
+async def test_stale_anchor_and_outage_retry_then_halt_after_window(monkeypatch):
+    halts, clock = [], [0.0]
+    monkeypatch.setattr(consumer_module.time, "monotonic", lambda: clock[0])
+    stop = asyncio.Event()
+
+    async def tick(delay):
+        clock[0] += consumer_module.TRANSIENT_WINDOW_SECONDS / 3
+        raise TimeoutError
+
+    async def no_wait(awaitable, timeout):
+        awaitable.close()
+        return await tick(timeout)
+
+    monkeypatch.setattr(consumer_module.asyncio, "wait_for", no_wait)
+    for error in (StaleAnchor("x"), AnchorUnavailable("x")):
+        halts.clear()
+        clock[0] = 0.0
+
+        class Down:
+            anchors = True
+            calls = 0
+            err = error
+
+            async def run_once(self):
+                self.calls += 1
+                raise self.err
+
+            async def persist_halt(self, reason):
+                halts.append(reason)
+
+        down = Down()
+        with pytest.raises(type(error)):
+            await run_forever(down, stop)
+        assert down.calls == 4 and halts == ["AUDIT_ANCHOR_UNAVAILABLE"]
+
+
+async def test_stale_anchor_recovery_resets_window(monkeypatch):
+    halts, clock = [], [0.0]
+    monkeypatch.setattr(consumer_module.time, "monotonic", lambda: clock[0])
+    stop = asyncio.Event()
+
+    async def no_wait(awaitable, timeout):
+        awaitable.close()
+        clock[0] += consumer_module.TRANSIENT_WINDOW_SECONDS - 1
+        raise TimeoutError
+
+    monkeypatch.setattr(consumer_module.asyncio, "wait_for", no_wait)
+
+    class Flaky:
+        anchors = True
+        calls = 0
+
+        async def run_once(self):
+            self.calls += 1
+            if self.calls in (1, 3):
+                raise StaleAnchor("x")
+            if self.calls == 4:
+                stop.set()
+            return 0
+
+        async def persist_halt(self, reason):
+            halts.append(reason)
+
+    await run_forever(Flaky(), stop)
+    assert halts == []
 
 
 async def test_stale_remote_reads_recover_before_durable_halt(
@@ -704,7 +784,7 @@ async def test_anchor_absence_and_transport_errors_never_export_unverified_data(
     assert await rows(pg_sessionmaker, AuditAnchor) == []
 
 
-async def test_integrity_and_transport_failures_stop_loop_but_cas_races_retry(caplog):
+async def test_integrity_and_transport_failures_stop_loop_but_cas_races_retry(caplog, monkeypatch):
     class Broken:
         anchors = None
 
@@ -715,6 +795,7 @@ async def test_integrity_and_transport_failures_stop_loop_but_cas_races_retry(ca
         await run_forever(Broken(), asyncio.Event())
     assert "audit_integrity_failed" in caplog.text and "private exception text" not in caplog.text
     stop = asyncio.Event()
+    monkeypatch.setattr(consumer_module, "TRANSIENT_WINDOW_SECONDS", 0)  # window already expired
 
     class Offline:
         anchors = True
