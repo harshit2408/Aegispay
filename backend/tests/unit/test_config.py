@@ -21,3 +21,12 @@ def test_defaults_and_extra_env_ignored(monkeypatch):
 
 def test_get_settings_is_cached():
     assert get_settings() is get_settings()
+
+
+def test_blank_session_secret_is_unset_but_short_one_is_rejected(monkeypatch):
+    # docker-compose passes SESSION_SECRET="" when the operator has not configured one.
+    monkeypatch.setenv("SESSION_SECRET", "")
+    assert Settings(_env_file=None).session_secret is None
+    monkeypatch.setenv("SESSION_SECRET", "short")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

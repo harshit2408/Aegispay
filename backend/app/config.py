@@ -61,6 +61,12 @@ class Settings(_PayPalSettings):
     payee_cooling_hours: int = Field(default=72, ge=72)
     vendor_new_days: int = Field(default=7, ge=0)
 
+    @field_validator("session_secret", mode="before")
+    @classmethod
+    def unset_session_secret(cls, value):
+        # Compose passes SESSION_SECRET="" when unset; treat it as absent (sessions fail closed).
+        return value or None
+
     @field_validator("frontend_origin")
     @classmethod
     def frontend(cls, value: str) -> str:
