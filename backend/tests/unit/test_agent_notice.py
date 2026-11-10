@@ -43,10 +43,10 @@ def test_numbers_come_from_template():
     assert node == "A5" and "BEGIN_DOCUMENT_" in msgs[1]["content"]
 
 
-def test_one_in_prose_is_allowed():
+def test_ambiguous_number_word_falls_back():
     prose = "We could not reach anyone; no one was available. {delta} was withheld."
     n = draft_notice(fake(prose), FACTS)
-    assert not n.used_fallback
+    assert n.used_fallback
     assert "$75.00" in n.text
 
 
@@ -61,6 +61,7 @@ def test_one_in_prose_is_allowed():
         "",
         "x" * 2000,
         "We withhold {delta} and fifteen more.",  # number word
+        "We withhold {delta} and one dollar more.",
         "We withhold {delta}, a Hundred less.",  # number word, case
         "We withhold {delta}, ten per cent extra.",
         "We withhold {delta} plus 5 percent.",

@@ -36,7 +36,7 @@ _SYSTEM = (
 
 _ID_PATTERN = r"^[A-Za-z0-9._/-]{1,64}$"  # Rust regex: $ is strict end, no trailing newline
 _NUMBER_WORDS = re.compile(
-    r"\b(zero|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen"
+    r"\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen"
     r"|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy"
     r"|eighty|ninety|hundred|thousand|million|billion|dozen|percent|per\s+cent)\b",
     re.IGNORECASE,
