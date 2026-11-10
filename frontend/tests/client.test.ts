@@ -98,3 +98,21 @@ test("document upload sends only multipart evidence fields with session CSRF", a
     execution_id: "new-case", duplicate_of_execution_id: "first-case",
   });
 });
+
+test("an unreadable success body becomes a transient APIError, not a SyntaxError", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => new Response("<html>", { status: 200 }));
+  await assert.rejects(api.getExecution("case"), (error: unknown) =>
+    error instanceof APIError && error.status === 502 && !/JSON|Syntax/i.test(error.message));
+});
+
+test("an abort while reading the body is rethrown, not converted to a 502", async (t) => {
+  const body = Promise.reject(new DOMException("aborted", "AbortError"));
+  body.catch(() => {});
+  t.mock.method(globalThis, "fetch", async () => ({ ok: true, status: 200, json: () => body }));
+  await assert.rejects(api.getExecution("c1"), (e: unknown) => e instanceof DOMException && e.name === "AbortError");
+});
+
+test("an unparsable 2xx body becomes APIError 502", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => new Response("not json", { status: 200 }));
+  await assert.rejects(api.getExecution("c1"), (e: unknown) => e instanceof APIError && e.status === 502);
+});

@@ -3,18 +3,19 @@ import { test } from "node:test";
 import { previewCase, mockReviewers } from "../src/fixtures/case-preview.ts";
 import { caseReadState, currentApprovals, decisionBlock, isEligible, usd } from "../src/lib/case-display.ts";
 
-test("replay warning persists while refreshing and after a failed refresh clears the case", () => {
+test("replay warning persists; refresh and transient failure keep data, terminal failure drops it", () => {
   const initial = { loading: true, replayed: false };
   const loaded = caseReadState(initial, { type: "loaded", data: previewCase });
   assert.equal(loaded.replayed, true);
   const loading = caseReadState(loaded, { type: "loading" });
   assert.equal(loading.replayed, true);
-  assert.equal(loading.loading, true);
   assert.equal(loading.data, previewCase);
   const failed = caseReadState(loading, { type: "failed", error: "Session expired" });
   assert.equal(failed.replayed, true);
-  assert.equal(failed.data, undefined);
+  assert.equal(failed.data, previewCase);
   assert.equal(failed.error, "Session expired");
+  assert.equal(caseReadState(loading, { type: "failed", error: "x", terminal: true }).data, undefined);
+  assert.equal(caseReadState(failed, { type: "loading" }).error, undefined);
   const live = caseReadState(failed, { type: "loaded", data: { ...previewCase, replayed: false } });
   assert.equal(live.replayed, false);
 });

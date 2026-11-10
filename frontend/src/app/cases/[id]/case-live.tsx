@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useReducer, useState } from "react";
 import { caseReadState, decisionBlock, isEligible } from "@/lib/case-display";
 import { decideCase } from "@/lib/case-decision";
@@ -20,27 +21,38 @@ export function CaseLive({ executionId }: { executionId: string }) {
 function CurrentCase({ executionId, operator }: { executionId: string; operator: Session }) {
   const [state, dispatch] = useReducer(caseReadState, { loading: true, replayed: false });
   const [attempt, setAttempt] = useState(0);
-  const [stream, setStream] = useState("Connecting to updates…");
+  const [stream, setStream] = useState({ message: "Connecting to updates…", closed: false });
   const [decisionMessage, setDecisionMessage] = useState("");
 
-  useEffect(() => {
-    return watchCase(executionId, dispatch, setStream);
-  }, [executionId, attempt]);
+  useEffect(
+    () => watchCase(executionId, dispatch, (message, closed = false) => setStream({ message, closed })),
+    [executionId, attempt]);
 
   function refresh() { dispatch({ type: "loading" }); setAttempt((value) => value + 1); }
+  const retry = <button type="button" onClick={() => {
+    setStream({ message: "Connecting to updates…", closed: false });
+    setAttempt((value) => value + 1);
+  }}>Retry</button>;
+  const stale = Boolean(state.data && state.error);
 
   return <>
     {state.replayed && <div className="replay-banner">REPLAY · Recorded case data</div>}
-    <p role="status">{state.loading ? "Loading current case…" : state.data ? stream : "Case unavailable"}</p>
+    {/* One stable polite live region: it only announces when its text changes. Retry stays in place to keep focus. */}
+    <div role="status" className={stale ? "stale-banner" : undefined}>
+      <p>{state.loading ? "Refreshing case…" : stale
+        ? `Warning: showing the last loaded case data, which may be out of date. ${state.error}`
+        : state.data ? stream.message : "Case unavailable"}</p>
+      {(stale || (stream.closed && !state.error)) && retry}
+    </div>
     {decisionMessage && <p role="status" className="local-status">{decisionMessage}</p>}
-    {state.error && <section className="empty-state" aria-labelledby="case-error-title">
+    {state.error && !state.data && <section className="empty-state" aria-labelledby="case-error-title">
       <h2 id="case-error-title">Case could not be loaded</h2>
       <p role="alert">{state.error}</p>
       <p className="locked-payee">Payee source: vendor master (locked)</p>
-      <button type="button" onClick={refresh}>Retry</button>
+      {retry} <Link href="/">Back to cockpit</Link>
     </section>}
     {state.data && state.data.viewer.operator_id === operator.operator_id && <CaseDetails data={state.data}
-      decisionControls={<CaseActions key={state.data.gate?.gate_hash ?? "no-gate"} data={state.data} loading={state.loading} refresh={refresh} message={setDecisionMessage} />} />}
+      decisionControls={<CaseActions key={state.data.gate?.gate_hash ?? "no-gate"} data={state.data} loading={state.loading || stale} refresh={refresh} message={setDecisionMessage} />} />}
   </>;
 }
 

@@ -116,7 +116,7 @@ def build_graph(
             if execution is None:
                 raise ValueError("unknown execution")
             if execution.status == "RECEIVED":
-                await transition(session, execution, "ANALYZING")
+                await transition(session, execution, "ANALYZING", actor="system:decision")
             elif execution.status != "ANALYZING":
                 raise ValueError("execution not ready for analysis")
             refs = {
@@ -224,7 +224,7 @@ def build_graph(
             execution.short_pay_json = _json(state.get("short_pay"))
             execution.evidence_pack_json = _json(state.get("evidence"))
             if status is not None and status != execution.status:
-                await transition(session, execution, status)
+                await transition(session, execution, status, actor="system:decision")
 
     async def policy_gate(state: GraphState):
         failure = state.get("match_failure")

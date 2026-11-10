@@ -126,5 +126,5 @@ async def approve_for_payment(
         execution.vendor_version = vendor.version
         execution.po_version = po.version
         execution.grn_id = match.grn_id
-        await transition(session, execution, "APPROVED_FOR_PAYMENT")
+        await transition(session, execution, "APPROVED_FOR_PAYMENT", actor="system:decision")
     return True

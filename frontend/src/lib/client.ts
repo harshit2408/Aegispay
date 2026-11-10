@@ -15,16 +15,22 @@ export class APIError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? ""}${path}`, {
     ...init, credentials: "include", cache: "no-store",
     headers: { Accept: "application/json", ...init?.headers },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    const detail = typeof body?.detail === "string" ? body.detail : `API request failed (${response.status})`;
+    const detail = response.status === 409 ? "Case changed, review again." :
+      typeof body?.detail === "string" ? body.detail : `API request failed (${response.status})`;
     throw new APIError(response.status, detail);
   }
-  return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+  if (response.status === 204) return undefined as T;
+  // A 2xx with an unparsable body is a transient server fault, not a raw SyntaxError for the user.
+  return response.json().catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === "AbortError") throw error; // caller cancelled
+    throw new APIError(502, "The server sent an unreadable response.");
+  }) as Promise<T>;
 }
 
 function post<T>(path: string, body: unknown, csrfToken: string): Promise<T> {

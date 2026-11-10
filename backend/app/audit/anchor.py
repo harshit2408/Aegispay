@@ -17,6 +17,8 @@ from app.audit.events import GENESIS_HASH, AuditIntegrityError, _timestamp
 
 BRANCH = "refs/heads/audit-anchors"
 GIT_OPERATION_SECONDS = 15
+MAX_ANCHOR_JSON_BYTES = 4096  # a real checkpoint is ~150 bytes
+DEFAULT_TOKEN_HOSTS = frozenset({"github.com"})
 
 
 class AnchorUnavailable(RuntimeError):
@@ -41,13 +43,14 @@ class Snapshot:
     commits: frozenset[str] = frozenset()
 
 
-def validate_remote(remote: str) -> str:
-    """Trusted configuration permits credential-free HTTPS or an existing absolute local repo."""
+def validate_remote(remote: str, *, allow_local: bool = False) -> str:
+    """Credential-free HTTPS only; an existing absolute local repo needs the explicit test flag."""
     try:
         url = urlsplit(remote)
         if (
             url.scheme == "https"
             and url.hostname
+            and url.port in (None, 443)  # .port raises ValueError on a malformed port
             and not url.username
             and not url.password
             and not url.query
@@ -55,6 +58,8 @@ def validate_remote(remote: str) -> str:
             and not any(char.isspace() or ord(char) < 32 for char in remote)
         ):
             return remote
+        if not allow_local:
+            raise ValueError
         if not url.scheme and Path(remote).is_absolute() and Path(remote).is_dir():
             return remote
         # Windows drive letters parse as schemes.
@@ -62,16 +67,27 @@ def validate_remote(remote: str) -> str:
             return remote
     except (ValueError, OSError):
         pass
-    raise ValueError("audit anchor repo requires credential-free HTTPS or an existing local repo")
+    raise ValueError("audit anchor repo requires a credential-free HTTPS URL")
 
 
 class GitAnchors:
     """Fresh isolated Git repository per operation; remote files are never checked out."""
 
-    def __init__(self, remote: str, token: str | None = None):
-        self.remote = validate_remote(remote)
-        if token and (not remote.startswith("https://") or any(ord(c) < 33 for c in token)):
-            raise ValueError("invalid dedicated audit anchor token")
+    def __init__(
+        self,
+        remote: str,
+        token: str | None = None,
+        *,
+        token_hosts: frozenset[str] = DEFAULT_TOKEN_HOSTS,
+        allow_local: bool = False,  # tests only: production configuration never sets it
+    ):
+        self.remote = validate_remote(remote, allow_local=allow_local)
+        if token and (
+            not remote.startswith("https://")
+            or (urlsplit(remote).hostname or "").lower() not in token_hosts
+            or any(ord(c) < 33 for c in token)
+        ):
+            raise ValueError("invalid dedicated audit anchor token or non-allowlisted host")
         self._token = token
 
     def _git(
@@ -153,6 +169,11 @@ class GitAnchors:
         self._required(directory, "update-ref", "HEAD", "FETCH_HEAD", deadline=deadline)
         tip = self._required(directory, "rev-parse", "HEAD", deadline=deadline)
         try:
+            size = self._required(
+                directory, "cat-file", "-s", "HEAD:anchor.json", deadline=deadline
+            )
+            if not size.isdecimal() or int(size) > MAX_ANCHOR_JSON_BYTES:
+                raise ValueError
             value = json.loads(
                 self._required(directory, "show", "HEAD:anchor.json", deadline=deadline)
             )

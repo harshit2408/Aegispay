@@ -117,6 +117,7 @@ class SettlementSettings(_PayPalSettings):
     audit_hmac_key: SecretStr = Field(min_length=32)
     audit_anchor_repo: str = Field(default="", repr=False)
     audit_anchor_token: SecretStr | None = None
+    audit_anchor_token_hosts: str = "github.com"  # comma-separated; the token goes nowhere else
     velocity_max_payouts_per_hour: int = Field(default=20, ge=1)
     velocity_max_cents_per_hour: int = Field(default=300000, ge=1)
     alert_webhook_url: str = Field(default="", repr=False)
@@ -142,6 +143,12 @@ class SettlementSettings(_PayPalSettings):
         from app.audit.anchor import validate_remote
 
         return validate_remote(value) if value else ""
+
+    @property
+    def anchor_token_hosts(self) -> frozenset[str]:
+        return frozenset(
+            h.strip().lower() for h in self.audit_anchor_token_hosts.split(",") if h.strip()
+        )
 
     @field_validator("audit_anchor_token", mode="before")
     @classmethod

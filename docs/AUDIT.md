@@ -48,10 +48,19 @@ authenticated prefix, then verifies the unanchored suffix. Database `audit_ancho
 receipts only. They may reject remote-history rollback but never replace external trust.
 If verification sees an apparent rollback, it rolls back the transaction and refetches up to
 two more times, after 250 ms and 500 ms, allowing a competing publication to become visible.
+A receipt ahead of, or missing from, the remote snapshot (`StaleAnchor`) is still stale after
+those retries: it is treated as an anchor outage, not tamper (below). HMAC or prefix mismatch
+is tamper: it persists the halt at once.
 Confirmed integrity failure persists `SETTLEMENT_HALT` with `AUDIT_INTEGRITY_FAILED` in a new
 transaction and stops the worker. If the database is unavailable, halt persistence can fail;
 the worker still stops and logs only a generic failure. Repair does not clear a persisted halt.
 An eligible operator must review the incident before resuming settlement.
+
+Outage policy, identical at startup and runtime: Git outages (`AnchorUnavailable`) and
+`StaleAnchor` are retried every 2 s and counted from the first failure; after
+`TRANSIENT_WINDOW_SECONDS` (300 s) the worker persists `AUDIT_ANCHOR_UNAVAILABLE` and stops.
+Any success resets the window. `AnchorConflict` (publication race) is retried and never halts.
+An existing halt reason is kept, never relabelled.
 
 A checkpoint is due on startup with no checkpoint, every hour, and when a newly signed event
 has type `SETTLED`. The next audit tick observes committed settlement events; polling is two
@@ -71,6 +80,28 @@ the tick on shutdown. A cancelled Git thread retains its operation deadline and 
 transaction; shutdown does not wait through the tick's remaining retries.
 
 ## Private setup
+
+### Halt reasons and operator clear procedure
+
+| `halted_reason` | Set by | Meaning |
+|---|---|---|
+| `AUDIT_INTEGRITY_FAILED` | audit consumer | Confirmed chain or checkpoint verification failure. |
+| `AUDIT_DRAIN_STUCK` | `run_forever` | Drain failed 10 consecutive times with a persistent error (poison row, constraint, bug), or lock/statement timeouts (SQLSTATE `55P03`/`57014`, `TimeoutError`) never cleared for 300 s. Money is unaudited. |
+| `AUDIT_ANCHOR_UNAVAILABLE` | `run_forever`, startup | Configured external anchor was unreachable. Persisting this halt is best-effort; the worker stops either way. |
+
+If settlement is already halted for another reason, `AUDIT_DRAIN_STUCK` and
+`AUDIT_ANCHOR_UNAVAILABLE` keep the existing `halted_reason` (so an integrity incident or
+maintenance halt is never relabelled as a routine outage); only `AUDIT_INTEGRITY_FAILED`
+replaces another reason.
+
+Transient lock or statement timeouts alone do not count toward the 10-failure limit; they
+halt only after 300 s without a successful drain. No halt route or clear function exists yet
+(`settlement/halt.py` only sets it). An eligible operator clears it by SQL, only after fixing
+the cause (restore anchor access, remove or repair the poison row, release the stuck lock
+holder) and confirming the worker verifies cleanly. Run the resume statement in the upgrade procedure below with that
+operator's identity and the exact reason, e.g. `halted_reason = 'AUDIT_ANCHOR_UNAVAILABLE'` in
+the `WHERE`, and require one returned row. Never clear `AUDIT_INTEGRITY_FAILED` this way
+without a reviewed incident record.
 
 ### Upgrade an existing Render worker
 
@@ -148,8 +179,9 @@ the settlement service; the API refuses them, including empty values:
 | Variable | Required behavior |
 |---|---|
 | `AUDIT_HMAC_KEY` | Required, at least 32 characters; use a securely generated secret and retain it across restarts. Changing it invalidates verification of existing history. |
-| `AUDIT_ANCHOR_REPO` | Credential-free HTTPS URL of a public repository. The branch is fixed to `audit-anchors`. An existing absolute local repository is supported for local verification. |
-| `AUDIT_ANCHOR_TOKEN` | Optional dedicated repository-write token for HTTPS publication. Keep it out of URLs, Git, logs and chat. It requires an anchor repo. |
+| `AUDIT_ANCHOR_REPO` | Credential-free HTTPS URL of a public repository. The branch is fixed to `audit-anchors`. Local paths are rejected outside tests. |
+| `AUDIT_ANCHOR_TOKEN` | Optional dedicated repository-write token for HTTPS publication. Keep it out of URLs, Git, logs and chat. It requires an anchor repo and is only sent to a host in `AUDIT_ANCHOR_TOKEN_HOSTS`. |
+| `AUDIT_ANCHOR_TOKEN_HOSTS` | Comma-separated HTTPS hosts allowed to receive the token. Default `github.com`. |
 
 Protect `audit-anchors` against deletion and force pushes. Restrict the publishing credential
 to its intended repository. Configure the real remote and token privately before enabling
@@ -160,10 +192,11 @@ Without `AUDIT_ANCHOR_REPO`, the PRD's explicitly permitted degraded HMAC-only m
 but externally verified exports refuse to run. A missing/short HMAC key refuses worker startup.
 Removing the repo after external receipts exist is refused as lost external history, rather
 than silently downgrading a previously anchored chain.
-A configured anchor transport outage logs a generic stop-worker error and stops settlement
-both at startup and during normal operation. It does not persist an integrity halt merely for
-a transport failure. Restart only recovers after startup verifies the full chain and remote
-checkpoint again. A normal competing-publisher conflict retries on the next tick. An unavailable
+A configured anchor transport outage logs a generic stop-worker error, makes a best-effort
+attempt to persist `SETTLEMENT_HALT` with `AUDIT_ANCHOR_UNAVAILABLE` (class-name logging only),
+and stops settlement both at startup and during normal operation. It is not an integrity
+finding. Restart recovers only after startup verifies the full chain and remote checkpoint
+again, and only once an operator has cleared the halt (below). A normal competing-publisher conflict retries on the next tick. An unavailable
 remote is never replaced by a DB-derived checkpoint. Hosted availability and the authenticated
 export HTTP route remain separate integration/deployment work.
 
@@ -184,11 +217,26 @@ unless `--include-replay` is explicit. No external checkpoint, tampering or miss
 history causes a generic refusal and nonzero exit, with no credential-bearing traceback.
 
 JSON contains `anchor`, `events` and `pending_unanchored_events`. CSV repeats checkpoint
-metadata on each event row and escapes spreadsheet formula prefixes. An empty CSV export
-contains one metadata-only row with blank event fields, so its checkpoint and pending count
-are not lost. Exported event subsets are verified by this settlement operation against the
+metadata on each event row and escapes spreadsheet formula prefixes: a cell that starts with
+`=`, `+`, `-`, `@`, tab, CR or LF is written with a leading `'` (formula guard).
+
+HMAC re-verification from CSV: strip exactly that one leading `'` from `actor`, `event_type`,
+`execution_id` and payload cells before recomputing the HMAC; otherwise every guarded row
+fails verification. The JSON export is unguarded and is the canonical form. An empty CSV
+export contains one metadata-only row with blank event fields, so its checkpoint and pending
+count are not lost. Exported event subsets are verified by this settlement operation against the
 global chain; a subset alone cannot independently reconstruct unrelated events' HMACs.
 
 The API export endpoint and case-view download remain disabled until authenticated routing
 and a settlement-side verification seam are implemented. Tests do not establish that endpoint,
 live sandbox S1–S4, public Git branch protection or hosted credential isolation.
+
+## Git in the settlement image
+
+`backend/Dockerfile` installs `git` only when built with `INSTALL_GIT=1` (default `0`, so the
+API image has none, R22). `render.yaml` sets `INSTALL_GIT=1` on the settlement service, but
+whether Render passes service env vars to the Docker build as build args is **UNVERIFIED**.
+After the first settlement deploy, run `git --version` in the worker shell and record the
+result here. The worker also fails closed at startup when `AUDIT_ANCHOR_REPO` is set and `git`
+is missing: it logs `audit_anchor_git_missing` and exits with a fixed message, never running
+without the anchor.

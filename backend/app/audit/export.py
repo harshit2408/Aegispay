@@ -139,6 +139,7 @@ async def _run(args) -> str:
                 settings.audit_anchor_token.get_secret_value()
                 if settings.audit_anchor_token
                 else None,
+                token_hosts=settings.anchor_token_hosts,
             ),
             key=settings.audit_hmac_key.get_secret_value().encode(),
             execution_id=args.execution_id,

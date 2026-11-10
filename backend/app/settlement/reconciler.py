@@ -126,7 +126,7 @@ class Reconciler:
             execution = await _lock(s, execution_id)
             payout = await _payout(s, execution_id)
             payout.item_status, payout.last_polled_at = item_status, func.now()
-            if not await transitions.apply_or_ignore(s, execution, to):
+            if not await transitions.apply_or_ignore(s, execution, to, actor="system:reconciler"):
                 return execution.status
             if release:
                 await _release_reservations(s, execution_id)
@@ -141,7 +141,7 @@ class Reconciler:
             if execution.status == "SETTLED":
                 return "SETTLED"
             if execution.status != "PAYOUT_SUCCEEDED" and not await transitions.apply_or_ignore(
-                s, execution, "PAYOUT_SUCCEEDED"
+                s, execution, "PAYOUT_SUCCEEDED", actor="system:reconciler"
             ):
                 return execution.status
             await po_ledger.close_if_fully_paid(s, execution.po_id)
@@ -188,7 +188,7 @@ class Reconciler:
             execution = await _lock(s, execution_id)
             if execution.status != "PAYOUT_SUCCEEDED":
                 return execution.status
-            await transitions.apply(s, execution, "SETTLED")
+            await transitions.apply(s, execution, "SETTLED", actor="system:reconciler")
             if execution.route == "SHORT_PAY":
                 execution.short_pay_balance = "NOTICE_SENT"
         return "SETTLED"
@@ -207,7 +207,9 @@ class Reconciler:
         """Reservation is kept: money may have moved (R6, R8)."""
         async with self._sm() as s, s.begin():
             execution = await _lock(s, execution_id)
-            if not await transitions.apply_or_ignore(s, execution, "NEEDS_MANUAL_REVIEW"):
+            if not await transitions.apply_or_ignore(
+                s, execution, "NEEDS_MANUAL_REVIEW", actor="system:reconciler"
+            ):
                 return execution.status
             await _set_outbox(s, execution_id, "FAILED", reason)
             if halt:
