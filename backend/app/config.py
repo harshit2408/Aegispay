@@ -69,7 +69,34 @@ class SettlementSettings(_PayPalSettings):
     vendor_client_id: str = Field(min_length=1, repr=False)
     vendor_client_secret: SecretStr = Field(min_length=1)
     vendor_account_email: str = Field(min_length=1, repr=False)
-    audit_hmac_key: SecretStr | None = None
+    audit_hmac_key: SecretStr = Field(min_length=32)
+    audit_anchor_repo: str = Field(default="", repr=False)
+    audit_anchor_token: SecretStr | None = None
+    audit_anchor_token_hosts: str = "github.com"  # comma-separated; the token goes nowhere else
+
+    @field_validator("audit_anchor_repo")
+    @classmethod
+    def anchor_repo(cls, value: str) -> str:
+        from app.audit.anchor import validate_remote
+
+        return validate_remote(value) if value else ""
+
+    @property
+    def anchor_token_hosts(self) -> frozenset[str]:
+        return frozenset(
+            h.strip().lower() for h in self.audit_anchor_token_hosts.split(",") if h.strip()
+        )
+
+    @field_validator("audit_anchor_token", mode="before")
+    @classmethod
+    def anchor_token(cls, value):
+        return value or None
+
+    @model_validator(mode="after")
+    def anchor_token_has_repo(self) -> "SettlementSettings":
+        if self.audit_anchor_token and not self.audit_anchor_repo:
+            raise ValueError("AUDIT_ANCHOR_TOKEN requires AUDIT_ANCHOR_REPO")
+        return self
 
     @field_validator("settlement_database_url")
     @classmethod

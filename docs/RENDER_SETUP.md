@@ -91,8 +91,9 @@ keys. Do not import the combined template as one shared environment group.
 | Settlement worker | `SETTLEMENT_DATABASE_URL` using its restricted login; existing Treasury/Vendor sandbox credentials, account emails and webhook IDs; `AUDIT_HMAC_KEY` |
 | Frontend build | `NEXT_PUBLIC_API_URL` with the public HTTPS API origin; `NEXT_PUBLIC_AG_LICENSE_KEY` with the legitimate Studio licence |
 
-`AUDIT_ANCHOR_REPO` and `ALERT_WEBHOOK_URL` already have blank slots; their consumers remain
-P2 work. This deployment does not consume a Render API token or a separate AG Studio AI key.
+`AUDIT_ANCHOR_REPO` and `ALERT_WEBHOOK_URL` already have blank slots. P2-26 implements the
+optional anchor consumer; the alert webhook consumer remains P2 work. This deployment does
+not consume a Render API token or a separate AG Studio AI key.
 Do not paste licence keys, database URLs or passwords into chat or this document.
 
 To verify the account-dependent work, share only project/Postgres/service dashboard links,
@@ -190,7 +191,15 @@ disposable verification so another developer's data is preserved.
 
 The settlement profile starts `python -m app.settlement.worker`, with independent outbox,
 GET reconciliation and verified-webhook-consumer loops. It requires configured Treasury and
-Vendor sandbox credentials. It receives no LLM/session/demo/API database variables. The API
+Vendor sandbox credentials and an `AUDIT_HMAC_KEY` of at least 32 characters. P2-26 adds the
+audit consumer and optional external Git anchor publication; follow [audit setup](AUDIT.md)
+and verify migration `0007` and its grants before deploying this version. Keep the dedicated
+anchor token only in the worker. For an existing live worker, follow the numbered
+[upgrade sequence](AUDIT.md#upgrade-an-existing-render-worker): halt/pause, owner migration
+and grant checks, private signing-key configuration, deploy/verify, then authorized resume.
+There is no automatic owner migration in the runtime services.
+Without an anchor repo it explicitly runs HMAC-only, with
+verified exports unavailable. It receives no LLM/session/demo/API database variables. The API
 receives no Treasury credentials, signing key or worker database URL. Do not start either
 process by loading one combined secret file; inject only its tagged PRD §7 variables.
 Settings validation errors expose field names, not credential values. SIGTERM stops the
@@ -198,5 +207,6 @@ worker loops and closes HTTP clients and the database engine; leased commands su
 
 P1-24 code/configuration can be reviewed locally. Hosted deployment evidence, webhook
 retargeting, licence entitlement, uptime and real sandbox S1 still require owner setup and
-their explicit acceptance checks. Audit queue consumption/external anchors and the velocity
-breaker remain P2 work; worker presence alone does not claim those controls are deployed.
+their explicit acceptance checks. P2-26's audit runtime is tested locally; hosted anchor
+publication remains unverified. The velocity breaker remains P2 work; worker presence alone
+does not claim those controls are deployed.

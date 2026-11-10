@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session, get_sessionmaker
-from app.routers import contracts, webhooks
+from app.routers import contracts, stream, webhooks
 from app.service_security import validate_database_role, validate_service_environment
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="AegisPay API", lifespan=lifespan)
 app.include_router(contracts.router)
+app.include_router(stream.router)
 app.include_router(webhooks.router)
 app.include_router(webhooks.simulator_router)  # 404s unless DEMO_ENABLED (R24); unmounted in P3-15
 

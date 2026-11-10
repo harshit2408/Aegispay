@@ -25,12 +25,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       typeof body?.detail === "string" ? body.detail : `API request failed (${response.status})`;
     throw new APIError(response.status, detail);
   }
-  return response.json() as Promise<T>;
+  // A 2xx with an unparsable body is a transient server fault, not a raw SyntaxError for the user.
+  return response.json().catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === "AbortError") throw error; // caller cancelled
+    throw new APIError(502, "The server sent an unreadable response.");
+  }) as Promise<T>;
 }
 
 export const api = {
   listExecutions: (): Promise<Rows> => request("/api/executions"),
-  getExecution: (id: string): Promise<CaseDetail> => request(`/api/executions/${encodeURIComponent(id)}`),
+  getExecution: (id: string, signal?: AbortSignal): Promise<CaseDetail> => request(`/api/executions/${encodeURIComponent(id)}`, { signal }),
   // The case preview never calls this method. A real session must supply its CSRF token.
   submitDecision: (id: string, decision: Decision, csrfToken: string): Promise<Receipt> => {
     if (!csrfToken.trim()) return Promise.reject(new Error("An operator session CSRF token is required"));

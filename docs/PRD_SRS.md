@@ -342,7 +342,8 @@ PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com
 # --- Treasury (buyer) REST app: Payouts [settlement only] ---
 TREASURY_CLIENT_ID=
 TREASURY_CLIENT_SECRET=
-TREASURY_WEBHOOK_ID=                                      # [settlement, api: id only, used to verify]
+# [settlement, api: id only, used to verify]
+TREASURY_WEBHOOK_ID=
 TREASURY_ACCOUNT_EMAIL=treasury@aegispay-demo.example     # Business sandbox account behind this app
 
 # --- Vendor Simulator REST app: Invoicing [settlement: write; api: read via VendorGateway read adapter] ---
@@ -364,11 +365,16 @@ CHECKPOINT_DB_URL=postgresql://aegis_api:aegis@localhost:5432/aegis             
 
 # --- Auth [api] — operators live in the `operators` table with argon2 hashes (R18); seeded from these once ---
 SESSION_SECRET=
-OPERATOR_SEED_FILE=                 # path to a git-ignored JSON of {username, role, password}; never commit
+# path to a git-ignored JSON of {username, role, password}; never commit
+OPERATOR_SEED_FILE=
 
 # --- Audit [settlement] ---
-AUDIT_HMAC_KEY=                     # R21; never present in the api service
-AUDIT_ANCHOR_REPO=                  # git remote + branch for head-hash anchors
+# R21; never present in the api service
+AUDIT_HMAC_KEY=
+# git remote + branch for head-hash anchors
+AUDIT_ANCHOR_REPO=
+# optional dedicated HTTPS Git token; settlement only
+AUDIT_ANCHOR_TOKEN=
 
 # --- Org hard limits (every mandate field is clamped to these, R13) [api, settlement] ---
 ORG_HARD_MAX_SINGLE_CENTS=100000
@@ -395,7 +401,8 @@ DEMO_REPLAY_MODE=false              # requires DEMO_ENABLED; replayed rows tagge
 
 # --- Frontend ---
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_AG_LICENSE_KEY=         # set in Render env only; never commit
+# set in Render env only; never commit
+NEXT_PUBLIC_AG_LICENSE_KEY=
 ```
 
 Secrets policy: `.env` is git-ignored; CI runs `gitleaks`; each Render service gets only its tagged variables; sandbox credentials are rotated after judging.
@@ -1126,6 +1133,15 @@ class SettlementService:                                       # runs only in th
 ```
 The outbox worker and reconciler run in the `settlement` background worker (one instance; the reconciler holds an advisory lock), claiming rows with `SELECT … FOR UPDATE SKIP LOCKED` and a 60 s lease, polling every 2 s and checking `SETTLEMENT_HALT` and the velocity breaker on every tick (R23). Settlement events reach the API's SSE stream through Postgres `LISTEN/NOTIFY`.
 
+**Audit availability policy (P2-26):** when external anchoring is configured, an unavailable
+anchor stops the settlement process at startup or runtime; transport failure alone does not
+persist an integrity halt. A restart must verify the chain and external checkpoint before
+settlement resumes. A normal competing-publisher conflict may retry. Apparent rollback gets
+two spaced refetches outside the database transaction before confirmation; confirmed audit
+verification failure persists the R23 halt. Explicit HMAC-only degradation remains permitted
+under §19 for a chain without prior external receipts. See `docs/AUDIT.md` for transaction
+budgets, operator recovery and the migration/key/deployment sequence.
+
 ---
 
 ## 12. Short-Pay Decision Model (replaces v1 "EV Short-Pay")
@@ -1194,6 +1210,8 @@ When `DEMO_ENABLED=false` the `demo` router is not mounted at all (R24). SSE fan
 ---
 
 P1 frontend contract seam (P1-14): `backend/openapi.json` is exported from the actual FastAPI app. `GET /api/executions`, `GET /api/executions/{id}` and `POST /api/executions/{id}/decisions` publish schemas while returning HTTP 501 until authentication and the case/decision service land. `CaseDetail` combines the §11.1 models with execution status, trusted-record versions/payee history, server-supplied PO consumption, viewer eligibility, approvals and settlement/audit presentation fields from §14.3. The decision request accepts only action, reason (at least ten characters) and the displayed `gate_hash`; actor, payee and amount are forbidden. Generated frontend types describe this contract; mocked screens do not establish functioning business endpoints.
+
+P2-19/P2-21 read integration: real case IDs fetch that contract without fixture fallback; payment controls stay disabled until authenticated session/CSRF delivery exists. The `/api/stream` contract also returns HTTP 501 until authenticated fan-out lands. Each future SSE data object has exactly `type` (`node`, `settlement`, `webhook`), `execution_id`, `name`, `status` and timezone-aware `ts`, with bounded identifier/state strings and no additional fields. Valid notifications trigger an authorized REST refresh; they never supply decision or money values. Client tests establish immediate dispatch and cleanup, not the end-to-end one-second latency target.
 
 ## 14. Frontend and AG Studio (`frontend/src/`)
 

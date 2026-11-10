@@ -67,7 +67,7 @@ jobs:
       FRONTEND_PORT: "13000"
       NEXT_PUBLIC_API_URL: http://localhost:18000
       TREASURY_CLIENT_SECRET: test-must-not-reach-api
-      AUDIT_HMAC_KEY: test-must-not-reach-api
+      AUDIT_HMAC_KEY: test-audit-key-must-not-reach-api-32bytes
       TREASURY_CLIENT_ID: verify-only-treasury
       VENDOR_CLIENT_ID: verify-only-vendor
       VENDOR_CLIENT_SECRET: verify-only-vendor-secret

@@ -51,7 +51,7 @@ async def claim_next(session: AsyncSession, now: datetime) -> SettlementOutbox |
         execution = (await session.execute(stuck.with_for_update())).scalar_one_or_none()
         if execution is not None:
             target = "NEEDS_MANUAL_REVIEW" if execution.status == "PAYOUT_SENDING" else "FROZEN"
-            await transitions.apply(session, execution, target)
+            await transitions.apply(session, execution, target, actor="system:outbox")
         await session.flush()
     return None
 

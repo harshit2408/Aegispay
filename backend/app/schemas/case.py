@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 from app.schemas.decision import (
     Cents,
@@ -32,6 +32,18 @@ ExecutionStatus = Literal[
     "SETTLED",
     "NEEDS_MANUAL_REVIEW",
 ]
+
+
+class StreamEvent(BaseModel):
+    """Minimal state notification; clients fetch authorized case details over REST (R25)."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    type: Literal["node", "settlement", "webhook"]
+    execution_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_:-]+$")
+    status: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_:-]+$")
+    ts: AwareDatetime
 
 
 class DecisionRequest(BaseModel):

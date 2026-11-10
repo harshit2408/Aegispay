@@ -31,6 +31,7 @@ def settlement_values(**overrides):
         "vendor_client_id": "test-vendor",
         "vendor_client_secret": "vendor-private",
         "vendor_account_email": "vendor@test.example",
+        "audit_hmac_key": "test-audit-key-not-a-real-secret!!",
         **overrides,
     }
 
@@ -234,15 +235,20 @@ async def test_role_validation_rejects_noninherited_cross_service_membership(
         await admin.dispose()
 
 
-@pytest.mark.parametrize("bad_role", [False, True])
-async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monkeypatch, bad_role):
+@pytest.mark.parametrize(
+    "failure", [None, "role", "audit", "anchor", "runtime_anchor", "stop_during_audit"]
+)
+async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(
+    monkeypatch, failure, caplog
+):
+    from app.audit.anchor import AnchorUnavailable
     from app.settlement import worker
 
     for field in PROJECT_VARIABLES:
         monkeypatch.delenv(field, raising=False)
     settings = SettlementSettings(_env_file=None, **settlement_values())
     monkeypatch.setattr(worker, "get_settlement_settings", lambda: settings)
-    events, handlers = [], {}
+    events, handlers, halts = [], {}, []
 
     class Engine:
         async def dispose(self):
@@ -265,7 +271,7 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
 
     async def validate(session, service):
         events.append("validate:" + service)
-        if bad_role:
+        if failure == "role":
             raise ValueError("wrong role")
 
     async def outbox(sessions, service, stop):
@@ -278,12 +284,41 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
         await stop.wait()
         events.append("poller:stop")
 
+    class Audit:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def persist_halt(self, reason):
+            halts.append(reason)
+
+        async def run_once(self):
+            events.append("audit:verify")
+            if failure == "stop_during_audit":
+                handlers[signal.SIGTERM]()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    events.append("audit:cancelled")
+            if failure == "audit":
+                raise RuntimeError("audit startup verification failed")
+            if failure == "anchor":
+                raise AnchorUnavailable("private transport details")
+
+    async def audit_loop(consumer, stop):
+        events.append("audit:start")
+        if failure == "runtime_anchor":
+            raise AnchorUnavailable("private transport details")
+        await stop.wait()
+        events.append("audit:stop")
+
     class Consumer:
         def __init__(self, *args):
             pass
 
         async def run_once(self):
             events.append("consumer:tick")
+            if failure == "runtime_anchor":
+                await asyncio.Event().wait()
             handlers[signal.SIGTERM]()
 
     loop = asyncio.get_running_loop()
@@ -297,15 +332,84 @@ async def test_worker_sigterm_stops_all_loops_and_closes_clients_and_engine(monk
     monkeypatch.setattr(worker, "validate_database_role", validate)
     monkeypatch.setattr(worker, "PayPalClient", Client)
     monkeypatch.setattr(worker, "WebhookConsumer", Consumer)
+    monkeypatch.setattr(worker, "AuditConsumer", Audit)
+    monkeypatch.setattr(worker.audit_consumer, "run_forever", audit_loop)
     monkeypatch.setattr(worker.outbox_worker, "run_forever", outbox)
     monkeypatch.setattr(worker.reconciler, "run_forever", poller)
-    if bad_role:
+    if failure == "role":
         with pytest.raises(RuntimeError, match="startup validation failed"):
             await worker.run()
         assert events == ["validate:settlement", "dispose"]
+    elif failure == "audit":
+        with pytest.raises(RuntimeError, match="audit startup verification failed"):
+            await worker.run()
+        assert events == ["validate:settlement", "audit:verify", "dispose"]
+    elif failure == "anchor":
+        monkeypatch.setattr(worker.audit_consumer, "TRANSIENT_WINDOW_SECONDS", 0)
+        with pytest.raises(AnchorUnavailable):
+            await worker.run()
+        assert events == ["validate:settlement", "audit:verify", "dispose"]
+        assert "audit_anchor_unavailable node=audit action=stop_worker" in caplog.text
+        assert "private transport details" not in caplog.text
+        assert halts == ["AUDIT_ANCHOR_UNAVAILABLE"]
+    elif failure == "runtime_anchor":
+        with pytest.raises(ExceptionGroup) as error:
+            await asyncio.wait_for(worker.run(), timeout=2)
+        assert any(isinstance(exc, AnchorUnavailable) for exc in error.value.exceptions)
+        assert events[-3:] == ["close:TREASURY", "close:VENDOR", "dispose"]
+    elif failure == "stop_during_audit":
+        await asyncio.wait_for(worker.run(), timeout=0.2)
+        assert events == ["validate:settlement", "audit:verify", "audit:cancelled", "dispose"]
     else:
         await asyncio.wait_for(worker.run(), timeout=2)
         assert events.index("validate:settlement") < events.index("client:TREASURY")
+        assert events.index("audit:verify") < events.index("client:TREASURY")
         assert {"outbox:stop", "poller:stop", "consumer:tick"} <= set(events)
         assert events[-3:] == ["close:TREASURY", "close:VENDOR", "dispose"]
     assert handlers == {}
+
+
+async def test_startup_retries_anchor_outage_within_window_then_raises(monkeypatch):
+    from app.audit import consumer as audit_consumer
+    from app.audit.anchor import AnchorConflict, AnchorUnavailable
+    from app.settlement import worker
+
+    clock = [0.0]
+    monkeypatch.setattr(worker.time, "monotonic", lambda: clock[0])
+
+    async def no_wait(awaitable, timeout):
+        awaitable.close()
+        clock[0] += audit_consumer.TRANSIENT_WINDOW_SECONDS / 3
+        raise TimeoutError
+
+    monkeypatch.setattr(worker.asyncio, "wait_for", no_wait)
+    for error in (AnchorUnavailable("x"), audit_consumer.StaleAnchor("x")):
+        clock[0], calls = 0.0, []
+
+        async def drain(audit, stop, error=error, calls=calls):
+            calls.append(1)
+            if len(calls) < 3:
+                raise error
+            return None
+
+        monkeypatch.setattr(audit_consumer, "run_once_until_stopped", drain)
+        await worker._startup_drain(object(), asyncio.Event())
+        assert len(calls) == 3  # recovered inside the window
+
+        clock[0], calls[:] = 0.0, []
+
+        async def down(audit, stop, error=error, calls=calls):
+            calls.append(1)
+            raise error
+
+        monkeypatch.setattr(audit_consumer, "run_once_until_stopped", down)
+        with pytest.raises(type(error)):
+            await worker._startup_drain(object(), asyncio.Event())
+        assert len(calls) == 4
+
+    async def conflict(audit, stop):
+        raise AnchorConflict("race")
+
+    monkeypatch.setattr(audit_consumer, "run_once_until_stopped", conflict)
+    with pytest.raises(AnchorConflict):
+        await worker._startup_drain(object(), asyncio.Event())

@@ -1,2 +1,3 @@
 frontend/src/lib/api.ts text eol=lf
 backend/openapi.json text eol=lf
+*.pdf binary

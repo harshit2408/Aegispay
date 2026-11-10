@@ -25,3 +25,31 @@ test("decision payload contains only the allowed request fields and requires a C
   assert.equal(mocked.mock.callCount(), 0);
   await assert.rejects(api.submitDecision("case", decision, "session-token"), /Case changed, review again/);
 });
+
+test("case refresh forwards cancellation to fetch instead of retaining a superseded request", async (t) => {
+  const controller = new AbortController();
+  t.mock.method(globalThis, "fetch", async (_url: string | URL | Request, init?: RequestInit) => {
+    assert.equal(init?.signal, controller.signal);
+    throw new DOMException("Cancelled", "AbortError");
+  });
+  controller.abort();
+  await assert.rejects(api.getExecution("case", controller.signal), { name: "AbortError" });
+});
+
+test("an unreadable success body becomes a transient APIError, not a SyntaxError", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => new Response("<html>", { status: 200 }));
+  await assert.rejects(api.getExecution("case"), (error: unknown) =>
+    error instanceof APIError && error.status === 502 && !/JSON|Syntax/i.test(error.message));
+});
+
+test("an abort while reading the body is rethrown, not converted to a 502", async (t) => {
+  const body = Promise.reject(new DOMException("aborted", "AbortError"));
+  body.catch(() => {});
+  t.mock.method(globalThis, "fetch", async () => ({ ok: true, status: 200, json: () => body }));
+  await assert.rejects(api.getExecution("c1"), (e: unknown) => e instanceof DOMException && e.name === "AbortError");
+});
+
+test("an unparsable 2xx body becomes APIError 502", async (t) => {
+  t.mock.method(globalThis, "fetch", async () => new Response("not json", { status: 200 }));
+  await assert.rejects(api.getExecution("c1"), (e: unknown) => e instanceof APIError && e.status === 502);
+});
