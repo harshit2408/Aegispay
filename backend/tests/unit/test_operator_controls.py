@@ -117,3 +117,21 @@ def test_receipt_rejects_untrusted_quantities_and_dates(changes):
     )
     with pytest.raises(ValueError):
         ReceiptRequest(**(data | changes))
+
+
+async def test_expired_lockout_does_not_relock_on_one_failure(auth_client, pg_sessionmaker):
+    async with pg_sessionmaker() as session, session.begin():
+        alice = await session.get(Operator, "alice")
+        alice.failed_logins = 5
+        alice.locked_until = datetime.now(UTC) - timedelta(minutes=1)
+    assert (
+        await auth_client.post("/api/auth/login", json={"operator_id": "alice", "password": "bad"})
+    ).status_code == 401
+    async with pg_sessionmaker() as session:
+        alice = await session.get(Operator, "alice")
+        assert alice.failed_logins == 1 and alice.locked_until is None
+    assert (
+        await auth_client.post(
+            "/api/auth/login", json={"operator_id": "alice", "password": "correct password"}
+        )
+    ).status_code == 200
