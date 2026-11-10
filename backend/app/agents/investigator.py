@@ -12,7 +12,7 @@ from collections.abc import Callable
 
 from app.agents import Halt
 from app.agents.prompting import FRAMING_TOKENS, MAX_INPUT_TOKEN_BOUND, delimit
-from app.paypal.toolkit import ReadTools, is_vendor_asserted
+from app.paypal.toolkit import ReadTools, is_vendor_asserted, wrap_untrusted
 from app.schemas.decision import EvidenceFact, EvidencePack
 
 log = logging.getLogger(__name__)
@@ -73,7 +73,8 @@ def validate_citations(final: dict, outputs: dict[str, str]) -> EvidencePack:
 
 def investigate(complete: Callable, tools: ReadTools, *, case: dict) -> EvidencePack | None:
     try:
-        token, body = delimit(json.dumps(case, sort_keys=True))
+        # R14: vendor free-text in the case is wrapped as untrusted, like tool output.
+        token, body = delimit(json.dumps(wrap_untrusted(case), sort_keys=True))
         system = _SYSTEM.format(token=token, tools=", ".join(tools.names))
         messages = [{"role": "system", "content": system}, {"role": "user", "content": body}]
         outputs: dict[str, str] = {}
@@ -93,7 +94,14 @@ def investigate(complete: Callable, tools: ReadTools, *, case: dict) -> Evidence
                 cid = f"call_{len(outputs) + 1}"
                 outputs[cid] = tools.call(c["tool"], c.get("args", {}))
                 results[cid] = outputs[cid]
-            messages.append({"role": "user", "content": delimit(json.dumps(results))[1]})
+            # Raw tool text (not re-encoded JSON) so excerpts can be quoted verbatim, inside
+            # the same boundary token the system prompt names as untrusted data.
+            text = "\n".join(f"{cid}: {out}" for cid, out in results.items())
+            if token in text:
+                return None
+            messages.append(
+                {"role": "user", "content": f"BEGIN_DOCUMENT_{token}\n{text}\nEND_DOCUMENT_{token}"}
+            )
         return None
     except Halt as e:  # BaseException: budget/run halt
         log.warning("A4 unavailable: %s", type(e).__name__)
