@@ -127,20 +127,20 @@ The [[PLAN]] explains the why; this file is the state.
 ## P4 — Hardening (Nov 7–8) · exit: **feature freeze Nov 8 EOD**
 
 - [ ] **P4-01** @A (P1 feature) A6 Vendor agent remedy negotiation — only if everything above is green
-- [ ] **P4-02** @A Webhook chaos tests: duplicate, out-of-order, delayed, unsigned, simulator
-- [ ] **P4-03** @A Contract tests with `respx` against recorded sandbox fixtures
+- [ ] **P4-02** @A Webhook chaos tests: duplicate, out-of-order, delayed, unsigned, simulator (WIP B)
+- [ ] **P4-03** @A Contract tests with `respx` against recorded sandbox fixtures (WIP B)
 - [x] **P4-04** @B Playwright E2E S1–S4 in replay mode, running in CI — 514b238
 - [ ] **P4-05** @B Polish + second video cut
 - [ ] **P4-06** @AB Feature freeze; only bug fixes after this line
 
 ## P5 — Ship (Nov 9–11) · exit: **submitted Nov 11** (deadline Nov 12 12:00 PT)
 
-- [ ] **P5-01** @A `README.md`: judge quickstart, hosted URL, operator logins, simulation boundary (verbatim §3)
-- [ ] **P5-02** @A `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md`, final `docs/EVAL.md`
+- [ ] **P5-01** @A `README.md`: judge quickstart, hosted URL, operator logins, simulation boundary (verbatim §3) (WIP B)
+- [ ] **P5-02** @A `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md`, final `docs/EVAL.md` (WIP B)
 - [x] **P5-03** @B Judge guide panel in the app — 514b238
 - [ ] **P5-04** @B Final video < 3 min, public on YouTube, captions, no copyrighted music
 - [ ] **P5-05** @AB Code freeze Nov 9 23:59 IST
-- [ ] **P5-06** @AB Clean-clone verification from README only
+- [ ] **P5-06** @AB Clean-clone verification from README only (WIP B)
 - [x] **P5-07** @AB Devpost text (problem, persona, real vs simulated); sponsor prize = AG Grid — 514b238
 - [ ] **P5-08** @AB **Submit** (≥ 24 h before deadline)
 
