@@ -42,7 +42,9 @@ test("credentialed stream refreshes only its case, recovers on reconnect and clo
   let refreshes = 0;
   let closedFlag: boolean | undefined;
   const statuses: string[] = [];
-  const close = subscribeToExecution("case_1", () => { refreshes += 1; }, (status, closed) => { statuses.push(status); closedFlag = closed; }, 0);
+  const observed: unknown[] = [];
+  const close = subscribeToExecution("case_1", () => { refreshes += 1; }, (status, closed) => { statuses.push(status); closedFlag = closed; }, 0,
+    (notification) => observed.push(notification));
   const source = FakeSource.instance;
   assert.ok(source.url.endsWith("/api/stream"));
   assert.equal(source.options?.withCredentials, true);
@@ -52,11 +54,13 @@ test("credentialed stream refreshes only its case, recovers on reconnect and clo
   assert.equal(refreshes, 0);
   await tick();
   assert.equal(refreshes, 1);
+  assert.deepEqual(observed, [event, event]);
   source.send("node", event);
   source.send("message", { ...event, execution_id: "other" });
   source.send("message", { ...event, payload: { payee: "forged" } });
   await tick();
   assert.equal(refreshes, 1);
+  assert.equal(observed.length, 2);
   source.dispatchEvent(new Event("open")); // reconnect
   source.dispatchEvent(new Event("open"));
   await tick();
@@ -76,4 +80,5 @@ test("credentialed stream refreshes only its case, recovers on reconnect and clo
   await tick();
   assert.equal(refreshes, 2);
   assert.equal(statuses.length, previousStatuses);
+  assert.equal(observed.length, 2);
 });

@@ -5,6 +5,7 @@ import type { AgWidgetData, AgWidgetDataFormat, AgWidgetParams } from "ag-studio
 import type { components } from "../../lib/api";
 import { usd } from "../../lib/case-display";
 import { frozenExposure, gaugeValue, triad } from "../../lib/cockpit-display";
+import { LiveExecutionProgress } from "../execution-progress";
 
 type CaseDetail = components["schemas"]["CaseDetail"];
 type Policy = components["schemas"]["MandatePolicy"];
@@ -15,11 +16,14 @@ export interface CockpitContext {
   policy: Policy | null;
   committedCents: number;
   businessDate: string;
+  selectedExecutionId?: string;
 }
 
 export interface LedgerData extends AgWidgetData<Record<string, never>, AgWidgetDataFormat<unknown>> { type: "payables-ledger" }
 export interface GaugeData extends AgWidgetData<Record<string, never>, AgWidgetDataFormat<unknown>> { type: "mandate-gauge" }
 export interface ExposureData extends AgWidgetData<Record<string, never>, AgWidgetDataFormat<unknown>> { type: "frozen-exposure" }
+export interface PathData extends AgWidgetData<Record<string, never>, AgWidgetDataFormat<unknown>> { type: "decision-path" }
+export interface TimelineData extends AgWidgetData<Record<string, never>, AgWidgetDataFormat<unknown>> { type: "settlement-timeline" }
 
 export function PayablesLedger({ cases, paidByExecution }: Pick<CockpitContext, "cases" | "paidByExecution">) {
   return <section className="cockpit-widget" aria-label="Payables ledger">
@@ -89,3 +93,5 @@ export function FrozenExposure({ cases }: Pick<CockpitContext, "cases">) {
 export function LedgerWidget({ context }: AgWidgetParams<LedgerData, unknown, CockpitContext>) { return <PayablesLedger {...context} />; }
 export function GaugeWidget({ context }: AgWidgetParams<GaugeData, unknown, CockpitContext>) { return <MandateGauge {...context} />; }
 export function ExposureWidget({ context }: AgWidgetParams<ExposureData, unknown, CockpitContext>) { return <FrozenExposure {...context} />; }
+export function PathWidget({ context }: AgWidgetParams<PathData, unknown, CockpitContext>) { return <LiveExecutionProgress executionId={context.selectedExecutionId ?? ""} />; }
+export function TimelineWidget({ context }: AgWidgetParams<TimelineData, unknown, CockpitContext>) { return <LiveExecutionProgress executionId={context.selectedExecutionId ?? ""} timeline />; }

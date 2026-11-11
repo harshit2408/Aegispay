@@ -7,11 +7,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.main import app  # noqa: E402
+from app.main import create_app  # noqa: E402
 
 
 def render_openapi() -> str:
-    return json.dumps(app.openapi(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    return (
+        json.dumps(
+            create_app(demo_enabled=True).openapi(), indent=2, sort_keys=True, ensure_ascii=False
+        )
+        + "\n"
+    )
 
 
 def main() -> None:

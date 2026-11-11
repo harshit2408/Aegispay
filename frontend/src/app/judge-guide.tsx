@@ -14,11 +14,14 @@ export function JudgeGuide() {
           </ol>
         </section>
         <section aria-labelledby="simulation-guide">
-          <h2 id="simulation-guide">What works in this preview</h2>
-          <p>The cockpit contains synthetic Studio integration probes and a scripted hello-world agent. No PayPal or LLM requests run here.</p>
-          <p>The case workspace includes synthetic Evidence, Security and Money panes with local decision rehearsal. Mandate changes, settlement and supplier actions are pending their backend integrations. The supplier area is a simulator, not an independent supplier service.</p>
+          <h2 id="simulation-guide">Real and simulated</h2>
+          <p>Sign in above to use the invoice inbox, live case actions and mandate compiler. Case amounts, payee and allowed actions come from the server. Decisions require an eligible reviewer and a reason.</p>
+          <p>The Studio cockpit preview uses synthetic records; Follow execution uses authenticated case data and SSE. The scripted hello-world agent makes no model or payment requests.</p>
+          <p>REPLAY identifies recorded responses with no live money movement. SANDBOX DEMO identifies demo mode. A simulated webhook is never proof of payment; settlement requires server confirmation.</p>
+          <p>In this demo, the Vendor Simulator holds the supplier app credentials to issue invoices, provide read access and reconcile after payment. In production the supplier controls that account. Model tools have read access only. The supplier portal is a simulator.</p>
           <h3>Operator access</h3>
-          <p>Operator sign-in and judge credentials are not configured in this shell. The authenticated demo will provide named accounts for controller, CFO, AP clerk, receiver and admin roles.</p>
+          <p>Use the named operator ID and password supplied by the demo owner. Passwords are never published here. A controller uploads; a different eligible controller or CFO reviews. Admin resets replay runs and changes detector state; the controller runs scenarios.</p>
+          <p>To rehearse S1–S4, an admin resets the run, then a controller runs each scenario from the replay runner. S4 links its original S1 case. Turn the detector OFF as admin before a new S3 run to see the independent payee lock.</p>
         </section>
       </div>
     </details>

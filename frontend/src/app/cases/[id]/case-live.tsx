@@ -9,13 +9,15 @@ import { APIError } from "@/lib/client";
 import type { components } from "@/lib/api";
 import { useSession } from "../../session";
 import { CaseDetails } from "./case-preview";
+import { DecisionPath } from "../../execution-progress";
+import { observedNodes } from "@/lib/execution-progress";
 
 type Session = components["schemas"]["SessionView"];
 
 export function CaseLive({ executionId }: { executionId: string }) {
   const { operator, busy } = useSession();
   if (!operator || busy) return <p role="status">{busy ? "Checking operator session…" : "Sign in above to view this case."}</p>;
-  return <CurrentCase key={`${operator.operator_id}:${operator.csrf_token}`} executionId={executionId} operator={operator} />;
+  return <CurrentCase key={`${operator.operator_id}:${operator.csrf_token}:${executionId}`} executionId={executionId} operator={operator} />;
 }
 
 function CurrentCase({ executionId, operator }: { executionId: string; operator: Session }) {
@@ -23,9 +25,11 @@ function CurrentCase({ executionId, operator }: { executionId: string; operator:
   const [attempt, setAttempt] = useState(0);
   const [stream, setStream] = useState({ message: "Connecting to updates…", closed: false });
   const [decisionMessage, setDecisionMessage] = useState("");
+  const [events, setEvents] = useState<components["schemas"]["StreamEvent"][]>([]);
 
   useEffect(
-    () => watchCase(executionId, dispatch, (message, closed = false) => setStream({ message, closed })),
+    () => watchCase(executionId, dispatch, (message, closed = false) => setStream({ message, closed }), undefined, undefined,
+      (event) => setEvents((previous) => observedNodes(previous, event))),
     [executionId, attempt]);
 
   function refresh() { dispatch({ type: "loading" }); setAttempt((value) => value + 1); }
@@ -45,6 +49,7 @@ function CurrentCase({ executionId, operator }: { executionId: string; operator:
       {(stale || (stream.closed && !state.error)) && retry}
     </div>
     {decisionMessage && <p role="status" className="local-status">{decisionMessage}</p>}
+    {state.data && !state.error && <DecisionPath events={events} />}
     {state.error && !state.data && <section className="empty-state" aria-labelledby="case-error-title">
       <h2 id="case-error-title">Case could not be loaded</h2>
       <p role="alert">{state.error}</p>

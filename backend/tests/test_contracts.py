@@ -7,7 +7,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from app.main import app
+from app.main import app, create_app
 from app.schemas.case import DecisionRequest, StreamEvent
 from app.schemas.decision import GateDecision
 
@@ -80,7 +80,10 @@ async def test_case_routes_require_operator_session(monkeypatch):
 
 def test_committed_openapi_matches_actual_server_contract():
     schema_file = Path(__file__).resolve().parents[1] / "openapi.json"
-    assert json.loads(schema_file.read_text(encoding="utf-8")) == app.openapi()
+    assert (
+        json.loads(schema_file.read_text(encoding="utf-8"))
+        == create_app(demo_enabled=True).openapi()
+    )
     request = app.openapi()["components"]["schemas"]["DecisionRequest"]
     assert set(request["properties"]) == {"action", "reason", "gate_hash"}
     assert request["additionalProperties"] is False

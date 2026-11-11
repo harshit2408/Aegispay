@@ -2,6 +2,30 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { APIError, api } from "../src/lib/client.ts";
 
+test("demo and halt writes require CSRF and send only explicit control inputs", async (t) => {
+  const calls: { path: string; body: unknown }[] = [];
+  t.mock.method(globalThis, "fetch", async (url: string | URL | Request, init?: RequestInit) => {
+    assert.equal(init?.credentials, "include");
+    if (init?.method === "POST") {
+      assert.equal((init.headers as Record<string, string>)["X-CSRF-Token"], "token");
+      calls.push({ path: String(url), body: JSON.parse(init.body as string) });
+    }
+    return Response.json({});
+  });
+  for (const attempt of [() => api.resetDemo(""), () => api.setDetector(false, ""), () => api.runScenario("S3", ""), () => api.setHalt(true, "Emergency halt requested.", "")]) {
+    await assert.rejects(attempt(), /CSRF/);
+  }
+  assert.equal(calls.length, 0);
+  await api.resetDemo("token"); await api.setDetector(false, "token"); await api.runScenario("S3", "token");
+  await api.setHalt(true, "Emergency halt requested.", "token");
+  assert.deepEqual(calls, [
+    { path: "/api/demo/reset", body: {} },
+    { path: "/api/demo/forensics-detector", body: { enabled: false } },
+    { path: "/api/demo/scenarios/S3/run", body: {} },
+    { path: "/api/ops/settlement-halt", body: { halted: true, reason: "Emergency halt requested." } },
+  ]);
+});
+
 test("typed requests encode IDs, include cookies and preserve explicit unimplemented errors", async (t) => {
   t.mock.method(globalThis, "fetch", async (url: string | URL | Request, init?: RequestInit) => {
     assert.ok(String(url).endsWith("/api/executions/case%2Fwith%20spaces"));

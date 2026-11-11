@@ -4,6 +4,7 @@ import { JudgeGuide } from "./judge-guide";
 import { NavigationLinks } from "./navigation-links";
 import { WorkspaceBanner } from "./workspace-banner";
 import { SessionProvider } from "./session";
+import { DemoWorkspace } from "./demo-toolbar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <div className="workspace">
           <SessionProvider>
+          <DemoWorkspace />
           <JudgeGuide />
           <main id="main" tabIndex={-1}>{children}</main>
           </SessionProvider>

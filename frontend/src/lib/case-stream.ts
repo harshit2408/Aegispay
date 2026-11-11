@@ -1,6 +1,7 @@
 import { APIError, api } from "./client.ts";
 import type { caseReadState } from "./case-display.ts";
 import { subscribeToExecution } from "./sse.ts";
+import type { components } from "./api.ts";
 
 export const RETRY_DELAYS_MS = [1000, 2000, 4000]; // bounded: after these, the user must press Retry
 
@@ -11,6 +12,7 @@ export function watchCase(
   status: (message: string, closed?: boolean) => void,
   retryDelays: readonly number[] = RETRY_DELAYS_MS,
   coalesceMs?: number,
+  observed?: (event: components["schemas"]["StreamEvent"]) => void,
 ): () => void {
   let active = true;
   let request: AbortController | undefined;
@@ -55,7 +57,7 @@ export function watchCase(
     }
   }
   // Open the stream up front so a failed first load still recovers on a later event or reconnect.
-  const unsubscribe = subscribeToExecution(executionId, () => void refresh(), status, coalesceMs);
+  const unsubscribe = subscribeToExecution(executionId, () => void refresh(), status, coalesceMs, observed);
   void refresh();
   return () => { active = false; clearTimeout(retryTimer); request?.abort(); unsubscribe(); };
 }
