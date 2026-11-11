@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { components } from "@/lib/api";
 import { currentApprovals, usd } from "@/lib/case-display";
 import { previewCase } from "@/fixtures/case-preview";
+import { SettlementTimeline } from "../../execution-progress";
 
 type CaseDetail = components["schemas"]["CaseDetail"];
 
@@ -106,8 +107,7 @@ export function CaseDetails({ data, preview = false, decisionControls }: {
           {data.short_pay && <><div className="table-scroll"><table><caption>Short-pay model · supplied estimates, not a payment authorization</caption><thead><tr><th scope="col">Option</th><th scope="col">Expected cost</th></tr></thead><tbody><tr><th scope="row">Pay and claim</th><td>{usd(data.short_pay.expected_cost_pay_and_claim_cents)}</td></tr><tr><th scope="row">Short-pay + notice</th><td>{usd(data.short_pay.expected_cost_short_pay_cents)}</td></tr></tbody></table></div>
           <p>Rejected portion: {usd(data.short_pay.delta_cents)} · Model choice: {data.short_pay.chosen}. {gate && `Gate route: ${gate.route}.`}</p>
           <details><summary>Model assumptions · editable only through a mandate</summary><dl className="assumptions"><dt>Recovery probability</dt><dd>{data.short_pay.assumptions.p_recover}</dd><dt>Claim operations cost</dt><dd>{usd(data.short_pay.assumptions.claim_ops_cost_cents)}</dd><dt>Annual cost of capital</dt><dd>{data.short_pay.assumptions.annual_cost_of_capital}</dd><dt>Claim days</dt><dd>{data.short_pay.assumptions.claim_days}</dd><dt>Notice operations cost</dt><dd>{usd(data.short_pay.assumptions.notice_ops_cost_cents)}</dd><dt>Vendor contest probability</dt><dd>{data.short_pay.assumptions.p_vendor_contests}</dd><dt>Contest cost</dt><dd>{usd(data.short_pay.assumptions.contest_cost_cents)}</dd></dl></details></>}
-          <h3>Settlement timeline</h3>
-          <ol className="settlement-timeline">{data.settlement_timeline.map((entry) => <li key={entry.status}><strong>{entry.status}</strong> · {entry.occurred_at ?? "Not reached"}<br /><span className="muted">{entry.simulated ? "Synthetic" : "Live"} · {entry.verified ? "GET verified" : "No verified receipt"} · {entry.paypal_id ?? "No payout ID"}</span></li>)}</ol>
+          <SettlementTimeline entries={data.settlement_timeline} />
           <p>Invoice ID: <code>{paypal?.invoice_id ?? "Unavailable"}</code><br />Payout references appear with their settlement events above.</p>
           <button type="button" disabled aria-describedby="audit-unavailable">Export audit</button><p id="audit-unavailable" className="muted">{data.audit_anchor.verified ? "Server reports an anchored audit chain. Authenticated export is not connected." : "No externally anchored audit chain has been verified."}</p>
         </div><div>

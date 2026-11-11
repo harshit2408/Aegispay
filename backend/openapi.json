@@ -57,6 +57,55 @@
         "title": "ActiveMandateView",
         "type": "object"
       },
+      "AlertView": {
+        "properties": {
+          "alert_id": {
+            "title": "Alert Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "execution_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Execution Id"
+          }
+        },
+        "required": [
+          "alert_id",
+          "event",
+          "execution_id",
+          "created_at",
+          "delivered_at"
+        ],
+        "title": "AlertView",
+        "type": "object"
+      },
       "ApprovalView": {
         "properties": {
           "action": {
@@ -869,6 +918,19 @@
         "title": "HaltRequest",
         "type": "object"
       },
+      "HaltView": {
+        "properties": {
+          "halted": {
+            "title": "Halted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "halted"
+        ],
+        "title": "HaltView",
+        "type": "object"
+      },
       "HiddenSegment": {
         "properties": {
           "bbox": {
@@ -1362,6 +1424,65 @@
         "title": "OperatorView",
         "type": "object"
       },
+      "OpsStatusView": {
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/AlertView"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "halted": {
+            "title": "Halted",
+            "type": "boolean"
+          },
+          "halted_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Halted Reason"
+          },
+          "last_anchor_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Anchor At"
+          },
+          "velocity_breaker_tripped": {
+            "title": "Velocity Breaker Tripped",
+            "type": "boolean"
+          },
+          "vendor_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PendingChangeView"
+            },
+            "title": "Vendor Changes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "halted",
+          "halted_reason",
+          "velocity_breaker_tripped",
+          "alerts",
+          "vendor_changes",
+          "last_anchor_at"
+        ],
+        "title": "OpsStatusView",
+        "type": "object"
+      },
       "POConsumptionView": {
         "properties": {
           "accepted_value_cents": {
@@ -1446,6 +1567,59 @@
           "payee_reference"
         ],
         "title": "PayPalInvoiceView",
+        "type": "object"
+      },
+      "PendingChangeView": {
+        "properties": {
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "change_id": {
+            "title": "Change Id",
+            "type": "string"
+          },
+          "effective_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective At"
+          },
+          "requested_by": {
+            "title": "Requested By",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "vendor_id": {
+            "title": "Vendor Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "change_id",
+          "vendor_id",
+          "status",
+          "requested_by",
+          "approved_by",
+          "effective_at"
+        ],
+        "title": "PendingChangeView",
         "type": "object"
       },
       "PurchaseOrderView": {
@@ -2524,7 +2698,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HaltView"
+                }
               }
             },
             "description": "Successful Response"
@@ -2551,7 +2727,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HaltView"
+                }
               }
             },
             "description": "Successful Response"
@@ -2568,6 +2746,27 @@
           }
         },
         "summary": "Set Halt",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/api/ops/status": {
+      "get": {
+        "operationId": "status_api_ops_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpsStatusView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status",
         "tags": [
           "ops"
         ]

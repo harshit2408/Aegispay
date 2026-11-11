@@ -33,6 +33,7 @@ export function parseStreamEvent(raw: string): StreamEvent | null {
 export function subscribeToExecution(
   executionId: string, refresh: () => void, status: (message: string, closed?: boolean) => void,
   coalesceMs = REFRESH_COALESCE_MS,
+  observed?: (event: StreamEvent) => void,
 ): () => void {
   const source = new EventSource(`${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/stream`, { withCredentials: true });
   let closed = false;
@@ -45,7 +46,10 @@ export function subscribeToExecution(
   function message(event: MessageEvent<string>) {
     if (closed) return;
     const data = parseStreamEvent(event.data);
-    if (data?.execution_id === executionId && (event.type === "message" || event.type === data.type)) schedule();
+    if (data?.execution_id === executionId && (event.type === "message" || event.type === data.type)) {
+      observed?.(data);
+      schedule();
+    }
   }
   function open() {
     if (closed) return;

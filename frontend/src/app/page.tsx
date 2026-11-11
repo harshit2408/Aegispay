@@ -1,5 +1,6 @@
 import { Inbox } from "./inbox";
 import { StudioSpike } from "./studio/studio-spike";
+import { OpsPanel } from "./ops-panel";
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
         </p>
       </section>
       <Inbox />
+      <OpsPanel />
       <StudioSpike />
     </>
   );

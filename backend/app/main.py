@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     validate_service_environment("api")
     settings = get_settings()
+    configure_demo_routes(app, enabled=settings.demo_enabled)
     sessions = get_sessionmaker(settings.database_url)
     engine = sessions.kw["bind"]
     app.state.sessions = sessions
@@ -171,15 +172,6 @@ class ConfiguredCORS:
             await self.app(scope, receive, send)
 
 
-app = FastAPI(title="AegisPay API", lifespan=lifespan)
-app.add_middleware(RequestLimits)
-app.add_middleware(ConfiguredCORS)
-for router in (auth, contracts, demo, documents, grns, mandates, ops, stream, vendors, webhooks):
-    app.include_router(router.router)
-app.include_router(webhooks.simulator_router)
-
-
-@app.get("/api/health")
 async def health(session: Annotated[AsyncSession, Depends(get_session)]) -> JSONResponse:
     try:
         await session.execute(text("SELECT 1"))
@@ -195,3 +187,28 @@ async def health(session: Annotated[AsyncSession, Depends(get_session)]) -> JSON
             "replay_mode": settings.demo_replay_mode,
         }
     )
+
+
+def configure_demo_routes(app: FastAPI, *, enabled: bool) -> None:
+    previous = getattr(app.state, "demo_routes", ())
+    app.router.routes[:] = [route for route in app.router.routes if route not in previous]
+    start = len(app.router.routes)
+    if enabled:
+        app.include_router(demo.router)
+        app.include_router(webhooks.simulator_router)
+    app.state.demo_routes = app.router.routes[start:]
+    app.openapi_schema = None
+
+
+def create_app(*, demo_enabled: bool = False) -> FastAPI:
+    application = FastAPI(title="AegisPay API", lifespan=lifespan)
+    application.add_middleware(RequestLimits)
+    application.add_middleware(ConfiguredCORS)
+    for router in (auth, contracts, documents, grns, mandates, ops, stream, vendors, webhooks):
+        application.include_router(router.router)
+    application.add_api_route("/api/health", health, methods=["GET"])
+    configure_demo_routes(application, enabled=demo_enabled)
+    return application
+
+
+app = create_app()

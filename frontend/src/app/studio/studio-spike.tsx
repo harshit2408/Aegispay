@@ -18,7 +18,7 @@ import { helloAgent } from "./hello-agent";
 import { ReactProbe, type ReactProbeData } from "./react-probe";
 import { agStudioPayPalTheme } from "./theme";
 import { cockpitPreview } from "../../fixtures/cockpit-preview";
-import { LedgerWidget, GaugeWidget, ExposureWidget, type LedgerData, type GaugeData, type ExposureData } from "./cockpit-widgets";
+import { LedgerWidget, GaugeWidget, ExposureWidget, PathWidget, TimelineWidget, type LedgerData, type GaugeData, type ExposureData, type PathData, type TimelineData } from "./cockpit-widgets";
 
 if (process.env.NODE_ENV !== "production") enableStudioDevValidations();
 
@@ -26,6 +26,19 @@ type ReactProbeDefinition = AgWidgetDefinition<"react-probe", ReactProbeData>;
 type LedgerDefinition = AgWidgetDefinition<"payables-ledger", LedgerData>;
 type GaugeDefinition = AgWidgetDefinition<"mandate-gauge", GaugeData>;
 type ExposureDefinition = AgWidgetDefinition<"frozen-exposure", ExposureData>;
+type PathDefinition = AgWidgetDefinition<"decision-path", PathData>;
+type TimelineDefinition = AgWidgetDefinition<"settlement-timeline", TimelineData>;
+
+const pathWidget: PathDefinition = {
+  id: "decision-path", label: "Decision path", comp: PathWidget,
+  form: (params) => params.createDefaults({ dataMappingItems: [] }),
+  defaultSize: { width: 500, height: 400 }, minSize: { width: 280, height: 220 },
+};
+const timelineWidget: TimelineDefinition = {
+  id: "settlement-timeline", label: "Settlement timeline", comp: TimelineWidget,
+  form: (params) => params.createDefaults({ dataMappingItems: [] }),
+  defaultSize: { width: 500, height: 400 }, minSize: { width: 280, height: 220 },
+};
 
 const ledgerWidget: LedgerDefinition = {
   id: "payables-ledger", label: "Payables ledger", comp: LedgerWidget,
@@ -53,12 +66,12 @@ const reactWidget: ReactProbeDefinition = {
 };
 
 interface SpikeRegistry extends AgBaseRegistry {
-  widgets: readonly (AgDefaultRegistry["widgets"][number] | ReactProbeDefinition | LedgerDefinition | GaugeDefinition | ExposureDefinition)[];
+  widgets: readonly (AgDefaultRegistry["widgets"][number] | ReactProbeDefinition | LedgerDefinition | GaugeDefinition | ExposureDefinition | PathDefinition | TimelineDefinition)[];
 }
 
 const widgets = createWidgets<SpikeRegistry>({
-  additionalTypes: [reactWidget, ledgerWidget, gaugeWidget, exposureWidget],
-  menu: [{ label: "AegisPay", widgetIds: ["payables-ledger", "mandate-gauge", "frozen-exposure", "react-probe"] }],
+  additionalTypes: [reactWidget, ledgerWidget, gaugeWidget, exposureWidget, pathWidget, timelineWidget],
+  menu: [{ label: "AegisPay", widgetIds: ["payables-ledger", "mandate-gauge", "frozen-exposure", "decision-path", "settlement-timeline", "react-probe"] }],
 });
 
 const data = {
@@ -81,6 +94,16 @@ const initialState: AgReportState<SpikeRegistry> = {
       ledger: { xTrack: 0, yTrack: 0, xSpan: 24, ySpan: 16 },
       gauge: { xTrack: 0, yTrack: 16, xSpan: 10, ySpan: 22 },
       exposure: { xTrack: 10, yTrack: 16, xSpan: 14, ySpan: 22 },
+    },
+  }, {
+    id: "execution",
+    widgets: {
+      path: { type: "decision-path", dataMapping: {} },
+      timeline: { type: "settlement-timeline", dataMapping: {} },
+    },
+    widgetLayout: {
+      path: { xTrack: 0, yTrack: 0, xSpan: 12, ySpan: 34 },
+      timeline: { xTrack: 12, yTrack: 0, xSpan: 12, ySpan: 34 },
     },
   }, {
     id: "spike",
@@ -112,6 +135,8 @@ export function StudioSpike() {
   const [mode, setMode] = useState<AgStudioMode>("view");
   const [ready, setReady] = useState(false);
   const [selectedPage, setSelectedPage] = useState("cockpit");
+  const [executionId, setExecutionId] = useState("");
+  const [selectedExecutionId, setSelectedExecutionId] = useState("");
 
   function selectPage(page: string) {
     if (!studioApi.current) return;
@@ -120,16 +145,22 @@ export function StudioSpike() {
   }
   return (
     <>
-      <div className="replay-banner">REPLAY · Studio preview · Synthetic data only</div>
+      {selectedPage !== "execution" && <div className="replay-banner">REPLAY · Studio preview · Synthetic data only</div>}
       <div className="studio-toolbar">
         <button type="button" disabled={!ready} aria-pressed={selectedPage === "cockpit"} onClick={() => selectPage("cockpit")}>Cockpit widgets</button>
         <button type="button" disabled={!ready} aria-pressed={selectedPage === "spike"} onClick={() => selectPage("spike")}>Integration probes</button>
+        <button type="button" disabled={!ready} aria-pressed={selectedPage === "execution"} onClick={() => selectPage("execution")}>Follow execution</button>
         <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode(mode === "view" ? "edit" : "view")}>
           {mode === "view" ? "Edit Studio layout" : "View Studio layout"}
         </button>
         <span role="status">{ready ? "Studio ready" : "Loading Studio…"}</span>
-        <span>Synthetic read-only snapshot · No live payments or API calls.</span>
+        <span>{selectedPage === "execution" ? "Authenticated case updates · Read-only widgets" : "Synthetic read-only snapshot · No live payments or API calls."}</span>
       </div>
+      {selectedPage === "execution" && <form className="studio-toolbar" onSubmit={(event) => { event.preventDefault(); setSelectedExecutionId(executionId.trim()); }}>
+        <label htmlFor="studio-execution">Execution ID from the inbox</label>
+        <input id="studio-execution" required pattern="[A-Za-z0-9_-]+" maxLength={128} value={executionId} onChange={(event) => setExecutionId(event.target.value)} />
+        <button type="submit">Follow selected execution</button>
+      </form>}
       <div className="studio-container" role="region" aria-label="AG Studio integration preview; scroll horizontally on narrow screens" tabIndex={0}>
         <AgStudioProvider licenseKey={process.env.NEXT_PUBLIC_AG_LICENSE_KEY} modules={[AgStudioAiModule]}>
           <AgStudio<SpikeRegistry>
@@ -140,7 +171,7 @@ export function StudioSpike() {
             widgets={widgets}
             ai={ai}
             initialState={initialState}
-            context={cockpitPreview}
+            context={{ ...cockpitPreview, selectedExecutionId }}
             mode={mode}
             onStudioReady={({ api }) => { studioApi.current = api; setReady(true); }}
           />

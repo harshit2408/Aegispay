@@ -6,10 +6,12 @@ databases:
     postgresMajorVersion: "16"
     databaseName: aegis
     user: aegis_owner
+    region: oregon
     ipAllowList: []
 services:
   - type: web
     name: aegispay-api
+    region: oregon
     runtime: docker
     plan: 0.5c-512mb
     numInstances: 1
@@ -17,11 +19,19 @@ services:
     dockerfilePath: ./backend/Dockerfile
     healthCheckPath: /api/health
     autoDeployTrigger: "off"
+    disk:
+      name: aegis-documents
+      mountPath: /var/data/documents
+      sizeGB: 1
     envVars:
       - key: DATABASE_URL
         sync: false
       - key: CHECKPOINT_DB_URL
         sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: STORAGE_PATH
+        value: /var/data/documents
       - key: PAYPAL_BASE_URL
         value: https://api-m.sandbox.paypal.com
       - key: TREASURY_WEBHOOK_ID
@@ -50,6 +60,7 @@ services:
         value: "false"
   - type: worker
     name: aegispay-settlement
+    region: oregon
     runtime: docker
     plan: 0.5c-512mb
     numInstances: 1
@@ -97,6 +108,7 @@ services:
         sync: false
   - type: web
     name: aegispay-frontend
+    region: oregon
     runtime: docker
     plan: 0.5c-512mb
     dockerContext: ./frontend

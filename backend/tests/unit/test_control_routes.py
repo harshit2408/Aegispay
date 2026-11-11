@@ -74,6 +74,7 @@ async def test_vendor_change_requires_second_person_and_blocks_before_worker(
     controls, pg_sessionmaker
 ):
     _, client, identity = controls
+    assert (await client.get("/api/ops/status")).status_code == 403
     response = await client.post(
         "/api/vendors/v1/changes",
         json={
@@ -94,6 +95,15 @@ async def test_vendor_change_requires_second_person_and_blocks_before_worker(
         f"/api/vendors/changes/{change_id}/approve", json={"reason": "Independent verification"}
     )
     assert approved.status_code == 200 and approved.json()["status"] == "COOLING"
+    summary = await client.get("/api/ops/status")
+    assert summary.status_code == 200
+    data = summary.json()
+    assert data["vendor_changes"][0]["change_id"] == change_id
+    assert data["vendor_changes"][0]["approved_by"] == "op-cfo"
+    assert data["alerts"][0]["event"] == "VENDOR_CHANGE"
+    assert not data["velocity_breaker_tripped"]
+    assert data["last_anchor_at"] is None
+    assert "new_values" not in str(data)
     async with pg_sessionmaker() as session, session.begin():
         vendor = await session.get(VendorMaster, "v1")
         assert vendor.trust_status == "VERIFIED" and vendor.version == 1
@@ -110,6 +120,20 @@ async def test_vendor_change_requires_second_person_and_blocks_before_worker(
         )
         await apply_vendor_changes(session, datetime.now(UTC))
         assert vendor.trust_status == "COOLING" and vendor.version == 1
+
+
+async def test_ops_status_requires_session_and_admin_reads_fail_closed(controls, pg_sessionmaker):
+    app, client, identity = controls
+    actor_override = app.dependency_overrides.pop(require_operator)
+    assert (await client.get("/api/ops/status")).status_code == 401
+    app.dependency_overrides[require_operator] = actor_override
+    identity["id"] = "op-adm"
+    async with pg_sessionmaker() as session, session.begin():
+        await session.delete(await session.get(SettlementControl, True))
+    response = await client.get("/api/ops/status")
+    assert response.status_code == 200
+    assert response.json()["halted"] is True
+    assert response.json()["halted_reason"] == "controls unavailable"
 
 
 async def test_elapsed_change_is_applied_once_and_versions_bump(controls, pg_sessionmaker):
