@@ -118,7 +118,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-09** @B Demo toolbar: reset, run S1–S4, forensics detector ON/OFF (kill-switch), replay banner (WIP B)
 - [ ] **P3-10** @B Custom dark theme shared by Studio and the app (WIP B)
 - [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework
-- [ ] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance)
+- [ ] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) (WIP B)
 - [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
 - [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
 - [ ] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24) (WIP B)
