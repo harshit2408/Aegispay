@@ -117,7 +117,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator) (WIP B) (BLOCKED: synthetic preview only; Dev A P3-02 authenticated notices and accept/contest integration pending)
 - [ ] **P3-09** @B Demo toolbar: reset, run S1–S4, forensics detector ON/OFF (kill-switch), replay banner (WIP B) (PARTIAL: admin reset/detector and controller scenario runner implemented; admin-only scenario contract and live reset remain)
 - [x] **P3-10** @B Custom dark theme shared by Studio and the app — 514b238
-- [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework
+- [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework (WIP B)
 - [x] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) — 514b238
 - [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
 - [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
