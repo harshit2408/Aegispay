@@ -201,6 +201,13 @@ async def test_invoice_lookup_failure_falls_back_to_match_time_status(pg_session
     assert (await case())["paypal_invoice"]["status"] == "SENT"
 
 
+async def test_invoice_lookup_transport_error_falls_back_instead_of_500(pg_sessionmaker, case):
+    # PayPalClient re-raises httpx.TransportError after its retries; the case view must stay up.
+    await seed_settled(pg_sessionmaker)
+    case.reader.get_invoice.side_effect = httpx.ConnectError("paypal unreachable")
+    assert (await case())["paypal_invoice"]["status"] == "SENT"
+
+
 async def test_invoice_is_not_fetched_before_payout_success(pg_sessionmaker, case):
     await seed_settled(
         pg_sessionmaker, status="PAYOUT_SUBMITTED", chain=CHAIN[:2], item_status="PENDING"
