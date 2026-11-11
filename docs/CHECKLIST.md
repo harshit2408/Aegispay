@@ -60,21 +60,21 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-07** @A `settlement/service.py` `execute(execution_id)` only (R1) + outbox worker (`SKIP LOCKED`, 2 s poll) — ef630d5, review fixes 34de277
 - [x] **P1-08** @A `settlement/reconciler.py` item-status state machine (PRD §9.3) + 15 s / 30 min poll fallback (R6) — ef630d5, review fixes 34de277
 - [x] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe — ef630d5, review fixes 34de277
-- [x] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix — 4b9ce9a
-- [x] **P1-11** @B `audit/events.py` global HMAC hash chain + verification — 46a2ecc (integrated audit foundation; anchors/runtime remain P2-26)
-- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP A) (BLOCKED: upload/decision pipeline absent; dependencies P2-01/02/05/06/07/09/10/13 and P3-13/14, then owner-configured real sandbox acceptance; see P1_COMPLETION.md)
-- [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — `4931be7` (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
-- [x] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI — 4b9ce9a
-- [x] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) — 4b9ce9a
-- [x] **P1-16** @B Three cited public AP/finance case profiles, evidence/inference mapping and limitations → `docs/USER_RESEARCH.md` (owner-authorized secondary-research substitution 2026-10-27; firsthand interviews deferred) — 1489339
-- [x] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base — 4b9ce9a
-- [x] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config? — 4b9ce9a
-- [x] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22) — 4b9ce9a
-- [x] **P1-20** @B `vendor_master` v2.1 (payer ID, version, onboarding evidence) + append-only `vendor_master_changes` with immutability trigger (PRD §8, R15) — 4b9ce9a
-- [x] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17) — 4b9ce9a
-- [x] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19) — 4b9ce9a
-- [x] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20) — 4b9ce9a
-- [x] **P1-24** @A Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007) — 4b9ce9a (local worker, guards, grants, Compose, blueprint); hosted worker Live with disjoint env names, evidence in RENDER_SETUP.md (worker runtime log not captured)
+- [x] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix — b198658 (#29)
+- [x] **P1-11** @B `audit/events.py` global HMAC hash chain + verification — b198658 (#29) (integrated audit foundation; anchors/runtime remain P2-26)
+- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP A) (BLOCKED: upload/decision pipeline and sessions merged in main via #40 0e00757; headless CLI `backend/scripts/s1_headless.py` and the parser-sandbox fix needed for any real PDF parse are in PR #43; remaining is owner-configured sandbox/provider/operator values and the real CLI run with saved execution, invoice and payout IDs; see P1_COMPLETION.md)
+- [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — e49f599 (#24) (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
+- [x] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI — b198658 (#29)
+- [x] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) — b198658 (#29)
+- [x] **P1-16** @B Three cited public AP/finance case profiles, evidence/inference mapping and limitations → `docs/USER_RESEARCH.md` (owner-authorized secondary-research substitution 2026-10-27; firsthand interviews deferred) — b0c936d (#31)
+- [x] **P1-17** @B Decide Q4: terminal aesthetic vs AG Studio theme as base — b198658 (#29)
+- [x] **P1-18** @AB Decide Q2: are `HIGH_RISK` cases approvable in the demo config? — b198658 (#29)
+- [x] **P1-19** @B `operators` table, five roles, SoD CHECKs (`activated_by <> created_by`, uploader/approver) and DB roles + grants for api vs settlement (PRD §8, R18, R22) — b198658 (#29)
+- [x] **P1-20** @B `vendor_master` v2.1 (payer ID, version, onboarding evidence) + append-only `vendor_master_changes` with immutability trigger (PRD §8, R15) — b198658 (#29)
+- [x] **P1-21** @A `settlement/po_ledger.py` atomic PO reserve/release + property test Σ ≤ accepted value (R17) — b198658 (#29)
+- [x] **P1-22** @A Write-ahead `PAYOUT_SENDING`, leased outbox claims, adopt-existing-batch, frozen command + response assertion; crash tests at each step (R5, R19) — b198658 (#29)
+- [x] **P1-23** @A `settlement/transitions.py` allowed-pairs table + `row_version`; pre-payout recheck (halt, vendor/PO/GRN version, invoice open) (R6, R20) — b198658 (#29)
+- [x] **P1-24** @A Settlement as a separate Render background worker with its own env; boot env assertions per service (R22, ADR-007) — b198658 (#29) (local worker, guards, grants, Compose, blueprint); hosted worker Live with disjoint env names, evidence in RENDER_SETUP.md (worker runtime log not captured)
 
 ## P2 — Decision engine + core UI (Oct 28 – Nov 2) · exit: **headless S1–S4 pass**; first `docs/EVAL.md` numbers
 
@@ -83,33 +83,33 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P2-03** @A Forensics `ocr_diff.py` (cut-order item 5 — keep PDF-structure checks if cut) — 04c2daf
 - [x] **P2-04** @A Eval set ≥ 50 labelled PDFs (held-out split, adaptive + A4 memo-injection cases, 5 runs, Wilson intervals) incl. false-positive traps in `tests/fixtures/eval/` — 04c2daf
 - [x] **P2-05** @A A3 Injection classifier (no tools) → `ForensicsReport` — 04c2daf
-- [x] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9) — f74a700
-- [x] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed — 5b8986c
-- [x] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00) — 5b8986c
-- [x] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests — b4e4f5f (integration f7fbb54)
-- [x] **P2-10** @A `decision/graph.py` topology + `human_review` `interrupt()` + resume via `Command`; Postgres checkpointer — b4e4f5f (integration f7fbb54)
-- [x] **P2-11** @A Property tests (hypothesis): receiver ∈ vendor master; paid ≤ accepted value; Σ reservations ≤ cap — b4e4f5f (integration f7fbb54)
-- [x] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) — b4e4f5f (integration f7fbb54)
-- [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP A, taken over from B) (PARTIAL: authenticated replay routes verified b4e4f5f; live reset owner orchestration and full PRD health probes remain)
-- [x] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution — f7fbb54
-- [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP B) (PARTIAL: local replay S1–S4 and first EVAL numbers b4e4f5f; real sandbox payout/invoice acceptance and browser S1–S4 remain)
-- [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — 55b2f38
-- [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — 55b2f38
-- [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — 55b2f38
-- [x] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required — f7fbb54
-- [x] **P2-20** @B Mandate studio: compile → diff → activate — f7fbb54
-- [x] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s — b4e4f5f (authenticated TCP SSE commit-to-HTTP 33.4 ms locally; frontend credentialed client in cbc9a27)
-- [x] **P2-22** @A `routers/vendors.py`: payee change request → second approver → cooling → effective; alerts (R15) — b4e4f5f (integration f7fbb54)
-- [x] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16) — b4e4f5f (integration f7fbb54)
-- [x] **P2-24** @A Gate G11–G14, approvals bound to `gate_hash`, resume by `approval_id` only, distinct-human count inside the gate (R11) — b4e4f5f (integration f7fbb54)
-- [x] **P2-25** @A `SETTLEMENT_HALT`, velocity breaker, `ops/alerts.py` (R23) — b4e4f5f (integration f7fbb54)
-- [x] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21) — cbc9a27; PR #33 review corrections f2f2735 (local PostgreSQL/Git verification; hosted publication and authenticated HTTP export remain deployment/integration work)
+- [x] **P2-06** @B `match` node: PO ↔ PDF ↔ PayPal invoice ↔ GRN; exact + fuzzy duplicate (R9) — a95ef4c (#32)
+- [x] **P2-07** @A `decision/risk.py` additive table (PRD §10.2), contributions exposed — 0e00757 (#40)
+- [x] **P2-08** @A `decision/short_pay.py` (PRD §12); S2 numbers exact to the cent ($65.92 vs $15.00) — 0e00757 (#40)
+- [x] **P2-09** @A `decision/policy_gate.py` G1–G10 table-driven + full truth-table tests — 0e00757 (#40)
+- [x] **P2-10** @A `decision/graph.py` topology + `human_review` `interrupt()` + resume via `Command`; Postgres checkpointer — 0e00757 (#40)
+- [x] **P2-11** @A Property tests (hypothesis): receiver ∈ vendor master; paid ≤ accepted value; Σ reservations ≤ cap — 0e00757 (#40)
+- [x] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) — 0e00757 (#40)
+- [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP A, taken over from B) (PARTIAL: authenticated replay routes verified 0e00757 (#40); live reset owner orchestration and full PRD health probes remain)
+- [x] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution — 0e00757 (#40)
+- [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP B) (PARTIAL: local replay S1–S4 and first EVAL numbers 0e00757 (#40); real sandbox payout/invoice acceptance and browser S1–S4 remain)
+- [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — a95ef4c (#32)
+- [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — a95ef4c (#32)
+- [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — a95ef4c (#32)
+- [x] **P2-19** @B Case view wired to `/api/executions/{id}`; actions only from `allowed_actions`, reason required — 0e00757 (#40)
+- [x] **P2-20** @B Mandate studio: compile → diff → activate — 0e00757 (#40)
+- [x] **P2-21** @B `lib/sse.ts` live updates ≤ 1 s — 0e00757 (#40) (authenticated TCP SSE commit-to-HTTP 33.4 ms locally; frontend credentialed client in 1f16a8b)
+- [x] **P2-22** @A `routers/vendors.py`: payee change request → second approver → cooling → effective; alerts (R15) — 0e00757 (#40)
+- [x] **P2-23** @A `routers/grns.py`: receiver-only GRN recording, supersede-on-correction, qty/date checks (R16) — 0e00757 (#40)
+- [x] **P2-24** @A Gate G11–G14, approvals bound to `gate_hash`, resume by `approval_id` only, distinct-human count inside the gate (R11) — 0e00757 (#40)
+- [x] **P2-25** @A `SETTLEMENT_HALT`, velocity breaker, `ops/alerts.py` (R23) — 0e00757 (#40)
+- [x] **P2-26** @B Audit HMAC chain via `audit_queue` + hourly external anchor + export verification (R21) — 1f16a8b (#33) (local PostgreSQL/Git verification; hosted publication and authenticated HTTP export remain deployment/integration work)
 
 ## P3 — Agents, auth, deploy (Nov 3–6) · exit: **hosted S1–S4 green on Render**; rough-cut video Nov 5
 
 - [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2) (WIP A) (PARTIAL: reviewed module merged in PR #37 — 2fc54e8; graph wiring and eval cases remain)
 - [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow (WIP A) (PARTIAL: reviewed drafter merged in PR #38 — db942a3; graph/eval wiring and vendor accept/contest flow remain)
-- [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only (WIP B)
+- [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only (WIP B) (PARTIAL: auth, opaque sessions, throttle and lockout merged in main via #40 0e00757 and tested; CORS-to-frontend-origin (`ConfiguredCORS`) has no test)
 - [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health`
 - [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag (WIP A) (PARTIAL: reviewed replay completion seam merged in PR #39 — 805331c; runtime graph integration, replay tagging and flag acceptance remain)
 - [ ] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order)
@@ -119,8 +119,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-10** @B Custom dark theme shared by Studio and the app
 - [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework
 - [ ] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance)
-- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
-- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
+- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B) (PARTIAL: merged in main via #40 0e00757; session TTL/idle expiry, CSRF, throttle/lockout and authenticated SSE tested; body caps (`RequestLimits`) untested)
+- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B) (PARTIAL: merged in main via #40 0e00757 but never parsed on Linux — LC_CTYPE env check always failed closed; fix and real-sandbox tests in PR #43)
 - [ ] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24)
 - [ ] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6)
 
