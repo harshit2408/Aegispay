@@ -132,6 +132,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P4-04** @B Playwright E2E S1–S4 in replay mode, running in CI — 514b238
 - [ ] **P4-05** @B Polish + second video cut
 - [ ] **P4-06** @AB Feature freeze; only bug fixes after this line
+- [ ] **P4-07** @B Patch disclosed frontend dependency vulnerabilities and verify regressions (WIP B)
 
 ## P5 — Ship (Nov 9–11) · exit: **submitted Nov 11** (deadline Nov 12 12:00 PT)
 
