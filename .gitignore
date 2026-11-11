@@ -260,3 +260,6 @@ Thumbs.db
 # Local demo manifests and private operator seed input
 .demo-runs/
 operator-seed*.json
+
+# S1 real-sandbox run output (raw case JSON, PDF). The curated docs/evidence/P1-12-s1.json is added deliberately.
+s1-out/

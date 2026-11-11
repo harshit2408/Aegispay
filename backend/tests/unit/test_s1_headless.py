@@ -1,3 +1,4 @@
+import copy
 import importlib.util
 from pathlib import Path
 
@@ -16,7 +17,7 @@ def _good():
     return {
         "status": "SETTLED",
         "duplicate_of_execution_id": None,
-        "po_consumption": {"paid_cents": 48000},
+        "po_consumption": {"paid_cents": 48000, "accepted_value_cents": 48000, "reserved_cents": 0},
         "settlement_timeline": [
             _event("PAYOUT_SUBMITTED"),
             _event("PAYOUT_SUCCEEDED"),
@@ -95,7 +96,52 @@ def test_session_cookie_found_by_name_among_other_cookies(monkeypatch, tmp_path)
     pdf = tmp_path / "s1.pdf"
     pdf.write_bytes(b"%PDF-1.4")
     args = argparse.Namespace(
-        pdf=str(pdf), po="PO-1", invoice="INV-1", out=str(tmp_path / "o.json"), timeout=5
+        pdf=str(pdf), po="PO-1", invoice="INV-1", out=str(tmp_path / "o.json"), timeout=5, grace=0
     )
     assert s1.run(args) == 0
     assert seen["/api/documents"] == "aegis_session=tok"
+
+
+def _mutations():
+    def drop(step):
+        return lambda c: c["settlement_timeline"].__delitem__(
+            [e["status"] for e in c["settlement_timeline"]].index(step)
+        )
+
+    def flag(step, **over):
+        def apply(case):
+            for event in case["settlement_timeline"]:
+                if event["status"] == step:
+                    event.update(over)
+
+        return apply
+
+    cases = {
+        "duplicate": lambda c: c.update(duplicate_of_execution_id="e0"),
+        "short_paid": lambda c: c["po_consumption"].update(paid_cents=42500),
+        "po_not_closed_value": lambda c: c["po_consumption"].update(accepted_value_cents=50000),
+        "po_cents_still_reserved": lambda c: c["po_consumption"].update(reserved_cents=1),
+        "no_consumption": lambda c: c.update(po_consumption=None),
+        "no_invoice": lambda c: c.update(paypal_invoice=None),
+        "invoice_partially_paid": lambda c: c["paypal_invoice"].update(status="PARTIALLY_PAID"),
+        "no_anchor": lambda c: c.update(audit_anchor=None),
+        "unverified_anchor": lambda c: c["audit_anchor"].update(verified=False),
+    }
+    for status in (s1.TERMINAL - {"SETTLED"}) | {"APPROVED_FOR_PAYMENT", "PAYOUT_SUBMITTED"}:
+        cases[f"status_{status}"] = lambda c, s=status: c.update(status=s)
+    for step in ("PAYOUT_SUBMITTED", "PAYOUT_SUCCEEDED", "SETTLED"):
+        cases[f"missing_{step}"] = drop(step)
+        cases[f"unverified_{step}"] = flag(step, verified=False)
+        cases[f"simulated_{step}"] = flag(step, simulated=True)
+    return cases
+
+
+@pytest.mark.parametrize("name", sorted(_mutations()))
+def test_every_wrong_state_is_rejected(name):
+    case = copy.deepcopy(_good())
+    _mutations()[name](case)
+    assert s1.verdict(case) != []
+
+
+def test_an_empty_case_is_never_a_pass():
+    assert len(s1.verdict({})) >= 5

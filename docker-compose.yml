@@ -81,6 +81,7 @@ services:
       context: ./backend
       args:
         INSTALL_GIT: "1"
+        INSTALL_TESSERACT: "0"
     command: ["python", "-m", "app.settlement.worker"]
     stop_grace_period: 45s
     environment:

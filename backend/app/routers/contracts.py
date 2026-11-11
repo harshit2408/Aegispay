@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,12 +11,98 @@ from app.auth import require_operator, roles
 from app.db import get_session
 from app.decision.dispatch import DecisionConflict, DispatchUnavailable
 from app.models.core import GoodsReceipt, MandatePolicy, Operator, PurchaseOrder, VendorMaster
-from app.models.payables import Approval, InvoiceDocument, InvoiceExecution, POLedger
+from app.models.payables import (
+    Approval,
+    AuditAnchor,
+    ExecutionEvent,
+    InvoiceDocument,
+    InvoiceExecution,
+    Payout,
+    POLedger,
+)
+from app.paypal.client import PayPalAuthError, PayPalError
 from app.schemas.case import APIError, CaseDetail, DecisionReceipt, DecisionRequest, ExecutionRow
 
 router = APIRouter(prefix="/api/executions", tags=["executions"])
 Session = Annotated[AsyncSession, Depends(get_session)]
 Viewer = Annotated[Operator, Depends(require_operator)]
+SETTLEMENT_STEPS = (
+    "PAYOUT_SENDING",
+    "PAYOUT_SUBMITTED",
+    "PAYOUT_SUCCEEDED",
+    "PAYOUT_FAILED",
+    "SETTLED",
+    "NEEDS_MANUAL_REVIEW",
+)
+INVOICE_LIVE_STATUSES = ("PAYOUT_SUCCEEDED", "SETTLED")
+
+
+async def _settlement_view(session, execution_id: str) -> tuple[list[dict], dict]:
+    """Timeline from the signed event chain; anchor only if a receipt covers this case's tail.
+
+    `verified` means PayPal said so on a GET (batch id returned, item SUCCESS), never "an event
+    exists". Simulated webhook events cannot move money (R10), so no timeline step is simulated.
+    The API holds no HMAC key (R22): it reports the settlement worker's anchor receipt, not a
+    chain check of its own.
+    """
+    events = list(
+        await session.scalars(
+            select(ExecutionEvent)
+            .where(
+                ExecutionEvent.execution_id == execution_id,
+                ExecutionEvent.event_type.in_(SETTLEMENT_STEPS),
+            )
+            .order_by(ExecutionEvent.event_seq)
+        )
+    )
+    payout = await session.scalar(select(Payout).where(Payout.execution_id == execution_id))
+    confirmed = {
+        "PAYOUT_SUBMITTED": payout is not None and payout.payout_batch_id is not None,
+        "PAYOUT_SUCCEEDED": payout is not None and payout.item_status == "SUCCESS",
+        "SETTLED": payout is not None and payout.item_status == "SUCCESS",
+    }
+    timeline = [
+        {
+            "status": event.event_type,
+            "occurred_at": event.ts.isoformat(),
+            "paypal_id": payout.payout_batch_id
+            if payout and event.event_type != "PAYOUT_SENDING"
+            else None,
+            "verified": confirmed.get(event.event_type, False),
+            "simulated": False,
+        }
+        for event in events
+    ]
+    last_seq = await session.scalar(
+        select(func.max(ExecutionEvent.event_seq)).where(
+            ExecutionEvent.execution_id == execution_id
+        )
+    )
+    anchor = None
+    if last_seq is not None:
+        anchor = await session.scalar(
+            select(AuditAnchor)
+            .where(AuditAnchor.event_seq >= last_seq)
+            .order_by(AuditAnchor.anchor_id)
+            .limit(1)
+        )
+    return timeline, {
+        "verified": anchor is not None,
+        "anchored_at": anchor.created_at.isoformat() if anchor else None,
+        "head_hmac": anchor.head_hash if anchor else None,
+    }
+
+
+async def _live_invoice_status(request: Request, row, stored: str | None) -> str | None:
+    """After the payout succeeded, ask PayPal (R7 outcome); otherwise keep the match-time status."""
+    reader = getattr(request.app.state, "vendor_reader", None)
+    if reader is None or row.status not in INVOICE_LIVE_STATUSES or not row.paypal_invoice_id:
+        return stored
+    try:
+        return (await reader.get_invoice(row.paypal_invoice_id)).status
+    except (PayPalError, PayPalAuthError, httpx.HTTPError):
+        # A read-only status refresh must not turn a PayPal outage into a 500 case view.
+        return stored
 
 
 @router.get("", response_model=list[ExecutionRow], operation_id="list_executions")
@@ -93,19 +180,25 @@ async def get_execution(execution_id: str, request: Request, session: Session, v
                     ),
                 )
                 .select_from(POLedger)
-                .join(InvoiceExecution, POLedger.execution_id == InvoiceExecution.execution_id)
+                # po_ledger.execution_id has no FK, so SQLAlchemy cannot infer this join.
+                .join(InvoiceExecution, InvoiceExecution.execution_id == POLedger.execution_id)
                 .where(POLedger.po_id == row.po_id)
             )
         ).one()
         po_consumption = {
             "accepted_value_cents": match["accepted_value_cents"],
+            # SUM(bigint) is NUMERIC in Postgres (Decimal); cents are int end to end (R4).
             "paid_cents": int(paid),
             "reserved_cents": int(reserved - paid),
             "this_payable_cents": row.approved_cents,
         }
     gate = None
     dispatcher = getattr(request.app.state, "dispatcher", None)
+    timeline, anchor = await _settlement_view(session, execution_id)
     await session.commit()
+    invoice_status = (
+        await _live_invoice_status(request, row, match["paypal_invoice_status"]) if match else None
+    )
     if dispatcher and row.status != "DUPLICATE_BLOCKED":
         snapshot = await dispatcher.snapshot(execution_id)
         gate = snapshot.values.get("gate")
@@ -161,13 +254,13 @@ async def get_execution(execution_id: str, request: Request, session: Session, v
         else None,
         paypal_invoice={
             "invoice_id": match["paypal_invoice_id"],
-            "status": match["paypal_invoice_status"],
+            "status": invoice_status,
             "billed_qty": match["billed_qty"],
             "unit_price_cents": match["billed_unit_price_cents"],
             "total_cents": match["billed_cents"],
             "payee_reference": None,
         }
-        if match and match["paypal_invoice_status"]
+        if match and invoice_status
         else None,
         po_consumption=po_consumption,
         policy=policy.compiled_json if policy and policy.version == row.policy_version else None,
@@ -189,8 +282,8 @@ async def get_execution(execution_id: str, request: Request, session: Session, v
             }
             for vote, actor in approvals
         ],
-        settlement_timeline=[],
-        audit_anchor={"verified": False, "anchored_at": None, "head_hmac": None},
+        settlement_timeline=timeline,
+        audit_anchor=anchor,
     )
 
 

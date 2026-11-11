@@ -50,9 +50,12 @@ def verdict(case: dict) -> list[str]:
         problems.append(f"status is {case.get('status')}, expected SETTLED")
     if case.get("duplicate_of_execution_id"):
         problems.append("case is a duplicate")
-    paid = (case.get("po_consumption") or {}).get("paid_cents")
-    if paid != S1_CENTS:
-        problems.append(f"po paid_cents {paid} != {S1_CENTS}")
+    consumption = case.get("po_consumption") or {}
+    if consumption.get("paid_cents") != S1_CENTS:
+        problems.append(f"po paid_cents {consumption.get('paid_cents')} != {S1_CENTS}")
+    # R17: PO closes only when everything accepted is paid and nothing is still reserved.
+    if consumption.get("accepted_value_cents") != S1_CENTS or consumption.get("reserved_cents"):
+        problems.append("PO not fully consumed (accepted value != paid, or cents still reserved)")
     steps = {e["status"]: e for e in case.get("settlement_timeline", [])}
     for needed in ("PAYOUT_SUBMITTED", "PAYOUT_SUCCEEDED", "SETTLED"):
         event = steps.get(needed)
@@ -93,15 +96,21 @@ def run(args: argparse.Namespace) -> int:
         receipt.raise_for_status()
         execution_id = receipt.json()["execution_id"]
         deadline = time.monotonic() + args.timeout
+        terminal_at = None
         case = {}
         while time.monotonic() < deadline:
             response = http.get(f"/api/executions/{execution_id}", headers=headers)
             response.raise_for_status()
             case = response.json()
             if case["status"] in TERMINAL:
-                break
+                # Audit events and the anchor receipt land a moment after the status flips.
+                terminal_at = terminal_at or time.monotonic()
+                if not verdict(case) or time.monotonic() - terminal_at > args.grace:
+                    break
             time.sleep(2)
     problems = verdict(case)
+    if case.get("status") == "FROZEN":
+        sys.stdout.write("Needs human approval (R11); this CLI never approves. Stopping.\n")
     Path(args.out).write_text(
         json.dumps({"execution_id": execution_id, "case": case, "problems": problems}, indent=2)
     )
@@ -122,4 +131,5 @@ if __name__ == "__main__":
     parser.add_argument("--invoice", required=True)
     parser.add_argument("--out", default="s1-evidence.json")
     parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--grace", type=int, default=60, help="seconds to wait for audit/anchor")
     sys.exit(run(parser.parse_args()))

@@ -72,6 +72,8 @@ services:
     envVars:
       - key: INSTALL_GIT # Docker build arg: git only in this image
         value: "1"
+      - key: INSTALL_TESSERACT # Docker build arg: the settlement worker never parses PDFs
+        value: "0"
       - key: SETTLEMENT_DATABASE_URL
         sync: false
       - key: PAYPAL_BASE_URL
