@@ -106,6 +106,140 @@
         "title": "AlertView",
         "type": "object"
       },
+      "AnalystCount": {
+        "properties": {
+          "count": {
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "RECEIVED",
+              "ANALYZING",
+              "FROZEN",
+              "REJECTED",
+              "DUPLICATE_BLOCKED",
+              "APPROVED_FOR_PAYMENT",
+              "PAYOUT_SENDING",
+              "PAYOUT_SUBMITTED",
+              "PAYOUT_SUCCEEDED",
+              "PAYOUT_FAILED",
+              "SETTLED",
+              "NEEDS_MANUAL_REVIEW"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ],
+        "title": "AnalystCount",
+        "type": "object"
+      },
+      "AnalystRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "AnalystRequest",
+        "type": "object"
+      },
+      "AnalystWidget": {
+        "properties": {
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "counts": {
+            "items": {
+              "$ref": "#/components/schemas/AnalystCount"
+            },
+            "title": "Counts",
+            "type": "array"
+          },
+          "days": {
+            "enum": [
+              1,
+              7,
+              30
+            ],
+            "title": "Days",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "status_summary",
+              "execution_list"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "replayed": {
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "RECEIVED",
+                  "ANALYZING",
+                  "FROZEN",
+                  "REJECTED",
+                  "DUPLICATE_BLOCKED",
+                  "APPROVED_FOR_PAYMENT",
+                  "PAYOUT_SENDING",
+                  "PAYOUT_SUBMITTED",
+                  "PAYOUT_SUCCEEDED",
+                  "PAYOUT_FAILED",
+                  "SETTLED",
+                  "NEEDS_MANUAL_REVIEW"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "days",
+          "as_of",
+          "rows",
+          "counts",
+          "truncated",
+          "replayed"
+        ],
+        "title": "AnalystWidget",
+        "type": "object"
+      },
       "ApprovalView": {
         "properties": {
           "action": {
@@ -2132,6 +2266,47 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/analyst/widgets": {
+      "post": {
+        "operationId": "widget_api_analyst_widgets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalystRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalystWidget"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Widget",
+        "tags": [
+          "analyst"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "login_api_auth_login_post",

@@ -30,3 +30,7 @@ Verification follow-up: merged Dev A's published security corrections (`1e0798d`
 - P2-13 remains partial: live demo reset returns HTTP 503 and still needs owner-seeder orchestration, new policy/PO/GRN trust roots and archival semantics; health still lacks complete token/webhook/account/worker/anchor probes from PRD §14.
 - P2-15 remains open: run S1–S4 against owner-configured PayPal sandbox through confirmed payout and invoice settlement. Browser Playwright S1–S4 is also unexecuted.
 - No live LLM/provider call, sandbox payout, hosted Render deployment or independent Dev A review was performed. R1–R4 changes require that review before merge.
+
+## A7 Treasury Analyst boundary — 2026-11-12
+
+Local Linux Python 3.12 checks passed **15 tests in 2.83 s**: five synthetic boundary eval cases plus ten selector/governance unit cases. The schema rejects arbitrary SQL/tools, unknown statuses, unsupported time windows and boolean/fractional days; the prompt is delimited and contains no execution records. These injected completions establish server boundaries, not natural-language selection accuracy. Four PostgreSQL route cases are verified separately by the integrated suite; no passing result is claimed here before that run. Frontend **58 tests** passed, including five Agent Framework runner/client checks for zero tools, stale-result clearing, cancellation, CSRF and provider errors. ESLint and TypeScript passed; two unused-variable warnings in the test were then removed. No live model call, hosted Studio session or model-quality measurement was performed.
