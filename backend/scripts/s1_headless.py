@@ -12,7 +12,9 @@ import json
 import os
 import sys
 import time
+from ipaddress import ip_address
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -25,6 +27,20 @@ TERMINAL = {
     "PAYOUT_FAILED",
     "NEEDS_MANUAL_REVIEW",
 }
+
+
+def api_base(url: str) -> str:
+    """The session cookie is re-sent by hand, so refuse cleartext HTTP except to loopback."""
+    parts = urlsplit(url)
+    if parts.scheme == "https" and parts.hostname:
+        return url
+    if parts.scheme == "http" and parts.hostname:
+        try:
+            if parts.hostname == "localhost" or ip_address(parts.hostname).is_loopback:
+                return url
+        except ValueError:
+            pass
+    raise SystemExit(f"AEGIS_API_URL must be https, or http to loopback only: {url!r}")
 
 
 def verdict(case: dict) -> list[str]:
@@ -52,7 +68,7 @@ def verdict(case: dict) -> list[str]:
 
 
 def run(args: argparse.Namespace) -> int:
-    base = os.environ.get("AEGIS_API_URL", "http://127.0.0.1:8000")
+    base = api_base(os.environ.get("AEGIS_API_URL", "http://127.0.0.1:8000"))
     with httpx.Client(base_url=base, timeout=30) as http:
         login = http.post(
             "/api/auth/login",
@@ -63,7 +79,9 @@ def run(args: argparse.Namespace) -> int:
         )
         login.raise_for_status()
         # The session cookie is Secure; the jar would drop it over plain-http localhost.
-        cookie = login.headers["set-cookie"].split("=", 1)[1].split(";")[0]
+        cookie = login.cookies.get("aegis_session")
+        if not cookie:
+            raise SystemExit("login response carried no aegis_session cookie")
         headers = {"Cookie": f"aegis_session={cookie}", "X-CSRF-Token": login.json()["csrf_token"]}
         with Path(args.pdf).open("rb") as pdf:
             receipt = http.post(
