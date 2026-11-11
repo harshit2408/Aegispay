@@ -130,6 +130,21 @@ logins and service variables below; migration credentials never belong in a runt
 Use `/api/health` for readiness and the external uptime check. Keep PayPal sandbox-only and
 enable demo routes only under R24's sandbox guard.
 
+The blueprint pins the services and database to Oregon, matching the deployed database.
+Set API `FRONTEND_ORIGIN` to the exact HTTPS frontend origin, and set frontend
+`NEXT_PUBLIC_API_URL` to the API HTTPS origin before the Docker build. The API document
+disk mounts at `/var/data/documents`, selected by `STORAGE_PATH`, so uploaded evidence
+survives service restarts. Preserve this disk during upgrades. Apply all current migrations
+in the separate owner session before deploying the current application; the older hosted
+evidence below establishes only migrations through 0007, not the current schema.
+
+For P3-04 acceptance, record the deployed commit and public frontend/API URLs, verify
+exactly one settlement instance, and configure an external uptime monitor against
+`https://<api-host>/api/health` through December 15. Record the monitor's public or
+owner-supplied non-secret evidence and its first successful check. A configured Render
+readiness path is not evidence of an external uptime monitor. This repository change
+does not deploy services, configure that monitor, or establish hosted S1–S4 acceptance.
+
 When the public API hostname is known, retarget **both sandbox apps'** webhook registrations
 to `/api/webhooks/paypal/treasury` and `/api/webhooks/paypal/vendor` (PRD §13).
 Recheck webhook IDs for those exact registrations and

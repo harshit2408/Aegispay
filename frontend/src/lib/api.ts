@@ -289,6 +289,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ops/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_ops_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stream": {
         parameters: {
             query?: never;
@@ -415,6 +432,22 @@ export interface components {
             policy_id: string;
             /** Version */
             version: number;
+        };
+        /** AlertView */
+        AlertView: {
+            /** Alert Id */
+            alert_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Delivered At */
+            delivered_at: string | null;
+            /** Event */
+            event: string;
+            /** Execution Id */
+            execution_id: string | null;
         };
         /** ApprovalView */
         ApprovalView: {
@@ -643,6 +676,11 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** HaltView */
+        HaltView: {
+            /** Halted */
+            halted: boolean;
+        };
         /** HiddenSegment */
         HiddenSegment: {
             /** Bbox */
@@ -828,6 +866,21 @@ export interface components {
              */
             role: "controller" | "cfo" | "vendor_admin" | "receiver" | "admin";
         };
+        /** OpsStatusView */
+        OpsStatusView: {
+            /** Alerts */
+            alerts: components["schemas"]["AlertView"][];
+            /** Halted */
+            halted: boolean;
+            /** Halted Reason */
+            halted_reason: string | null;
+            /** Last Anchor At */
+            last_anchor_at: string | null;
+            /** Velocity Breaker Tripped */
+            velocity_breaker_tripped: boolean;
+            /** Vendor Changes */
+            vendor_changes: components["schemas"]["PendingChangeView"][];
+        };
         /** POConsumptionView */
         POConsumptionView: {
             /** Accepted Value Cents */
@@ -853,6 +906,21 @@ export interface components {
             total_cents: number;
             /** Unit Price Cents */
             unit_price_cents: number;
+        };
+        /** PendingChangeView */
+        PendingChangeView: {
+            /** Approved By */
+            approved_by: string | null;
+            /** Change Id */
+            change_id: string;
+            /** Effective At */
+            effective_at: string | null;
+            /** Requested By */
+            requested_by: string;
+            /** Status */
+            status: string;
+            /** Vendor Id */
+            vendor_id: string;
         };
         /** PurchaseOrderView */
         PurchaseOrderView: {
@@ -1511,7 +1579,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HaltView"];
                 };
             };
         };
@@ -1535,7 +1603,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HaltView"];
                 };
             };
             /** @description Validation Error */
@@ -1545,6 +1613,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_ops_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpsStatusView"];
                 };
             };
         };

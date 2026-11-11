@@ -93,14 +93,14 @@ async def get_execution(execution_id: str, request: Request, session: Session, v
                     ),
                 )
                 .select_from(POLedger)
-                .join(InvoiceExecution)
+                .join(InvoiceExecution, POLedger.execution_id == InvoiceExecution.execution_id)
                 .where(POLedger.po_id == row.po_id)
             )
         ).one()
         po_consumption = {
             "accepted_value_cents": match["accepted_value_cents"],
-            "paid_cents": paid,
-            "reserved_cents": reserved - paid,
+            "paid_cents": int(paid),
+            "reserved_cents": int(reserved - paid),
             "this_payable_cents": row.approved_cents,
         }
     gate = None

@@ -39,6 +39,13 @@ function post<T>(path: string, body: unknown, csrfToken: string): Promise<T> {
 }
 
 export const api = {
+  opsStatus: (signal?: AbortSignal): Promise<components["schemas"]["OpsStatusView"]> => request("/api/ops/status", { signal }),
+  setHalt: (halted: boolean, reason: string, csrfToken: string): Promise<components["schemas"]["HaltView"]> => post("/api/ops/settlement-halt", { halted, reason }, csrfToken),
+  health: (signal?: AbortSignal): Promise<unknown> => request("/api/health", { signal }),
+  resetDemo: (csrfToken: string): Promise<components["schemas"]["DemoControlView"]> => post("/api/demo/reset", {}, csrfToken),
+  setDetector: (enabled: boolean, csrfToken: string): Promise<components["schemas"]["DemoControlView"]> => post("/api/demo/forensics-detector", { enabled }, csrfToken),
+  runScenario: (scenario: "S1" | "S2" | "S3" | "S4", csrfToken: string): Promise<components["schemas"]["DocumentReceipt"]> =>
+    post(`/api/demo/scenarios/${scenario}/run`, {}, csrfToken),
   session: (): Promise<components["schemas"]["SessionView"]> => request("/api/auth/me"),
   login: (operatorId: string, password: string): Promise<components["schemas"]["SessionView"]> =>
     request("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operator_id: operatorId, password }) }),

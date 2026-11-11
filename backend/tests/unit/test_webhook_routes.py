@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.db import get_session
-from app.main import app
+from app.main import create_app
 from app.models.payables import InvoiceExecution, Payout, WebhookEvent
 from app.paypal.client import PayPalClient
 from app.paypal.invoicing import Invoicing
@@ -56,6 +56,7 @@ async def hook(pg_sessionmaker):
         async with pg_sessionmaker() as session:
             yield session
 
+    app = create_app(demo_enabled=True)
     app.dependency_overrides[get_session] = session_override
     app.dependency_overrides[webhooks.get_verifier] = lambda: verifier
     app.dependency_overrides[webhooks.get_webhook_ids] = lambda: IDS
