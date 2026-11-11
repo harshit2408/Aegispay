@@ -59,4 +59,9 @@ All names are unique and owned by this run; Postgres data lives in disposable tm
 Record commit, any explicit overlays, Python/Postgres versions, final test count and exit code. `CI=true` makes unavailable PostgreSQL fail instead of skip for the integration fixture. A running command, missing exit code, skipped DB suite or failure summary is not a pass. Review the actual log before Git sync. No environment files, credential stores, home directories or host mounts enter the image. Re-run after code changes or a merge that changes tested code.
 
 ## Gotchas
+When reusing a cached image with a new source archive, install that archive's backend into the
+container before testing. `PYTHONPATH` alone does not update the sandboxed parser: its `python -I`
+child ignores it and can load an older installed package. Check both ordinary and isolated imports
+against the intended implementation. A fresh image built with the steps above avoids this mismatch.
+
 See team memories mem_20261026_e5a2118492a34b25814b (runtime dependencies and Compose paths) and mem_20261026_fa1171b7107840dfa532 (audit transaction/ORM freshness). A `[dev]` test image can hide missing runtime dependencies; separately smoke-test the production image. This procedure repeats the P0-17 and P1-09/P1-11 verification pattern; task state stays in `docs/CHECKLIST.md`.
