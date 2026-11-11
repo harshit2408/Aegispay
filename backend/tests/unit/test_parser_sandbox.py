@@ -1,6 +1,7 @@
 """PRD R22 / P3-14: parser subprocess fails closed; Linux-only tests prove the real sandbox."""
 
 import io
+import platform
 import subprocess
 import sys
 from pathlib import Path
@@ -12,7 +13,8 @@ from app.parser import MAX_BYTES, ParseUnavailable, parse_pdf
 
 BACKEND = Path(__file__).resolve().parents[2]
 linux_only = pytest.mark.skipif(
-    sys.platform != "linux", reason="seccomp/rlimit sandbox is Linux x86_64 only"
+    sys.platform != "linux" or platform.machine() != "x86_64",
+    reason="seccomp/rlimit sandbox is Linux x86_64 only",
 )
 
 
