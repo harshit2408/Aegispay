@@ -22,6 +22,7 @@ from app.schemas.decision import HiddenSegment
 
 MIN_ASCII_TOKEN_LEN = 3
 MAX_RENDER_PX = 3000  # longest rendered side; bounds memory for huge MediaBoxes
+MAX_OCR_JOIN = 6  # OCR tokens one visible word may be split into around punctuation
 # Subprocess isolation and wall-clock timeout belong to P3-14.
 
 
@@ -31,6 +32,27 @@ def _token(text: str) -> str | None:
     if not n or (n.isascii() and len(n) < MIN_ASCII_TOKEN_LEN):
         return None
     return n
+
+
+def _ocr_tokens(text: str) -> set[str]:
+    """OCR tokens, plus same-line runs of adjacent tokens joined across a punctuation boundary.
+
+    OCR often re-spaces punctuation ("a @ b.example"), splitting one visible word. Joining only
+    neighbours that meet at punctuation keeps matching exact: a hidden word is never "seen" just
+    because its letters occur somewhere in the page text.
+    """
+    found: set[str] = set()
+    for line in text.splitlines():
+        words = line.split()
+        for i, word in enumerate(words):
+            found.add(word)
+            run = word
+            for j in range(i + 1, min(len(words), i + MAX_OCR_JOIN)):
+                if not (re.search(r"\W$", words[j - 1]) or re.match(r"\W", words[j])):
+                    break
+                run += words[j]
+                found.add(run)
+    return {t for t in map(_token, found) if t}
 
 
 def tesseract_ocr(png: bytes) -> str:
@@ -96,15 +118,11 @@ def detect_ocr_diff(pdf: bytes, ocr: Callable[[bytes], str], dpi: int = 200) -> 
                     text = ocr(png)
                 except Exception as exc:
                     raise PdfParseError(f"OCR failed: {exc}") from exc
-                seen = {t for t in map(_token, text.split()) if t}
-                # OCR often re-spaces punctuation ("a @ b.example"), splitting one visible word.
-                # A word with punctuation counts as seen if its letters appear in the OCR text run
-                # together; plain words still need an exact token, so hidden words stay detectable.
-                joined = re.sub(r"\W", "", text.casefold())
+                seen = _ocr_tokens(text)
                 chars = [o for o in page_objects(page) if isinstance(o, LTChar)]
                 for word, box in _words(chars):
                     n = _token(word)
-                    if n and n not in seen and not (re.search(r"\W", word) and n in joined):
+                    if n and n not in seen:
                         segs.append(
                             HiddenSegment(page=idx + 1, bbox=box, technique="OCR_DIFF", text=word)
                         )
