@@ -82,7 +82,7 @@ def test_malformed_payer_id_fails_before_any_write(tmp_path, identity, monkeypat
     assert list(tmp_path.iterdir()) == []
 
 
-def test_private_permissions_apply_at_creation_and_existing_file_is_preserved(tmp_path, monkeypatch):
+def test_private_permissions_apply_before_writing_and_preserve_existing_file(tmp_path, monkeypatch):
     original = init.os.open
     modes = []
 
