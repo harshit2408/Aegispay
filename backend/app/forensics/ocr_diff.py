@@ -97,10 +97,14 @@ def detect_ocr_diff(pdf: bytes, ocr: Callable[[bytes], str], dpi: int = 200) -> 
                 except Exception as exc:
                     raise PdfParseError(f"OCR failed: {exc}") from exc
                 seen = {t for t in map(_token, text.split()) if t}
+                # OCR often re-spaces punctuation ("a @ b.example"), splitting one visible word.
+                # A word with punctuation counts as seen if its letters appear in the OCR text run
+                # together; plain words still need an exact token, so hidden words stay detectable.
+                joined = re.sub(r"\W", "", text.casefold())
                 chars = [o for o in page_objects(page) if isinstance(o, LTChar)]
                 for word, box in _words(chars):
                     n = _token(word)
-                    if n and n not in seen:
+                    if n and n not in seen and not (re.search(r"\W", word) and n in joined):
                         segs.append(
                             HiddenSegment(page=idx + 1, bbox=box, technique="OCR_DIFF", text=word)
                         )

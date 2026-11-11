@@ -47,6 +47,8 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install
         run: pip install -e "backend[dev]"
+      - name: Tesseract (real-parser S1 pipeline test; API image installs it too)
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends tesseract-ocr
       - name: Ruff
         run: ruff check backend .codex/scripts .codex/tests
       - name: Verify complete Claude/Codex context ports

@@ -39,6 +39,29 @@ def test_hidden_tokens_flagged_with_page_and_bbox():
     assert segs[0].bbox[0] < segs[0].bbox[2] and segs[0].bbox[1] < 120
 
 
+def _email_pdf(visible: str, hidden: str | None = None) -> bytes:
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf, pagesize=(400, 300))
+    c.drawString(20, 250, "Pay to " + visible)
+    if hidden:
+        c.setFillColor(white)
+        c.drawString(20, 100, hidden)
+    c.save()
+    return buf.getvalue()
+
+
+def test_ocr_spacing_around_punctuation_in_a_visible_email_is_not_hidden_text():
+    # Tesseract reads "a@b.example" as "a @ b.example"; that is not a hidden token (P1-12).
+    ocr = lambda _png: "Pay to supplier @ aegispay-demo.example"  # noqa: E731
+    assert detect_ocr_diff(_email_pdf("supplier@aegispay-demo.example"), ocr) == []
+
+
+def test_hidden_email_absent_from_ocr_is_still_flagged():
+    ocr = lambda _png: "Pay to supplier @ aegispay-demo.example"  # noqa: E731
+    pdf = _email_pdf("supplier@aegispay-demo.example", hidden="evil@attacker-example.com")
+    assert [s.text for s in detect_ocr_diff(pdf, ocr)] == ["evil@attacker-example.com"]
+
+
 def test_short_tokens_ignored():
     assert detect_ocr_diff(_pdf(False), lambda _png: "") != []  # long tokens flagged
     assert [s.text for s in detect_ocr_diff(_pdf(False), lambda _png: "")] == [
