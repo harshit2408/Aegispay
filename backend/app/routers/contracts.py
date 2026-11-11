@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,7 +100,8 @@ async def _live_invoice_status(request: Request, row, stored: str | None) -> str
         return stored
     try:
         return (await reader.get_invoice(row.paypal_invoice_id)).status
-    except (PayPalError, PayPalAuthError):
+    except (PayPalError, PayPalAuthError, httpx.HTTPError):
+        # A read-only status refresh must not turn a PayPal outage into a 500 case view.
         return stored
 
 

@@ -62,6 +62,14 @@ def test_hidden_email_absent_from_ocr_is_still_flagged():
     assert [s.text for s in detect_ocr_diff(pdf, ocr)] == ["evil@attacker-example.com"]
 
 
+def test_hidden_punctuated_word_is_not_seen_via_letters_elsewhere_on_the_page():
+    # Letters of a hidden punctuated word occurring run together in visible text ("to supplier")
+    # must not make it "seen": matching stays exact-token after closing punctuation spacing.
+    ocr = lambda _png: "Pay to supplier @ aegispay-demo.example"  # noqa: E731
+    pdf = _email_pdf("supplier@aegispay-demo.example", hidden="to.supplier")
+    assert [s.text for s in detect_ocr_diff(pdf, ocr)] == ["to.supplier"]
+
+
 def test_short_tokens_ignored():
     assert detect_ocr_diff(_pdf(False), lambda _png: "") != []  # long tokens flagged
     assert [s.text for s in detect_ocr_diff(_pdf(False), lambda _png: "")] == [
