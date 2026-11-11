@@ -1,3 +1,5 @@
 frontend/src/lib/api.ts text eol=lf
 backend/openapi.json text eol=lf
 *.pdf binary
+# Mounted into Linux containers: CRLF would break the shebang/`set -eu` lines.
+*.sh text eol=lf

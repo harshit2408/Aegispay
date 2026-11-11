@@ -1,0 +1,50 @@
+# Real-sandbox S1 stack (docs/S1_RUNBOOK.md). Layered over docker-compose.yml:
+#   docker compose -p aegispay-s1 -f docker-compose.yml -f docker-compose.s1.yml \
+#       --env-file <.env.s1> --env-file .env.s1.operators --profile settlement up ...
+# No secret lives here: every value is substituted from the two ignored env files.
+# Owner (migrations, seeding), api and settlement use three different database passwords (R22).
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      # `:-` not `:?` so `build`/`config` work before s1_init_secrets.py ran; s1-db-init.sh refuses blanks.
+      S1_API_DB_PASSWORD: ${S1_API_DB_PASSWORD:-}
+      S1_SETTLE_DB_PASSWORD: ${S1_SETTLE_DB_PASSWORD:-}
+    volumes:
+      - ./backend/scripts/s1-db-init.sh:/docker-entrypoint-initdb.d/002-s1-role-passwords.sh:ro
+
+  migrate:
+    environment:
+      MIGRATION_DATABASE_URL: postgresql+asyncpg://aegis_owner:${POSTGRES_PASSWORD}@postgres:5432/aegis
+
+  api:
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegis_api:${S1_API_DB_PASSWORD}@postgres:5432/aegis
+      CHECKPOINT_DB_URL: postgresql://aegis_api:${S1_API_DB_PASSWORD}@postgres:5432/aegis
+
+  settlement:
+    environment:
+      SETTLEMENT_DATABASE_URL: postgresql+asyncpg://aegis_settle:${S1_SETTLE_DB_PASSWORD}@postgres:5432/aegis
+
+  # Seeding and the headless CLI. Shares the API's network namespace, so the CLI reaches the API on
+  # loopback (s1_headless refuses cleartext to anything else). Owner URL is for seeding only.
+  tools:
+    profiles: ["s1-tools"]
+    build: ./backend
+    network_mode: "service:api"
+    working_dir: /srv
+    volumes:
+      - ./backend/scripts:/scripts:ro
+      - ./s1-out:/out
+      - ./operator-seed-s1.json:/seed/operator-seed-s1.json:ro
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegis_owner:${POSTGRES_PASSWORD}@postgres:5432/aegis
+      DEMO_ENABLED: ${DEMO_ENABLED:-false}
+      DEMO_REPLAY_MODE: ${DEMO_REPLAY_MODE:-false}
+      PAYPAL_BASE_URL: ${PAYPAL_BASE_URL:-https://api-m.sandbox.paypal.com}
+      VENDOR_CLIENT_ID: ${VENDOR_CLIENT_ID:-}
+      VENDOR_CLIENT_SECRET: ${VENDOR_CLIENT_SECRET:-}
+      VENDOR_ACCOUNT_EMAIL: ${VENDOR_ACCOUNT_EMAIL:-}
+      AEGIS_API_URL: http://127.0.0.1:8000
+      AEGIS_OPERATOR_ID: demo-controller1
+      AEGIS_OPERATOR_PASSWORD: ${S1_OPERATOR_PASSWORD_CONTROLLER1:-}
