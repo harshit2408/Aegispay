@@ -38,7 +38,7 @@ Keep `PAYPAL_BASE_URL` on an approved sandbox origin. Demo/replay refuses a live
 
 ## Operators and acceptance
 
-The [README replay quickstart](../README.md#judge-quickstart-local-synthetic-replay) provisions disposable synthetic role accounts without private configuration or PayPal calls. Never deploy its public test passwords. Real roles live in `operators` with Argon2id hashes. The existing `seed_demo` callable in `backend/app/demo/seeder.py` validates seven role hashes and trusted supplier onboarding evidence. There is no standalone operator CLI or automatic `OPERATOR_SEED_FILE` loader; that template variable alone does not provision users.
+The [README replay quickstart](../README.md#judge-quickstart-local-synthetic-replay) provisions disposable synthetic role accounts without private configuration or PayPal calls. Never deploy its public test passwords. Real roles live in `operators` with Argon2id hashes. The existing `seed_demo` callable in `backend/app/demo/seeder.py` validates seven role hashes and trusted supplier onboarding evidence. Its owner CLI is `python -m app.demo --config <private-seed.json> --apply-db`; omitting `--apply-db` performs a dry run. Follow [S1_RUNBOOK](S1_RUNBOOK.md) for private seed generation and setup. There is no automatic `OPERATOR_SEED_FILE` loader; that template variable alone does not provision users.
 
 Before a hosted sandbox run, the owner must provision private role access and trusted supplier/PO/GRN/mandate records, retarget both webhook subscriptions to the deployed HTTPS treasury/vendor endpoints, and verify the restricted-login API plus separate worker. Follow [AUDIT](AUDIT.md) for HMAC/anchor setup. Public health alone does not prove token, account, webhook, worker or external-anchor readiness.
 

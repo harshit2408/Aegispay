@@ -73,7 +73,7 @@ The fixture automatically creates these **local test accounts**, all with public
 
 Real operators are `operators` rows with Argon2id hashes and one role each. Existing provisioning is the `seed_demo` callable in [seeder.py](backend/app/demo/seeder.py), used by the fixture. Its `DemoSeed` requires all seven role hashes, a trusted vendor payer ID, distinct supplier/treasury emails and onboarding evidence. It refuses non-demo, replay-enabled and non-sandbox configuration. The fixture supplies synthetic trusted values and invokes it before replay execution. Passing a VendorGateway additionally creates/sends sandbox invoices; seeding never submits payouts.
 
-There is no standalone operator-provisioning CLI or automatic `OPERATOR_SEED_FILE` loader. That template variable does not create accounts. Hosted operators need owner-controlled provisioning and private passwords; do not publish credentials that satisfy dual approval. Fixture accounts are not hosted judge credentials.
+The owner can provision demo records with `python -m app.demo --config <private-seed.json> --apply-db`; omitting `--apply-db` performs a dry run. The [sandbox S1 runbook](docs/S1_RUNBOOK.md) covers private seed generation and the separate setup service. There is no automatic `OPERATOR_SEED_FILE` loader; that template variable alone does not create accounts. Hosted operators need private passwords; do not publish credentials that satisfy dual approval. Fixture accounts are not hosted judge credentials.
 
 After the walkthrough, stop its named database:
 
