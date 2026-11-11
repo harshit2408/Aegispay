@@ -80,3 +80,21 @@ def test_malformed_payer_id_fails_before_any_write(tmp_path, identity, monkeypat
     with pytest.raises(ValueError):
         run(tmp_path)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_private_permissions_apply_at_creation_and_existing_file_is_preserved(tmp_path, monkeypatch):
+    original = init.os.open
+    modes = []
+
+    def create(path, flags, mode):
+        assert flags & init.os.O_EXCL
+        modes.append(mode)
+        return original(path, flags, mode)
+
+    monkeypatch.setattr(init.os, "open", create)
+    target = tmp_path / "synthetic-secret"
+    init.write_private(target, "synthetic")
+    assert modes == [0o600]
+    with pytest.raises(FileExistsError):
+        init.write_private(target, "replacement")
+    assert target.read_text() == "synthetic"

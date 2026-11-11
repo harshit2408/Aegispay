@@ -48,9 +48,10 @@ def build(*, run: str, reference: str, env: dict[str, str]) -> tuple[dict, dict[
 
 
 def write_private(path: Path, text: str) -> None:
-    with path.open("x", encoding="utf-8") as handle:  # "x": never clobber existing secrets
+    # O_EXCL: never clobber existing secrets; permissions apply before any plaintext write.
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         handle.write(text)
-    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
 def main(argv: list[str] | None = None) -> int:
