@@ -28,8 +28,14 @@ Replay uses synthetic PDFs, recorded extraction/forensics evidence and execution
 Verification follow-up: merged Dev A's published security corrections (`1e0798d`, source `claude/fix-pr-40` through `cc4b98a`), including migration 0012 server-clock cooling timestamps, CFO-only settlement resume, idempotent halt alerts and expired-login-lockout reset. Preserved both JavaScript name-tree and OpenAction fixture coverage. The resulting local Linux/PostgreSQL suite passed **906 tests in 123.83 s** with Ruff passing. The preceding head `6923a7f` passed all five CI jobs in [run 42769525333](https://github.com/harshit2408/Aegispay/actions/runs/42769525333), including fresh Compose startup after fixing the reconciler's idle transaction. Fresh CI for the merged security corrections is reported separately; prior-head CI is not an exact-head claim.
 
 - P2-13 remains partial: live demo reset returns HTTP 503 and still needs owner-seeder orchestration, new policy/PO/GRN trust roots and archival semantics; health still lacks complete token/webhook/account/worker/anchor probes from PRD §14.
-- P2-15 remains open: run S1–S4 against owner-configured PayPal sandbox through confirmed payout and invoice settlement. Browser Playwright S1–S4 is also unexecuted.
-- No live LLM/provider call, sandbox payout, hosted Render deployment or independent Dev A review was performed. R1–R4 changes require that review before merge.
+- P2-15 remains open: run S1–S4 against owner-configured PayPal sandbox through confirmed payout and invoice settlement. Browser replay S1–S4 was subsequently exercised as recorded below.
+- The P2 run above made no live LLM/provider call, sandbox payout or hosted Render deployment. Independent review and merge status is recorded in `docs/SESSION_LOG.md`; local test results do not substitute for the required other-developer R1–R4 review.
+
+## P3 browser replay and fixture coverage — 2026-11-11
+
+The session handoff records the integrated backend suite at implementation `514b238`: **1,024 passed in 169.76 s**, frontend **53 tests**, ESLint/TypeScript and production build passing. Authenticated Chromium S1–S4 replay passed in **18.0 s**, including S3 rejection, S4 original-case linking, detector-disabled freeze and zero spend-ledger/PO-ledger/outbox rows. A separate rough-cut recording run passed its case test in **24.8 s**. These local browser runs use synthetic provider/extraction responses and a test-only API lifespan; they do not prove normal hosted startup or real payout/invoice settlement.
+
+The committed forensics manifest contains **75 labelled PDFs**, split **52 development / 23 held-out**. Fixture presence and deterministic structural checks do not establish extraction/classification accuracy. Five live model runs per held-out case, per-class counts with Wilson intervals, extraction field accuracy, A4 memo-injection evaluation and A5 leakage evaluation remain unreported. No aggregate live-model detection rate is claimed.
 
 ## A7 Treasury Analyst boundary — 2026-11-12
 

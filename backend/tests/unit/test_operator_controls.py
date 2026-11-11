@@ -6,13 +6,13 @@ import httpx
 import pytest
 from argon2 import PasswordHasher
 from fastapi import FastAPI
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.auth import COOKIE, token_hash
 from app.db import get_session
-from app.models.auth import OperatorSession
+from app.models.auth import AuthAttempt, OperatorSession
 from app.models.core import Operator
-from app.routers.auth import router
+from app.routers.auth import _throttled, router
 from app.routers.grns import ReceiptRequest
 
 
@@ -135,3 +135,104 @@ async def test_expired_lockout_does_not_relock_on_one_failure(auth_client, pg_se
             "/api/auth/login", json={"operator_id": "alice", "password": "correct password"}
         )
     ).status_code == 200
+
+
+async def test_cross_site_login_never_creates_session_or_throttle_bucket(
+    auth_client, pg_sessionmaker
+):
+    response = await auth_client.post(
+        "/api/auth/login",
+        headers={"Sec-Fetch-Site": "cross-site"},
+        json={"operator_id": "alice", "password": "correct password"},
+    )
+    assert response.status_code == 403 and "set-cookie" not in response.headers
+    async with pg_sessionmaker() as session:
+        assert await session.scalar(select(func.count()).select_from(OperatorSession)) == 0
+        assert await session.scalar(select(func.count()).select_from(AuthAttempt)) == 0
+
+
+async def test_absolute_expiry_refuses_recently_active_session(auth_client, pg_sessionmaker):
+    await auth_client.post(
+        "/api/auth/login", json={"operator_id": "alice", "password": "correct password"}
+    )
+    async with pg_sessionmaker() as session, session.begin():
+        row = await session.scalar(select(OperatorSession))
+        row.created_at = datetime.now(UTC) - timedelta(hours=9)
+        row.last_seen_at = datetime.now(UTC)
+        row.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    assert (await auth_client.get("/api/auth/me")).status_code == 401
+
+
+async def test_login_rotates_token_and_csrf_and_revokes_previous_session(
+    auth_client, pg_sessionmaker
+):
+    credentials = {"operator_id": "alice", "password": "correct password"}
+    first = await auth_client.post("/api/auth/login", json=credentials)
+    old_token = auth_client.cookies[COOKIE]
+    second = await auth_client.post("/api/auth/login", json=credentials)
+    new_token = auth_client.cookies[COOKIE]
+    assert first.status_code == second.status_code == 200
+    assert old_token != new_token
+    assert first.json()["csrf_token"] != second.json()["csrf_token"]
+    async with pg_sessionmaker() as session:
+        assert await session.get(OperatorSession, token_hash(old_token)) is None
+        assert await session.get(OperatorSession, token_hash(new_token)) is not None
+    assert (
+        await auth_client.get("/api/auth/me", headers={"Cookie": f"{COOKIE}={old_token}"})
+    ).status_code == 401
+    assert (await auth_client.get("/api/auth/me")).status_code == 200
+    assert (
+        await auth_client.post(
+            "/api/auth/logout", headers={"X-CSRF-Token": first.json()["csrf_token"]}
+        )
+    ).status_code == 403
+
+
+@pytest.mark.parametrize("shared", ["account", "ip"])
+async def test_account_and_ip_throttles_persist_independently(pg_sessionmaker, monkeypatch, shared):
+    monkeypatch.setenv("SESSION_SECRET", "synthetic-auth-throttle-secret-32-chars")
+    now = datetime.now(UTC)
+    for index in range(6):
+        account = "same-account" if shared == "account" else f"account-{index}"
+        ip = "192.0.2.1" if shared == "ip" else f"192.0.2.{index + 1}"
+        async with pg_sessionmaker() as session, session.begin():
+            assert await _throttled(session, account, ip, now) is (index == 5)
+    async with pg_sessionmaker() as session, session.begin():
+        assert not await _throttled(session, "unrelated-account", "198.51.100.1", now)
+
+
+@pytest.mark.parametrize(
+    ("origin", "expected_status"),
+    [("https://frontend.example", 200), ("https://attacker.example", 400)],
+)
+async def test_cors_allows_only_configured_frontend(origin, expected_status, monkeypatch):
+    from app.main import ConfiguredCORS
+
+    monkeypatch.setenv("FRONTEND_ORIGIN", "https://frontend.example")
+    application = FastAPI()
+    application.add_middleware(ConfiguredCORS)
+
+    @application.get("/probe")
+    async def probe():
+        return {"ok": True}
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=application), base_url="https://api.example"
+    ) as client:
+        response = await client.options(
+            "/probe",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "Content-Type,X-CSRF-Token",
+            },
+        )
+        assert response.status_code == expected_status
+        actual = await client.get("/probe", headers={"Origin": origin})
+    if expected_status == 200:
+        assert response.headers["access-control-allow-origin"] == origin
+        assert actual.headers["access-control-allow-origin"] == origin
+        assert response.headers["access-control-allow-credentials"] == "true"
+    else:
+        assert "access-control-allow-origin" not in response.headers
+        assert "access-control-allow-origin" not in actual.headers
