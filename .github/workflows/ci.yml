@@ -87,6 +87,12 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install
         run: pip install -e "backend[dev]"
+      - name: Tesseract (real-parser S1 pipeline test; API image installs it too)
+        # Bounded: a hung apt mirror must fail the job fast instead of holding it for hours.
+        timeout-minutes: 8
+        run: |
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install --yes --no-install-recommends tesseract-ocr
       - name: Ruff
         run: ruff check backend .codex/scripts .codex/tests
       - name: Verify complete Claude/Codex context ports
