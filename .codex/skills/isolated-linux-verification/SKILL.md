@@ -16,7 +16,7 @@ $verifyDir = Join-Path ([IO.Path]::GetTempPath()) $verifyId
 $verifyPg = $verifyId + '-pg'
 $verifyJob = $verifyId + '-test'
 New-Item -ItemType Directory -Path $verifyDir -ErrorAction Stop | Out-Null
-git archive --output="$verifyDir/source.tar" HEAD backend
+git -c core.autocrlf=false archive --output="$verifyDir/source.tar" HEAD backend
 if ($LASTEXITCODE -ne 0) { throw 'Archive failed' }
 tar -xf "$verifyDir/source.tar" -C "$verifyDir"
 if ($LASTEXITCODE -ne 0) { throw 'Extract failed' }
@@ -63,5 +63,6 @@ When reusing a cached image with a new source archive, install that archive's ba
 container before testing. `PYTHONPATH` alone does not update the sandboxed parser: its `python -I`
 child ignores it and can load an older installed package. Check both ordinary and isolated imports
 against the intended implementation. A fresh image built with the steps above avoids this mismatch.
+Disable `core.autocrlf` for Linux archives so generated mirror checks compare the committed LF bytes.
 
 See team memories mem_20261026_e5a2118492a34b25814b (runtime dependencies and Compose paths) and mem_20261026_fa1171b7107840dfa532 (audit transaction/ORM freshness). A `[dev]` test image can hide missing runtime dependencies; separately smoke-test the production image. This procedure repeats the P0-17 and P1-09/P1-11 verification pattern; task state stays in `docs/CHECKLIST.md`.
