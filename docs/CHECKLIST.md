@@ -141,7 +141,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P5-04** @B Final video < 3 min, public on YouTube, captions, no copyrighted music
 - [ ] **P5-05** @AB Code freeze Nov 9 23:59 IST
 - [ ] **P5-06** @AB Clean-clone verification from README only
-- [ ] **P5-07** @AB Devpost text (problem, persona, real vs simulated); sponsor prize = AG Grid
+- [ ] **P5-07** @AB Devpost text (problem, persona, real vs simulated); sponsor prize = AG Grid (WIP B)
 - [ ] **P5-08** @AB **Submit** (≥ 24 h before deadline)
 
 ## SUB — Must stay true until judging ends (Dec 15)
