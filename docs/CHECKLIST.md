@@ -109,7 +109,7 @@ The [[PLAN]] explains the why; this file is the state.
 
 - [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2) (WIP A) (PARTIAL: reviewed module merged in PR #37 — 2fc54e8; graph wiring and eval cases remain)
 - [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow (WIP A) (PARTIAL: reviewed drafter merged in PR #38 — db942a3; graph/eval wiring and vendor accept/contest flow remain)
-- [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only (WIP B) (PARTIAL: auth, opaque sessions, throttle and lockout merged in main via #40 0e00757 and tested; CORS-to-frontend-origin (`ConfiguredCORS`) has no test)
+- [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only (WIP B)
 - [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health`
 - [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag (WIP A) (PARTIAL: reviewed replay completion seam merged in PR #39 — 805331c; runtime graph integration, replay tagging and flag acceptance remain)
 - [ ] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order)
@@ -119,8 +119,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-10** @B Custom dark theme shared by Studio and the app
 - [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework
 - [ ] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance)
-- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B) (PARTIAL: merged in main via #40 0e00757; session TTL/idle expiry, CSRF, throttle/lockout and authenticated SSE tested; body caps (`RequestLimits`) untested)
-- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B) (PARTIAL: merged in main via #40 0e00757 but never parsed on Linux — LC_CTYPE env check always failed closed; fix and real-sandbox tests in PR #43)
+- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
+- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
 - [ ] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24)
 - [ ] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6)
 
