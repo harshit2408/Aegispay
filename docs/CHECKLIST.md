@@ -110,26 +110,26 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2) (WIP A) (PARTIAL: reviewed module merged in PR #37 — 2fc54e8; graph wiring and eval cases remain)
 - [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow (WIP A) (PARTIAL: reviewed drafter merged in PR #38 — db942a3; graph/eval wiring and vendor accept/contest flow remain)
 - [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only (WIP B)
-- [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health` (WIP B)
+- [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health` (WIP B) (BLOCKED: blueprint ready; owner will supply hosted URLs and uptime evidence)
 - [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag (WIP A) (PARTIAL: reviewed replay completion seam merged in PR #39 — 805331c; runtime graph integration, replay tagging and flag acceptance remain)
-- [ ] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order) (WIP B)
-- [ ] **P3-07** @B Widget: Settlement timeline with PayPal IDs, verified / simulated badges (WIP B)
-- [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator) (WIP B)
-- [ ] **P3-09** @B Demo toolbar: reset, run S1–S4, forensics detector ON/OFF (kill-switch), replay banner (WIP B)
-- [ ] **P3-10** @B Custom dark theme shared by Studio and the app (WIP B)
+- [x] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order) — 514b238
+- [x] **P3-07** @B Widget: Settlement timeline with PayPal IDs, verified / simulated badges — 514b238
+- [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator) (WIP B) (BLOCKED: synthetic preview only; Dev A P3-02 authenticated notices and accept/contest integration pending)
+- [ ] **P3-09** @B Demo toolbar: reset, run S1–S4, forensics detector ON/OFF (kill-switch), replay banner (WIP B) (PARTIAL: admin reset/detector and controller scenario runner implemented; admin-only scenario contract and live reset remain)
+- [x] **P3-10** @B Custom dark theme shared by Studio and the app — 514b238
 - [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework
-- [ ] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) (WIP B)
+- [x] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) — 514b238
 - [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
 - [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
-- [ ] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24) (WIP B)
-- [ ] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6) (WIP B)
+- [x] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24) — 514b238
+- [x] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6) — 514b238
 
 ## P4 — Hardening (Nov 7–8) · exit: **feature freeze Nov 8 EOD**
 
 - [ ] **P4-01** @A (P1 feature) A6 Vendor agent remedy negotiation — only if everything above is green
 - [ ] **P4-02** @A Webhook chaos tests: duplicate, out-of-order, delayed, unsigned, simulator
 - [ ] **P4-03** @A Contract tests with `respx` against recorded sandbox fixtures
-- [ ] **P4-04** @B Playwright E2E S1–S4 in replay mode, running in CI (WIP B)
+- [x] **P4-04** @B Playwright E2E S1–S4 in replay mode, running in CI — 514b238
 - [ ] **P4-05** @B Polish + second video cut
 - [ ] **P4-06** @AB Feature freeze; only bug fixes after this line
 
@@ -137,11 +137,11 @@ The [[PLAN]] explains the why; this file is the state.
 
 - [ ] **P5-01** @A `README.md`: judge quickstart, hosted URL, operator logins, simulation boundary (verbatim §3)
 - [ ] **P5-02** @A `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md`, final `docs/EVAL.md`
-- [ ] **P5-03** @B Judge guide panel in the app (WIP B)
+- [x] **P5-03** @B Judge guide panel in the app — 514b238
 - [ ] **P5-04** @B Final video < 3 min, public on YouTube, captions, no copyrighted music
 - [ ] **P5-05** @AB Code freeze Nov 9 23:59 IST
 - [ ] **P5-06** @AB Clean-clone verification from README only
-- [ ] **P5-07** @AB Devpost text (problem, persona, real vs simulated); sponsor prize = AG Grid (WIP B)
+- [x] **P5-07** @AB Devpost text (problem, persona, real vs simulated); sponsor prize = AG Grid — 514b238
 - [ ] **P5-08** @AB **Submit** (≥ 24 h before deadline)
 
 ## SUB — Must stay true until judging ends (Dec 15)
