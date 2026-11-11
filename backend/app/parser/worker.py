@@ -12,7 +12,8 @@ import sys
 
 
 def restrict() -> None:
-    if sys.platform != "linux" or platform.machine() != "x86_64" or os.environ:
+    # Parent passes env={}; CPython's C-locale coercion (PEP 538) adds LC_CTYPE itself.
+    if sys.platform != "linux" or platform.machine() != "x86_64" or set(os.environ) - {"LC_CTYPE"}:
         raise RuntimeError("parser isolation unavailable")
     resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
     resource.setrlimit(resource.RLIMIT_AS, (768 * 1024 * 1024,) * 2)

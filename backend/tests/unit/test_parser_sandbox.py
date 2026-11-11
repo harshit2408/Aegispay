@@ -91,7 +91,7 @@ async def test_malformed_child_output_never_partial(stdout, monkeypatch):
 
 @linux_only
 async def test_real_sandbox_parses_clean_pdf():
-    doc = await parse_pdf(_pdf(2))
+    doc = await parse_pdf(_pdf(2), detector_enabled=False)  # tesseract not required in CI
     assert "Invoice 1001 total 40.00" in doc.text
     assert doc.segments == [] and len(doc.images) == 2
 
@@ -117,7 +117,7 @@ def test_restrict_denies_network_and_requires_empty_env():
         "\nexcept OSError:\n print('denied')"
     )
     run = lambda env: subprocess.run(  # noqa: E731
-        [sys.executable, "-c", code, str(BACKEND)], env=env, capture_output=True, text=True
+        [sys.executable, "-I", "-c", code, str(BACKEND)], env=env, capture_output=True, text=True
     )
     assert run({}).stdout.strip() == "denied"
     assert run({"X": "1"}).returncode != 0
