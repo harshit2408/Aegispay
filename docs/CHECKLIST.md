@@ -92,7 +92,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) — 0e00757 (#40)
 - [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP A, taken over from B) (PARTIAL: authenticated replay routes verified 0e00757 (#40); live reset owner orchestration and full PRD health probes remain)
 - [x] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution — 0e00757 (#40)
-- [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP B) (PARTIAL: local replay S1–S4 and first EVAL numbers 0e00757 (#40); real sandbox payout/invoice acceptance and browser S1–S4 remain)
+- [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP A, taken over from B) (PARTIAL: local replay S1–S4 and first EVAL numbers 0e00757 (#40); real sandbox payout/invoice acceptance and browser S1–S4 remain)
 - [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — a95ef4c (#32)
 - [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — a95ef4c (#32)
 - [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — a95ef4c (#32)
