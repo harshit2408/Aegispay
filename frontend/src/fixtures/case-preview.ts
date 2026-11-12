@@ -62,6 +62,7 @@ export const previewCase = {
       annual_cost_of_capital: 0.1, claim_days: 45, notice_ops_cost_cents: 500,
       p_vendor_contests: 0.1, contest_cost_cents: 10000 },
   },
+  short_pay_balance: "NONE",
   gate: {
     route: "FREEZE", payable_cents: 42500, reasons: ["HIGH_RISK", "G3 · Hidden instruction and payee mismatch"],
     required_approvals: 2, allowed_actions: ["APPROVE", "SHORT_PAY", "REJECT"], policy_id: "mock-policy",
