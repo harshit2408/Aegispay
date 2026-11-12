@@ -20,6 +20,17 @@ async def test_health_ok():
     assert set(body["checks"].values()) == {None}
 
 
+async def test_health_reports_replay_flag_when_replay_mode_on(monkeypatch):
+    # R24 / §16 Honesty: the UI REPLAY banner reads this flag.
+    monkeypatch.setenv("DEMO_ENABLED", "true")
+    monkeypatch.setenv("DEMO_REPLAY_MODE", "true")
+    get_settings.cache_clear()
+    async with _client() as c:
+        r = await c.get("/api/health")
+    assert r.status_code == 200
+    assert (r.json()["demo_enabled"], r.json()["replay_mode"]) == (True, True)
+
+
 async def test_health_503_on_broken_db_without_leaking_error(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:////nonexistent-aegis-dir/x/y.db")
     get_settings.cache_clear()
