@@ -14,7 +14,7 @@ from chronicle.capabilities.record.record_environment_types import RecordEnviron
 from chronicle.capabilities.record.recorder import record_request
 from chronicle.framework.context.session_settings_types import SessionSettings
 
-from app.agents.llm_allowlist import OUTPUT_CAP, REVIEWED
+from app.agents.llm_allowlist import OUTPUT_CAPS, REVIEWED
 
 # TokenOps auto-loads dotenv at import; app.config alone owns secret configuration.
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
@@ -29,22 +29,27 @@ from tokenops.providers.types import ModelResponse  # noqa: E402
 
 _LOG = logging.getLogger(__name__)
 _DEFAULT_LLM = ("openai", "gpt-6.1-sol")
-_OUTPUT_CAP = OUTPUT_CAP
-_GOVERNANCE = {
-    "governance": {
-        "budgets": [{"id": "invoice_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],
-        "policies": {
-            "cost_budget": {"budget": "invoice_llm_cap"},
-            "pre_call_worst_case": {"budget": "invoice_llm_cap", "default_max_output": _OUTPUT_CAP},
-        },
+
+
+def _governance(output_cap: int) -> dict:
+    return {
+        "governance": {
+            "budgets": [{"id": "invoice_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],
+            "policies": {
+                "cost_budget": {"budget": "invoice_llm_cap"},
+                "pre_call_worst_case": {
+                    "budget": "invoice_llm_cap",
+                    "default_max_output": output_cap,
+                },
+            },
+        }
     }
-}
 
 
 def _price(provider: str, model: str, usage: Usage) -> int:
     # Standard <=272k pricing reviewed in TOOLS.md; cached input gets no discount. Free
     # OpenRouter models bill $0 but are charged at the same conservative rate (budget is a ceiling).
-    if (provider, model, _OUTPUT_CAP) not in REVIEWED:
+    if (provider, model, OUTPUT_CAPS.get(provider)) not in REVIEWED:
         raise ValueError("unreviewed provider or model price")
     return 2 * (usage.input + usage.cached) + 10 * (usage.output + usage.reasoning)
 
@@ -72,6 +77,7 @@ class InvoiceRun:
         self, execution_id: UUID, dispatch: Callable, bound: TokenOpsBound, llm: tuple[str, str]
     ):
         self._provider, self._model = llm
+        self._cap = OUTPUT_CAPS[self._provider]
         self._execution_id = execution_id
         self._dispatch = dispatch
         self._bound = bound
@@ -149,7 +155,7 @@ class InvoiceRun:
                         self._halt("invalid provider token usage")
                     rejected = (
                         response.input_tokens > input_token_bound
-                        or response.output_tokens > _OUTPUT_CAP
+                        or response.output_tokens > self._cap
                         or response.cached_tokens > response.input_tokens
                         or response.reasoning_tokens > response.output_tokens
                     )
@@ -211,7 +217,7 @@ def invoice_run(
     """
     if not isinstance(execution_id, UUID):
         raise ValueError("execution_id must be a UUID")
-    if (*llm, _OUTPUT_CAP) not in REVIEWED:
+    if (*llm, OUTPUT_CAPS.get(llm[0])) not in REVIEWED:
         raise ValueError("unreviewed provider or model")
     install_crossing_hook()
     environment = RecordEnvironment(
@@ -224,7 +230,7 @@ def invoice_run(
     with (
         record_request(environment),
         tokenops_run(
-            config=_GOVERNANCE,
+            config=_governance(OUTPUT_CAPS[llm[0]]),
             service="aegispay.invoice",
             intent="invoice",
             provider=llm[0],

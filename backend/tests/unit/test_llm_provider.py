@@ -9,7 +9,7 @@ import pytest
 import respx
 
 from app.agents import ModelResponse, invoice_run
-from app.agents.llm_allowlist import OUTPUT_CAP, REVIEWED
+from app.agents.llm_allowlist import OUTPUT_CAPS, REVIEWED
 from app.agents.provider import (
     DurableDispatch,
     ProviderUnavailable,
@@ -21,6 +21,7 @@ from app.config import Settings
 OPENAI = ("openai", "gpt-6.1-sol")
 ROUTER = ("openrouter", "nvidia/nemotron-3.5-super-vl:free")
 URLS = {key[0]: url for key, url in REVIEWED.items()}
+ROUTER_CAP = OUTPUT_CAPS["openrouter"]
 KEYS = {"openai": "sk-proj-sentinel-openai", "openrouter": "sk-or-v1-sentinel-router"}
 KEY = KEYS["openrouter"]
 
@@ -54,10 +55,12 @@ def _row(pg_url, run_id):
     ("provider", "model", "cap"),
     [
         ("openai", "gpt-6.1-sol", 2048),
-        ("openai", "nvidia/nemotron-3.5-super-vl:free", OUTPUT_CAP),
-        ("openrouter", "gpt-6.1-sol", OUTPUT_CAP),
-        ("openrouter", "meta/other:free", OUTPUT_CAP),
-        ("evil", "gpt-6.1-sol", OUTPUT_CAP),
+        ("openrouter", ROUTER[1], 1024),
+        ("openai", "gpt-6.1-sol", 4096),
+        ("openai", "nvidia/nemotron-3.5-super-vl:free", 1024),
+        ("openrouter", "gpt-6.1-sol", 4096),
+        ("openrouter", "meta/other:free", 4096),
+        ("evil", "gpt-6.1-sol", 1024),
         ("openrouter", ROUTER[1], None),
     ],
 )
@@ -79,7 +82,10 @@ async def test_request_goes_only_to_the_providers_own_host(pg_url, selection):
         route = router.post(URLS[provider]).mock(return_value=httpx.Response(200, json=_body()))
         catch_all = router.route().mock(return_value=httpx.Response(500))
         response = dispatch(
-            provider, model, [{"role": "user", "content": "x"}], max_output_tokens=1024
+            provider,
+            model,
+            [{"role": "user", "content": "x"}],
+            max_output_tokens=OUTPUT_CAPS[provider],
         )
     assert isinstance(response, ModelResponse) and response.input_tokens == 100
     assert route.call_count == 1 and not catch_all.called
@@ -89,7 +95,7 @@ async def test_request_goes_only_to_the_providers_own_host(pg_url, selection):
     assert sent["model"] == model
     if provider == "openrouter":
         assert request.headers["x-title"] == "AegisPay"
-        assert sent["max_tokens"] == 1024
+        assert sent["max_tokens"] == ROUTER_CAP
         assert not {"store", "service_tier", "max_completion_tokens", "tools"} & sent.keys()
     else:
         assert sent["max_completion_tokens"] == 1024 and sent["store"] is False
@@ -106,8 +112,8 @@ async def test_budget_is_charged_before_http_and_reconciled_after(pg_url):
 
     with respx.mock as router:
         router.post(URLS["openrouter"]).mock(side_effect=handler)
-        dispatch(*ROUTER, [], max_output_tokens=1024)
-    reserve = 2 * 1000 + 10 * 1024
+        dispatch(*ROUTER, [], max_output_tokens=ROUTER_CAP)
+    reserve = 2 * 1000 + 10 * ROUTER_CAP
     assert seen["during"] == (1, reserve, True)  # committed and halted while in flight
     assert _row(pg_url, run_id) == (1, 2 * 100 + 10 * 20, False)
 
@@ -117,10 +123,10 @@ async def test_fifth_request_and_over_cap_reserve_are_refused(pg_url):
     with respx.mock as router:
         router.post(URLS["openrouter"]).mock(return_value=httpx.Response(200, json=_body()))
         for _ in range(4):
-            dispatch(*ROUTER, [], max_output_tokens=1024)
+            dispatch(*ROUTER, [], max_output_tokens=ROUTER_CAP)
         with pytest.raises(ProviderUnavailable, match="budget"):
-            dispatch(*ROUTER, [], max_output_tokens=1024)
-    # Reserve 2*272000 + 10*1024 = 554240 on top of 500000 already charged exceeds $1.00.
+            dispatch(*ROUTER, [], max_output_tokens=ROUTER_CAP)
+    # Reserve 2*272000 + 10*4096 on top of 500000 already charged exceeds $1.00.
     big, big_id = _dispatch(pg_url, bound=272_000)
     with psycopg.connect(postgres_dsn(pg_url)) as c:
         c.execute(
@@ -129,7 +135,7 @@ async def test_fifth_request_and_over_cap_reserve_are_refused(pg_url):
     with respx.mock(assert_all_called=False) as router:
         route = router.route().mock(return_value=httpx.Response(200, json=_body()))
         with pytest.raises(ProviderUnavailable, match="budget"):
-            big(*ROUTER, [], max_output_tokens=1024)
+            big(*ROUTER, [], max_output_tokens=ROUTER_CAP)
     assert not route.called
 
 
@@ -143,7 +149,7 @@ async def test_fifth_request_and_over_cap_reserve_are_refused(pg_url):
         httpx.Response(200, json=_body(usage={})),
         httpx.Response(200, json=_body(usage={"prompt_tokens": 0, "completion_tokens": 1})),
         httpx.Response(200, json=_body(usage={"prompt_tokens": 5000, "completion_tokens": 1})),
-        httpx.Response(200, json=_body(usage={"prompt_tokens": 10, "completion_tokens": 2000})),
+        httpx.Response(200, json=_body(usage={"prompt_tokens": 10, "completion_tokens": 5000})),
         httpx.Response(200, json=_body(usage={"prompt_tokens": 10, "completion_tokens": True})),
         httpx.Response(
             200,
@@ -195,7 +201,7 @@ async def test_bad_provider_outcome_fails_closed_and_stays_halted(pg_url, respon
             return_value=httpx.Response(200)
         )
         with pytest.raises(ProviderUnavailable):
-            dispatch(*ROUTER, [], max_output_tokens=1024)
+            dispatch(*ROUTER, [], max_output_tokens=ROUTER_CAP)
     assert route.call_count == 1 and not attacker.called
     assert _row(pg_url, run_id)[2] is True  # sticky: no further admission
 
@@ -212,7 +218,7 @@ async def test_openrouter_null_usage_details_are_tolerated(pg_url):
         router.post(URLS["openrouter"]).mock(
             return_value=httpx.Response(200, json=_body(usage=usage))
         )
-        response = dispatch(*ROUTER, [], max_output_tokens=1024)
+        response = dispatch(*ROUTER, [], max_output_tokens=ROUTER_CAP)
     assert (response.cached_tokens, response.reasoning_tokens) == (0, 0)
 
 
@@ -221,7 +227,7 @@ async def test_missing_key_or_bound_fails_before_budget(pg_url):
     keyless = DurableDispatch(run_id=run_id, database_url=pg_url, api_key="")
     keyless.input_token_bound = 10
     with pytest.raises(ProviderUnavailable):
-        keyless(*ROUTER, [], max_output_tokens=1024)
+        keyless(*ROUTER, [], max_output_tokens=ROUTER_CAP)
     assert _row(pg_url, run_id) is None
 
 
@@ -236,7 +242,7 @@ async def test_key_is_never_sent_to_the_wrong_provider(pg_url, selection, key):
     with respx.mock(assert_all_called=False) as router:
         route = router.route().mock(return_value=httpx.Response(200, json=_body()))
         with pytest.raises(ProviderUnavailable, match="selected provider"):
-            dispatch(*selection, [], max_output_tokens=1024)
+            dispatch(*selection, [], max_output_tokens=OUTPUT_CAPS[selection[0]])
     assert not route.called and _row(pg_url, run_id) is None
 
 
@@ -267,7 +273,7 @@ def test_run_is_keyed_to_the_selected_model_and_unreviewed_price_is_refused():
     with invoice_run(uuid4(), dispatch=dispatch, llm=ROUTER) as run:
         run.complete("A2", [], input_token_bound=100)
         assert run.spent_micros == 400  # same conservative per-token price as the reviewed model
-    assert seen == [("openrouter", ROUTER[1], 1024)]
+    assert seen == [("openrouter", ROUTER[1], ROUTER_CAP)]
     with pytest.raises(ValueError):
         with invoice_run(uuid4(), dispatch=dispatch, llm=("openrouter", "other:free")):
             pass
