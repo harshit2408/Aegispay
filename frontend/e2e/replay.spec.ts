@@ -21,7 +21,13 @@ test("S1–S4 replay uses real authenticated routes, graph decisions and browser
     expect(reset.ok(), await reset.text()).toBeTruthy();
     expect((await reset.json()).replayed).toBe(true);
 
+    const health = await admin.get(`${apiURL}/api/health`);
+    expect(health.ok(), await health.text()).toBeTruthy();
+    expect(await health.json()).toMatchObject({ demo_enabled: true, replay_mode: true });
+
     await page.goto("/");
+    // Persistent global REPLAY indicator, driven by the health flag (R24, PRD §16 Honesty).
+    await expect(page.locator(".replay-banner").filter({ hasText: /^REPLAY · / }).first()).toBeVisible();
     await page.getByText("Operator sign in", { exact: true }).click();
     await page.getByLabel("Operator ID", { exact: true }).fill("demo-cfo");
     await page.getByLabel("Password", { exact: true }).fill(password);

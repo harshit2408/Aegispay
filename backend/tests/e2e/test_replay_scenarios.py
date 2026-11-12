@@ -5,6 +5,7 @@ from time import perf_counter
 
 import httpx
 import pytest
+import respx
 from argon2 import PasswordHasher
 from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -13,6 +14,7 @@ from sqlalchemy import func, select
 from app.agents.provider import postgres_dsn
 from app.config import Settings, get_settings
 from app.db import get_session
+from app.decision import analyze as analyze_module
 from app.decision.analyze import build_analyzer
 from app.decision.approve import approve_for_payment
 from app.decision.dispatch import Dispatcher
@@ -20,7 +22,14 @@ from app.decision.graph import build_graph
 from app.demo import runtime
 from app.demo.runtime import DemoUnavailable, ReplayReader
 from app.demo.seeder import OPERATORS, DemoSeed, seed_demo
-from app.models.payables import InvoiceExecution, POLedger, SettlementOutbox, SpendLedger
+from app.models.payables import (
+    AuditQueue,
+    ExecutionEvent,
+    InvoiceExecution,
+    POLedger,
+    SettlementOutbox,
+    SpendLedger,
+)
 from app.routers import auth, contracts, demo
 from app.settlement.po_ledger import reserve
 from app.settlement.transitions import apply
@@ -59,6 +68,22 @@ async def replay_app(pg_url, pg_sessionmaker, tmp_path, monkeypatch):
             yield session
 
     app.dependency_overrides[get_session] = sessions
+    # Tripwires: any live LLM, parser or PayPal read records itself and fails the node.
+    attempts = []
+
+    def tripwire(name):
+        def fail(*args, **kwargs):
+            attempts.append(name)
+            raise AssertionError(f"replay attempted live {name}")
+
+        return fail
+
+    class LiveReader:
+        def __getattr__(self, name):
+            return tripwire("paypal." + name)
+
+    monkeypatch.setattr(analyze_module, "governed_analysis", tripwire("llm"))
+    monkeypatch.setattr(analyze_module, "parse_pdf", tripwire("parser"))
     async with AsyncPostgresSaver.from_conn_string(postgres_dsn(pg_url)) as saver:
         await saver.setup()
         recorded = ReplayReader(pg_sessionmaker, settings.storage_path)
@@ -66,7 +91,7 @@ async def replay_app(pg_url, pg_sessionmaker, tmp_path, monkeypatch):
             saver,
             sessions=pg_sessionmaker,
             analyze=build_analyzer(pg_sessionmaker, settings),
-            reader=None,
+            reader=LiveReader(),
             replay_reader=recorded,
             transition=apply,
             approve=partial(approve_for_payment, pg_sessionmaker, apply, reserve),
@@ -75,7 +100,9 @@ async def replay_app(pg_url, pg_sessionmaker, tmp_path, monkeypatch):
         app.state.dispatcher = dispatcher
         app.state.run_case = dispatcher.run
         try:
-            yield app, password, dispatcher, recorded
+            # No route registered: any outbound httpx request raises instead of reaching a network.
+            with respx.mock(assert_all_mocked=True, assert_all_called=False):
+                yield app, password, dispatcher, recorded, attempts
         finally:
             get_settings.cache_clear()
 
@@ -92,7 +119,7 @@ async def login(client, name, password):
 async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
     replay_app, pg_sessionmaker, record_property
 ):
-    app, password, dispatcher, recorded = replay_app
+    app, password, dispatcher, recorded, attempts = replay_app
     transport = httpx.ASGITransport(app=app)
     async with (
         httpx.AsyncClient(transport=transport, base_url="https://test") as controller,
@@ -144,10 +171,12 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
         assert duplicate.status_code == 202, duplicate.text
         assert elapsed < 1000
         assert duplicate.json()["duplicate_of_execution_id"] == admitted["S1"]
+        admitted["S4"] = duplicate.json()["execution_id"]
         disabled = await admin.post("/api/demo/forensics-detector", json={"enabled": False})
         assert disabled.status_code == 200, disabled.text
         killed = await controller.post("/api/demo/scenarios/S3/run")
         assert killed.status_code == 202, killed.text
+        admitted["S3-off"] = killed.json()["execution_id"]
         snapshot = await dispatcher.snapshot(killed.json()["execution_id"])
         assert snapshot.values["gate"].route == "FREEZE"
         assert snapshot.values["forensics"].detector_enabled is False
@@ -162,14 +191,28 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
             for scenario in ("S1", "S2"):
                 row = await session.get(InvoiceExecution, admitted[scenario])
                 assert row.status == "APPROVED_FOR_PAYMENT"
-                assert row.replayed
+            # R24: every replay execution is tagged and has its replayed audit event.
+            assert len(set(admitted.values())) == 5
+            for execution_id in admitted.values():
+                assert (await session.get(InvoiceExecution, execution_id)).replayed is True
+                events = [
+                    payload
+                    for model in (AuditQueue, ExecutionEvent)
+                    for payload in await session.scalars(
+                        select(model.payload).where(
+                            model.execution_id == execution_id, model.event_type == "DEMO_RUN"
+                        )
+                    )
+                ]
+                assert [event["replayed"] for event in events] == [True], execution_id
+        assert attempts == []
         assert (await controller.post("/api/demo/reset")).status_code == 403
         admin.headers.pop("X-CSRF-Token")
         assert (await admin.post("/api/demo/reset")).status_code == 403
 
 
 async def test_demo_disabled_and_live_mode_fail_closed(replay_app, monkeypatch):
-    app, password, _, _ = replay_app
+    app, password, _, _, _ = replay_app
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="https://test"
     ) as client:
