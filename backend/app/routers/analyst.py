@@ -7,13 +7,11 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.analyst import AnalystUnavailable, select_widget
-from app.auth import roles, token_hash, utc
+from app.auth import bucket_hit, roles, token_hash
 from app.db import get_session
-from app.models.auth import AuthAttempt
 from app.models.core import Operator, VendorMaster
 from app.models.payables import InvoiceExecution
 from app.schemas.case import ExecutionRow, ExecutionStatus
@@ -52,17 +50,8 @@ async def widget(
     complete = getattr(request.app.state, "analyst_complete", None)
     if complete is None:
         raise HTTPException(503, "Treasury Analyst unavailable")
-    key, now = "analyst:" + token_hash(actor.operator_id), datetime.now(UTC)
-    await session.execute(
-        insert(AuthAttempt)
-        .values(bucket_key=key, window_started=now, attempts=0)
-        .on_conflict_do_nothing()
-    )
-    bucket = await session.get(AuthAttempt, key, with_for_update=True, populate_existing=True)
-    if utc(bucket.window_started) + timedelta(minutes=1) <= now:
-        bucket.window_started, bucket.attempts = now, 0
-    bucket.attempts += 1
-    throttled = bucket.attempts > 5
+    key = "analyst:" + token_hash(actor.operator_id)
+    throttled = await bucket_hit(session, key, datetime.now(UTC)) > 5
     await session.commit()  # no transaction or row lock spans provider HTTP
     if throttled:
         raise HTTPException(429, "Treasury Analyst throttled")

@@ -149,19 +149,38 @@ async def test_body_over_64kb_is_rejected_before_verification(hook):
     assert await stored(hook) == []
 
 
-async def test_sixty_deliveries_per_app_per_minute_then_429_before_verification(hook):
+def forged(raw: bytes) -> dict:
+    """Every PayPal transmission header present, signature wrong."""
+    return {**sign(raw, "treasury-id"), "paypal-transmission-sig": "AAAA"}
+
+
+async def test_sixty_deliveries_per_app_per_minute_then_429_before_verification(hook, caplog):
     for _ in range(webhooks.PER_APP_PER_MINUTE):
-        assert (await hook.post(TREASURY, content=b"garbage")).status_code == 400
+        response = await hook.post(TREASURY, content=b"garbage", headers=forged(b"garbage"))
+        assert response.status_code == 400
     raw = event("WH-RATE")
     assert (await post(hook, TREASURY, raw)).status_code == 429  # validly signed, still refused
     assert not any(row.event_id == "WH-RATE" for row in await stored(hook))
+    assert "ALERT webhook rate limited app=TREASURY simulated=False" in caplog.text
     vendor_raw = event("WH-V", "INVOICING.INVOICE.PAID", invoice={"id": "INV2-ABC"})
     assert (await post(hook, VENDOR, vendor_raw, "vendor-id")).status_code == 204  # per app
 
 
+@pytest.mark.parametrize("missing", sorted(webhooks.REQUIRED_HEADERS))
+async def test_headerless_junk_is_refused_uncounted_and_cannot_starve_signed_events(hook, missing):
+    raw = event()
+    partial = {k: v for k, v in sign(raw, "treasury-id").items() if k.lower() != missing}
+    for _ in range(webhooks.PER_APP_PER_MINUTE + 5):
+        assert (await hook.post(TREASURY, content=raw, headers=partial)).status_code == 400
+        assert (await hook.post(TREASURY, content=b"junk")).status_code == 400
+    assert await stored(hook) == []  # nothing counted, nothing stored
+    assert (await post(hook, TREASURY, raw)).status_code == 204
+
+
 async def test_unverified_duplicates_collapse_to_one_row(hook):
     for _ in range(3):
-        assert (await hook.post(TREASURY, content=b"garbage")).status_code == 400
+        response = await hook.post(TREASURY, content=b"garbage", headers=forged(b"garbage"))
+        assert response.status_code == 400
     assert len(await stored(hook)) == 1
 
 
@@ -210,7 +229,7 @@ async def test_consumer_ignores_vendor_simulated_and_unverified_events(hook, mon
     get_settings.cache_clear()
     await post(hook, VENDOR, event("WH-3", "INVOICING.INVOICE.PAID", id="INV2-ABC"), "vendor-id")
     await post(hook, f"{SIMULATOR}/treasury", event("WH-SIM"), "WEBHOOK_ID")
-    await hook.post(TREASURY, content=b"garbage")
+    await hook.post(TREASURY, content=b"garbage", headers=forged(b"garbage"))
     fake = FakeReconciler()
     assert await WebhookConsumer(hook.sm, fake).run_once() == 1  # only the verified vendor hint
     assert fake.calls == []  # vendor events carry no money transition
@@ -284,7 +303,10 @@ async def test_duplicate_out_of_order_and_delayed_hints_settle_once(hook, monkey
 
     success = await deliver("WH-SUCCESS", "PAYMENT.PAYOUTS-ITEM.SUCCEEDED", timedelta())
     assert (await post(hook, TREASURY, success)).status_code == 204
-    assert (await hook.post(TREASURY, content=event("WH-UNSIGNED"))).status_code == 400
+    unsigned = event("WH-UNSIGNED")
+    assert (
+        await hook.post(TREASURY, content=unsigned, headers=forged(unsigned))
+    ).status_code == 400
     assert (
         await post(hook, f"{SIMULATOR}/treasury", event("WH-SIM"), "WEBHOOK_ID")
     ).status_code == 204
