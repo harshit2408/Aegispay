@@ -136,6 +136,10 @@ class PayPalClient:
             before_send=before_send,
         )
 
+    async def verify_token(self) -> None:
+        """Force a fresh OAuth exchange (health probe); raises PayPalAuthError on failure."""
+        await self._access_token(force=True)
+
     async def _access_token(self, *, force: bool = False) -> str:
         async with self._token_lock:
             if (

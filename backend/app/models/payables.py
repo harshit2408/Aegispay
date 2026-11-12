@@ -328,3 +328,23 @@ class WebhookEvent(Base):
     confirmed_by_get: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))  # R10
     received_at: Mapped[datetime] = mapped_column(TS, server_default=NOW)
     processed_at: Mapped[datetime | None] = mapped_column(TS)
+
+
+HEALTH_CHECKS = (
+    "treasury_token",
+    "vendor_token",
+    "treasury_webhook",
+    "vendor_webhook",
+    "accounts_distinct",
+)
+
+
+class ServiceHealth(Base):
+    """Settlement-reported probe booleans for /api/health (P2-13); API reads, settlement writes."""
+
+    __tablename__ = "service_health"
+    __table_args__ = (CheckConstraint("service = 'settlement'", name="ck_service_health_service"),)
+
+    service: Mapped[str] = mapped_column(Text, primary_key=True)
+    checked_at: Mapped[datetime] = mapped_column(TS)
+    details: Mapped[dict[str, Any]] = mapped_column(JSONB)

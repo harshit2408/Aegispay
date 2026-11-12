@@ -15,7 +15,7 @@ from app.config import get_settlement_settings
 from app.paypal.client import PayPalClient
 from app.paypal.payouts import Payouts
 from app.service_security import validate_database_role, validate_service_environment
-from app.settlement import controls, outbox_worker, reconciler
+from app.settlement import controls, health, outbox_worker, reconciler
 from app.settlement.reconciler import Reconciler
 from app.settlement.service import SettlementService
 from app.settlement.webhook_consumer import WebhookConsumer
@@ -166,6 +166,7 @@ async def run(stop: asyncio.Event | None = None) -> None:
             tasks.create_task(reconciler.run_forever(poller, sessions, stop))
             tasks.create_task(_consume(consumer, stop))
             tasks.create_task(_controls(sessions, settings, stop))
+            tasks.create_task(health.run_forever(sessions, treasury, vendor, settings, stop))
             tasks.create_task(audit_consumer.run_forever(audit, stop))
     finally:
         stop.set()

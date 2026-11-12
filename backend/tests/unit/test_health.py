@@ -12,7 +12,12 @@ async def test_health_ok():
     async with _client() as c:
         r = await c.get("/api/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok", "db": True, "demo_enabled": False, "replay_mode": False}
+    body = r.json()
+    # SQLite has no settlement report: reachable DB is HTTP 200, everything else reads unknown.
+    assert (body["status"], body["db"]) == ("degraded", True)
+    assert (body["demo_enabled"], body["replay_mode"]) == (False, False)
+    assert body["settlement_alive"] is False
+    assert set(body["checks"].values()) == {None}
 
 
 async def test_health_503_on_broken_db_without_leaking_error(monkeypatch):

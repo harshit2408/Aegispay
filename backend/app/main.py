@@ -4,17 +4,14 @@ import asyncio
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from functools import partial
-from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 
 from app.agents.provider import analyst_completion, mandate_completion, postgres_dsn
 from app.config import get_settings
-from app.db import get_session, get_sessionmaker
+from app.db import get_sessionmaker
+from app.health import health
 from app.paypal.client import PayPalClient
 from app.routers import (
     analyst,
@@ -172,23 +169,6 @@ class ConfiguredCORS:
             await middleware(scope, receive, send)
         else:
             await self.app(scope, receive, send)
-
-
-async def health(session: Annotated[AsyncSession, Depends(get_session)]) -> JSONResponse:
-    try:
-        await session.execute(text("SELECT 1"))
-    except Exception:
-        logger.exception("health: database check failed")
-        return JSONResponse(status_code=503, content={"status": "error", "db": False})
-    settings = get_settings()
-    return JSONResponse(
-        content={
-            "status": "ok",
-            "db": True,
-            "demo_enabled": settings.demo_enabled,
-            "replay_mode": settings.demo_replay_mode,
-        }
-    )
 
 
 def configure_demo_routes(app: FastAPI, *, enabled: bool) -> None:
