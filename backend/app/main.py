@@ -59,6 +59,7 @@ async def lifespan(app: FastAPI):
                 from app.decision.approve import approve_for_payment
                 from app.decision.dispatch import Dispatcher
                 from app.decision.graph import build_graph
+                from app.decision.investigate import build_investigator
                 from app.settlement.po_ledger import reserve
                 from app.settlement.transitions import apply
 
@@ -96,6 +97,10 @@ async def lifespan(app: FastAPI):
                     reader=reader,
                     replay_reader=ReplayReader(sessions, settings.storage_path)
                     if settings.demo_replay_mode
+                    else None,
+                    # A4 only with a configured provider; replayed cases never call it.
+                    investigator=build_investigator(sessions, settings, reader)
+                    if settings.llm_api_key
                     else None,
                     transition=apply,
                     approve=partial(approve_for_payment, sessions, apply, reserve, **gate_settings),

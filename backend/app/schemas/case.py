@@ -124,6 +124,12 @@ class AuditAnchorView(BaseModel):
     head_hmac: str | None
 
 
+class EvidenceView(EvidencePack):
+    """A4 pack as served: the advisory recommendation is withheld on HIGH_RISK cases (R14)."""
+
+    advisory_recommendation: Literal["APPROVE", "SHORT_PAY", "REJECT", "NEEDS_INFO"] | None
+
+
 class CaseDetail(BaseModel):
     execution_id: str
     status: ExecutionStatus
@@ -141,7 +147,7 @@ class CaseDetail(BaseModel):
     forensics: ForensicsReport | None
     match: MatchReport | None
     risk: RiskAssessment | None
-    evidence: EvidencePack | None
+    evidence: EvidenceView | None
     short_pay: ShortPayDecision | None
     gate: GateDecision | None
     approvals: list[ApprovalView]
