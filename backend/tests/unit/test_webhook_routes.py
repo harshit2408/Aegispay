@@ -149,6 +149,16 @@ async def test_body_over_64kb_is_rejected_before_verification(hook):
     assert await stored(hook) == []
 
 
+async def test_sixty_deliveries_per_app_per_minute_then_429_before_verification(hook):
+    for _ in range(webhooks.PER_APP_PER_MINUTE):
+        assert (await hook.post(TREASURY, content=b"garbage")).status_code == 400
+    raw = event("WH-RATE")
+    assert (await post(hook, TREASURY, raw)).status_code == 429  # validly signed, still refused
+    assert not any(row.event_id == "WH-RATE" for row in await stored(hook))
+    vendor_raw = event("WH-V", "INVOICING.INVOICE.PAID", invoice={"id": "INV2-ABC"})
+    assert (await post(hook, VENDOR, vendor_raw, "vendor-id")).status_code == 204  # per app
+
+
 async def test_unverified_duplicates_collapse_to_one_row(hook):
     for _ in range(3):
         assert (await hook.post(TREASURY, content=b"garbage")).status_code == 400

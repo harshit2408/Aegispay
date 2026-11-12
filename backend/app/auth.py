@@ -6,11 +6,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
-from app.models.auth import OperatorSession
+from app.models.auth import AuthAttempt, OperatorSession
 from app.models.core import Operator
 
 COOKIE = "aegis_session"
@@ -33,6 +34,20 @@ def csrf_token(token: str) -> str:
 
 def utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+async def bucket_hit(session: AsyncSession, key: str, now: datetime) -> int:
+    """Count one attempt in a persistent one-minute bucket; the caller commits."""
+    await session.execute(
+        insert(AuthAttempt)
+        .values(bucket_key=key, window_started=now, attempts=0)
+        .on_conflict_do_nothing()
+    )
+    row = await session.get(AuthAttempt, key, with_for_update=True, populate_existing=True)
+    if utc(row.window_started) + timedelta(minutes=1) <= now:
+        row.window_started, row.attempts = now, 0
+    row.attempts += 1
+    return row.attempts
 
 
 async def require_operator(

@@ -10,12 +10,12 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import (
     ABSOLUTE_TTL,
     COOKIE,
+    bucket_hit,
     csrf_token,
     require_csrf,
     require_operator,
@@ -24,7 +24,7 @@ from app.auth import (
 )
 from app.config import get_settings
 from app.db import get_session
-from app.models.auth import AuthAttempt, OperatorSession
+from app.models.auth import OperatorSession
 from app.models.core import Operator
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -61,16 +61,7 @@ async def _throttled(session: AsyncSession, account: str, ip: str, now: datetime
         key = hmac.new(
             secret.get_secret_value().encode(), f"{label}:{value}".encode(), "sha256"
         ).hexdigest()
-        await session.execute(
-            insert(AuthAttempt)
-            .values(bucket_key=key, window_started=now, attempts=0)
-            .on_conflict_do_nothing()
-        )
-        row = await session.get(AuthAttempt, key, with_for_update=True, populate_existing=True)
-        if utc(row.window_started) + timedelta(minutes=1) <= now:
-            row.window_started, row.attempts = now, 0
-        row.attempts += 1
-        blocked |= row.attempts > 5
+        blocked |= await bucket_hit(session, key, now) > 5
     return blocked
 
 
