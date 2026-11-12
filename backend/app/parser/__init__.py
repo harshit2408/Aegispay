@@ -1,7 +1,10 @@
 """R22 PDF boundary: the API never imports a PDF parser or native rendering library."""
 
 import asyncio
+import contextlib
 import json
+import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -13,6 +16,7 @@ from app.schemas.decision import HiddenSegment
 
 MAX_BYTES = 10 * 1024 * 1024
 MAX_RESULT = 16 * 1024 * 1024
+TIMEOUT_SECONDS = 15  # wall clock; stricter than the PRD §16 30 s cap
 
 
 class ParseUnavailable(ValueError):
@@ -31,23 +35,31 @@ def _parse(pdf: bytes, detector: bool) -> ParsedDocument:
         raise ParseUnavailable("PDF must be at most 10 MB")
     try:
         with tempfile.TemporaryDirectory(prefix="aegis-parser-") as directory:
-            with tempfile.TemporaryFile() as output:
-                result = subprocess.run(
+            with (
+                tempfile.TemporaryFile() as output,
+                subprocess.Popen(
                     [
                         sys.executable,
                         "-I",
                         str(Path(__file__).with_name("worker.py")),
                         "on" if detector else "off",
                     ],
-                    input=pdf,
+                    stdin=subprocess.PIPE,
                     stdout=output,
                     stderr=subprocess.DEVNULL,
                     env={},
                     cwd=directory,
-                    timeout=15,
-                    check=False,
-                )
-                if result.returncode:
+                    start_new_session=True,  # own process group, so the kill reaches tesseract too
+                ) as child,
+            ):
+                try:
+                    child.communicate(pdf, timeout=TIMEOUT_SECONDS)
+                finally:
+                    # Always, not only on timeout: a crashed worker must not leave children behind.
+                    with contextlib.suppress(ProcessLookupError):
+                        os.killpg(child.pid, signal.SIGKILL)
+                    child.wait()
+                if child.returncode:
                     raise ParseUnavailable("PDF parsing failed closed")
                 output.seek(0)
                 raw = output.read(MAX_RESULT + 1)
