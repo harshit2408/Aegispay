@@ -34,6 +34,7 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 MAX_ROWS = 50
 LIVE_STATUS_CONCURRENCY = 5
 LIVE_STATUS_TIMEOUT_S = 3.0
+LIVE_STATUS_TOTAL_S = 8.0
 ROLE_NOTE = (
     "Role: any authenticated operator (PRD §13). Simulator only: the operator acts as the "
     "supplier; responses are attributable via responded_by and the audit chain."
@@ -73,9 +74,13 @@ class NoticeReceipt(BaseModel):
     responded_at: datetime
 
 
+def _stored_status(row) -> str | None:
+    return (row.match_report_json or {}).get("paypal_invoice_status")
+
+
 async def _paypal_status(reader, row, semaphore) -> str | None:
     """Live status after payout success; stored match-time status on any delay or error."""
-    stored = (row.match_report_json or {}).get("paypal_invoice_status")
+    stored = _stored_status(row)
     if reader is None or row.status not in INVOICE_LIVE_STATUSES:
         return stored
     try:
@@ -131,7 +136,16 @@ async def list_invoices(
     await session.commit()  # no DB transaction is held across the PayPal reads below
     semaphore = asyncio.Semaphore(LIVE_STATUS_CONCURRENCY)
     reader = getattr(request.app.state, "vendor_reader", None)
-    statuses = await asyncio.gather(*(_paypal_status(reader, r[0], semaphore) for r in rows))
+    tasks = [asyncio.create_task(_paypal_status(reader, r[0], semaphore)) for r in rows]
+    late = set()
+    if tasks:  # overall bound: rows still queued or in flight keep their stored status
+        _, late = await asyncio.wait(tasks, timeout=LIVE_STATUS_TOTAL_S)
+        for task in late:
+            task.cancel()
+    statuses = [
+        _stored_status(r[0]) if task in late else task.result()
+        for task, r in zip(tasks, rows, strict=True)
+    ]
     return [
         SupplierInvoice(
             paypal_invoice_id=row.paypal_invoice_id,

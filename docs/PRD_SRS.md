@@ -605,8 +605,9 @@ CREATE TABLE short_pay_notices (          -- §12.4: one A5 notice per SHORT_PAY
     CHECK ((response IS NULL) = (responded_at IS NULL) AND (response IS NULL) = (responded_by IS NULL))
 );
 -- Trigger: one response, then the row is frozen for every role. API: SELECT/INSERT + UPDATE of the
--- response columns only. Settlement sets NOTICE_SENT at SETTLED only if this row exists, else it
--- raises ops alert SHORT_PAY_NOTICE_MISSING. The API write guard lets the api role change a
+-- response columns only. Settlement sets NOTICE_SENT at SETTLED only if this row exists; a
+-- reconciler sweep sends late notices and raises ops alert SHORT_PAY_NOTICE_MISSING once if none
+-- exists 5 minutes after record-payment. The API write guard lets the api role change a
 -- settlement-state execution only for NOTICE_SENT → ACCEPTED|CONTESTED with all else unchanged.
 
 CREATE TABLE approvals (

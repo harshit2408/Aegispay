@@ -102,6 +102,25 @@ async def test_supplier_view_bounds_live_paypal_reads(pg_sessionmaker, client, m
     assert reader.get_invoice.await_count == 2
 
 
+async def test_supplier_view_has_an_overall_time_bound(pg_sessionmaker, client, monkeypatch):  # noqa: F811
+    for n in range(1, 8):  # more rows than the concurrency limit, all hung
+        await seed_short_pay(pg_sessionmaker, f"e{n}", status="SETTLED")
+
+    async def hang(invoice_id):
+        await asyncio.sleep(30)
+
+    reader = AsyncMock()
+    reader.get_invoice.side_effect = hang
+    app.state.vendor_reader = reader  # the client fixture restores it
+    monkeypatch.setattr(vendor_sim, "LIVE_STATUS_TIMEOUT_S", 30)
+    monkeypatch.setattr(vendor_sim, "LIVE_STATUS_TOTAL_S", 0.3)
+    start = perf_counter()
+    response = await client.get("/api/vendor-sim/invoices")
+    assert response.status_code == 200 and perf_counter() - start < 5
+    assert {row["paypal_status"] for row in response.json()} == {"SENT"}
+    assert len(response.json()) == 7
+
+
 async def test_open_notices_come_first_then_newest(pg_sessionmaker, client):  # noqa: F811
     await seed_short_pay(pg_sessionmaker, balance="NOTICE_SENT")
     await seed_short_pay(pg_sessionmaker, "e2")  # newer, no open notice
