@@ -8,14 +8,21 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy import update
 from tokenops.providers.types import ModelResponse
 
+from app.agents.extractor import ExtractionResult
 from app.agents.provider import postgres_dsn
 from app.decision.investigate import TOOL_NAMES, build_investigator, read_tools
 from app.models.payables import InvoiceExecution
 from app.paypal.toolkit import assert_read_only
 from app.routers.contracts import _evidence_view
-from app.schemas.decision import EvidenceFact, EvidencePack, GateDecision, RiskAssessment
+from app.schemas.decision import (
+    EvidenceFact,
+    EvidencePack,
+    ForensicsReport,
+    GateDecision,
+    RiskAssessment,
+)
 from tests.unit.test_decision_graph import EXECUTION, graph_for, seeded_case  # noqa: F401
-from tests.unit.test_match import invoice, report
+from tests.unit.test_match import extraction, invoice, report
 
 
 def pack(recommendation="REJECT"):
@@ -26,8 +33,22 @@ def pack(recommendation="REJECT"):
     )
 
 
+def risky_analyze():
+    # INJECTION scores 60, so the case reaches the investigate edge (risk >= 30).
+    report = ForensicsReport(
+        detector_enabled=True,
+        hidden_segments=[],
+        classifier_label="INJECTION",
+        classifier_rationale="injected instructions",
+        detector_version="test",
+    )
+    return AsyncMock(
+        return_value=(ExtractionResult(extraction=extraction(), freeze_reason=None), report)
+    )
+
+
 async def run_case(saver, sessions, thread, **overrides):
-    graph, *_ = graph_for(saver, sessions, **overrides)
+    graph, *_ = graph_for(saver, sessions, analyze=risky_analyze(), **overrides)
     config = {"configurable": {"thread_id": thread}}
     await graph.ainvoke({"execution_id": EXECUTION}, config, durability="sync")
     return (await graph.aget_state(config)).values
