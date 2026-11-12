@@ -6,8 +6,10 @@ from unittest.mock import AsyncMock
 import pytest
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy import update
+from tokenops.framework.core import Action, ActionKind
 from tokenops.providers.types import ModelResponse
 
+from app.agents import Halt
 from app.agents.extractor import ExtractionResult
 from app.agents.provider import postgres_dsn
 from app.decision.investigate import TOOL_NAMES, build_investigator, read_tools
@@ -82,6 +84,19 @@ async def test_evidence_persisted_and_gate_ignores_it(pg_url, pg_sessionmaker):
     async with pg_sessionmaker() as session:
         row = await session.get(InvoiceExecution, EXECUTION)
         assert row.evidence_pack_json is None  # second (failed) run overwrote the first
+
+
+@pytest.mark.usefixtures("seeded_case")
+async def test_budget_halt_in_investigator_is_unavailable_not_a_crash(pg_url, pg_sessionmaker):
+    # TokenOps Halt is a BaseException; A4 is advisory, so a halted budget must not abort
+    # the graph before the gate (R3, R14).
+    halted = AsyncMock(side_effect=Halt(Action(kind=ActionKind.HALT, trace_id="t", reason="cap")))
+    async with AsyncPostgresSaver.from_conn_string(postgres_dsn(pg_url)) as saver:
+        await saver.setup()
+        values = await run_case(saver, pg_sessionmaker, "t-halt", investigator=halted)
+    halted.assert_awaited_once()
+    assert values["evidence"] is None
+    assert values["gate"].route == "FREEZE" and "HIGH_RISK" in values["gate"].reasons
 
 
 @pytest.mark.usefixtures("seeded_case")
