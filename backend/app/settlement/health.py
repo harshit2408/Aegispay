@@ -15,11 +15,14 @@ from app.models.payables import ServiceHealth
 
 log = logging.getLogger("aegis.health")
 INTERVAL_SECONDS = 30
+PROBE_TIMEOUT_SECONDS = 10
 
 
 async def _token_ok(client) -> bool:
+    # The timeout bounds how long the probe can hold the shared client's token lock.
     try:
-        await client.verify_token()
+        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+            await client.verify_token()
     except Exception:
         return False
     return True
@@ -29,7 +32,8 @@ async def _webhook_ok(client, webhook_id: str) -> bool:
     if not webhook_id.strip():
         return False
     try:
-        response = await client.get("/v1/notifications/webhooks")
+        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+            response = await client.get("/v1/notifications/webhooks")
         registered = response.body.get("webhooks", [])
         return any(isinstance(row, dict) and row.get("id") == webhook_id for row in registered)
     except Exception:

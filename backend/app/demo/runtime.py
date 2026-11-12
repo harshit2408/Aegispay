@@ -28,7 +28,8 @@ class DemoUnavailable(ValueError):
 RESET_REQUEST = "DEMO_RESET_REQUEST"
 RESET_DONE = "DEMO_RESET_DONE"
 RESET_FAILED = "DEMO_RESET_FAILED"
-RESET_EVENTS = (RESET_REQUEST, RESET_DONE, RESET_FAILED)
+RESET_STARTED = "DEMO_RESET_STARTED"  # claims a request and fixes its run id, so retries resume
+RESET_EVENTS = (RESET_REQUEST, RESET_STARTED, RESET_DONE, RESET_FAILED)
 RESET_STALE = timedelta(minutes=10)
 LIVE_RESET_WAIT_SECONDS = 25.0
 LIVE_RESET_POLL_SECONDS = 0.5
@@ -116,8 +117,21 @@ def _outcome(rows, request_id):
     return None
 
 
+def _started_run(rows, request_id):
+    for _, kind, payload in rows:
+        run_id = payload.get("run_id")
+        if (
+            kind == RESET_STARTED
+            and payload.get("request_id") == request_id
+            and isinstance(run_id, str)
+            and RUN_ID.fullmatch(run_id)
+        ):
+            return run_id
+    return None
+
+
 async def pending_reset(session):
-    """The newest live-reset request still waiting for the owner runner, else None."""
+    """Newest live-reset request without an outcome: (request_id, ts, started_run_id) or None."""
     rows = await _reset_events(session)
     for ts, kind, payload in rows:
         if kind != RESET_REQUEST:
@@ -125,7 +139,9 @@ async def pending_reset(session):
         request_id = payload.get("request_id")
         if not isinstance(request_id, str) or _outcome(rows, request_id) is not None:
             return None
-        return (request_id, ts) if datetime.now(UTC) - ts < RESET_STALE else None
+        if datetime.now(UTC) - ts >= RESET_STALE:
+            return None
+        return request_id, ts, _started_run(rows, request_id)
     return None
 
 
@@ -136,11 +152,11 @@ async def request_live_reset(session, actor, *, bucket):
     run itself is recreated by the owner-credentialed runner (python -m app.demo --serve-resets).
     """
     await session.execute(text("SELECT pg_advisory_xact_lock(9140013)"))
+    await throttle(session, bucket)  # same limit whether or not a request is already pending
     pending = await pending_reset(session)
     if pending is not None:
         await session.commit()
         return pending[0]
-    await throttle(session, bucket)
     request_id = uuid4().hex
     await enqueue_event(
         session,

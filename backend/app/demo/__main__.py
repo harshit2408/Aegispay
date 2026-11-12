@@ -48,7 +48,10 @@ async def run(args: argparse.Namespace) -> dict:
                 "gateway": gateway,
             }
             if getattr(args, "once", False):
-                return {"handled_request": await reset_runner.process_pending(sessions, **options)}
+                async with reset_runner.exclusive(sessions):
+                    return {
+                        "handled_request": await reset_runner.process_pending(sessions, **options)
+                    }
             await reset_runner.serve(sessions, **options)
             return {"stopped": True}
         return await seed_demo(

@@ -1,5 +1,6 @@
 """Demo controls and replay scenarios, gated by mode, role and session CSRF (R24–R25)."""
 
+import asyncio
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -21,6 +22,7 @@ def enabled():
 
 
 router = APIRouter(prefix="/api/demo", tags=["demo"], dependencies=[Depends(enabled)])
+WAITERS = asyncio.Semaphore(4)  # bounds concurrent live-reset waits per API process
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
@@ -50,6 +52,13 @@ def unavailable(error):
 
 async def live_reset(request: Request, session: AsyncSession, actor: Operator):
     """Queue a reset for the owner runner and wait for it; the API never seeds trust roots."""
+    if WAITERS.locked():
+        raise HTTPException(429, "Too many reset requests are already waiting")
+    async with WAITERS:
+        return await _live_reset(request, session, actor)
+
+
+async def _live_reset(request: Request, session: AsyncSession, actor: Operator):
     try:
         request_id = await runtime.request_live_reset(
             session, actor.operator_id, bucket=token_hash(request.cookies[COOKIE])

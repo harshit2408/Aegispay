@@ -460,6 +460,74 @@ async def test_probe_loop_survives_failures_and_stops_on_event(monkeypatch):
     assert len(calls) == 2  # the first failure did not end the loop
 
 
+async def test_probe_timeout_marks_a_hung_paypal_call_unhealthy(monkeypatch):
+    class Hung(FakePayPal):
+        async def verify_token(self):
+            await asyncio.sleep(3600)
+
+        async def get(self, path, **kwargs):
+            await asyncio.sleep(3600)
+
+    monkeypatch.setattr(settlement_health, "PROBE_TIMEOUT_SECONDS", 0.05)
+    result = await asyncio.wait_for(
+        settlement_health.probe(Hung(), Hung(), probe_settings()), timeout=5
+    )
+    assert (result["treasury_token"], result["vendor_webhook"]) == (False, False)
+    assert result["accounts_distinct"] is True
+
+
+async def test_resumed_request_reuses_its_run_when_the_outcome_write_fails(
+    live, monkeypatch, tmp_path
+):
+    _, sessions, runner, stop = live
+    stop.set()
+    await runner
+    template, settings = seed("base"), get_settings()
+    async with sessions() as session:
+        await runtime.request_live_reset(session, "demo-admin", bucket="resume-bucket")
+    real, failures = reset_runner._record, []
+
+    async def flaky(sessions, kind, payload):
+        if kind == runtime.RESET_DONE and not failures:
+            failures.append(payload)
+            raise ConnectionError("database restarting")
+        await real(sessions, kind, payload)
+
+    monkeypatch.setattr(reset_runner, "_record", flaky)
+    options = {"template": template, "settings": settings, "manifest_dir": tmp_path / "resume"}
+    with pytest.raises(ConnectionError):
+        await reset_runner.process_pending(sessions, **options)
+    assert await reset_runner.process_pending(sessions, **options) is not None
+    done = await control_events(sessions, runtime.RESET_DONE)
+    started = await control_events(sessions, runtime.RESET_STARTED)
+    assert len(started) == 1 and len(done) == 1
+    assert done[0].payload["run_id"] == started[0].payload["run_id"] == failures[0]["run_id"]
+    async with sessions() as session:
+        pos = (await session.scalars(select(PurchaseOrder.po_id))).all()
+    assert len([po for po in pos if po.startswith("PO-1042-")]) == 2  # base + exactly one reset
+    async with sessions() as session:
+        assert await runtime.pending_reset(session) is None
+        await session.rollback()
+
+
+async def test_only_one_reset_runner_may_hold_the_lock(live):
+    _, sessions, runner, stop = live
+    with pytest.raises(RuntimeError, match="already active"):
+        async with reset_runner.exclusive(sessions):
+            pass  # the fixture's serve() holds the lock
+    stop.set()
+    await runner
+    async with reset_runner.exclusive(sessions):  # free again after the runner stopped
+        pass
+
+
+async def test_concurrent_reset_waiters_are_capped(live, monkeypatch):
+    app, *_ = live
+    monkeypatch.setattr(demo, "WAITERS", asyncio.Semaphore(0))
+    async with await login(app, "admin") as admin:
+        assert (await admin.post("/api/demo/reset")).status_code == 429
+
+
 def test_settlement_worker_runs_the_health_loop():
     source = (Path(__file__).parents[2] / "app" / "settlement" / "worker.py").read_text("utf-8")
     assert "health.run_forever(sessions, treasury, vendor, settings, stop)" in source

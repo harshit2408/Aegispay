@@ -63,6 +63,39 @@ new active demo mandate, preserves prior records, and refuses to replace a non-d
 A differing vendor identity fails closed and requires vendor change control. PDFs, execution
 archival and the authenticated reset endpoint remain outside this P1 seeder.
 
+## Live reset (`POST /api/demo/reset`, `DEMO_ENABLED=true`, replay off)
+
+The API database role cannot create POs, GRNs, mandates or vendor identity (R15, R16, R22), so the
+endpoint never seeds anything itself. An admin's request records a `DEMO_RESET_REQUEST` control
+event and waits up to 25 s for the owner-side runner, which holds the owner `DATABASE_URL` and the
+Vendor credential and reuses this seeder:
+
+```powershell
+# One long-lived process per deployment, in the trusted setup environment (never the API process).
+python -m app.demo --config ../operator-seed-demo.json --apply-db --send-invoices --serve-resets
+# Handle at most one pending request and exit (rehearsal / cron):
+python -m app.demo --config ../operator-seed-demo.json --apply-db --send-invoices --serve-resets --once
+```
+
+For each request the runner takes the seed file as a template, replaces `run_id` with a fresh
+12-character suffix, seeds a new run (POs, `SEEDED` receiver GRNs, new active demo mandate, S1/S2
+Vendor invoices) and records `DEMO_RESET_DONE` or `DEMO_RESET_FAILED`. Responses: `200` with the
+new `run_id` and `previous_run_id`; `504` while the runner has not finished (repeat the request: it
+waits on the same pending request); `502` when seeding failed (only the error class is recorded);
+`429` after 10 control requests per minute per session. With no runner the request stays pending
+and every call returns `504`.
+
+"Archived" is derived, not stored: once a newer demo mandate is active, finished cases of earlier
+runs (`SETTLED`, `REJECTED`, `DUPLICATE_BLOCKED`) leave the `GET /api/executions` grid. Cases still
+in flight or needing review stay visible, and no execution row or audit event is changed.
+
+`GET /api/health` is public and returns only booleans and ages. `200` with `status` `ok` or
+`degraded`; `503` only when the database is unreachable. Settlement reports the Treasury and Vendor
+OAuth tokens, both webhook registrations (`TREASURY_WEBHOOK_ID`, `VENDOR_WEBHOOK_ID` must be listed
+by that app) and Treasury/Vendor account distinctness (R12) every 30 s into `service_health`; the
+API adds halt state and last-anchor age. A report older than 90 s reads as unknown. Unset webhook
+IDs count as unregistered, so a local stack without public webhooks reports `degraded`.
+
 Migration `0006` creates password-free `aegis_api_role` and `aegis_settlement_role` capability
 roles. Provision separate `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS` login accounts,
 grant exactly one capability to each, and keep ownership/migration credentials out of both
