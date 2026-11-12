@@ -48,7 +48,11 @@ def _fake_child(monkeypatch, *, stdout=b"", code=0, error=None):
             if isinstance(error, subprocess.TimeoutExpired):
                 raise error
 
+        def kill(self):
+            seen["killed"] = True
+
         def wait(self):
+            seen["reaped"] = True
             return code
 
         def __enter__(self):
@@ -99,9 +103,35 @@ async def test_crash_timeout_oserror_fail_closed(outcome, monkeypatch):
     )
 
 
+async def test_no_process_groups_fails_closed_without_spawning(monkeypatch):
+    monkeypatch.delattr(os, "killpg", raising=False)  # Windows has no os.killpg
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: pytest.fail("spawned"))
+    with pytest.raises(ParseUnavailable):
+        await parse_pdf(b"%PDF-1.4")
+
+
+async def test_failed_group_kill_still_kills_and_reaps_the_child(monkeypatch):
+    seen, _ = _fake_child(monkeypatch, error=subprocess.TimeoutExpired("w", 15))
+
+    def refuse(pid, sig):
+        raise PermissionError
+
+    monkeypatch.setattr(os, "killpg", refuse)
+    with pytest.raises(ParseUnavailable):
+        await parse_pdf(b"%PDF-1.4")
+    assert seen["killed"] and seen["reaped"]
+
+
 @pytest.mark.parametrize(
     "stdout",
-    [b"", b"not json", b'{"text":"x","segments":[],"images":[],"extra":1}', b'{"text":1}'],
+    [
+        b"",
+        b"not json",
+        b'{"text":"x","segments":[],"images":[],"extra":1}',
+        b'{"text":1}',
+        b"[" * 100_000,  # json.loads -> RecursionError
+    ],
+    ids=["empty", "not_json", "extra", "wrong_type", "deep_nesting"],
 )
 async def test_malformed_child_output_never_partial(stdout, monkeypatch):
     _fake_child(monkeypatch, stdout=stdout)
@@ -141,6 +171,23 @@ def test_restrict_denies_network_and_requires_empty_env():
     )
     assert run({}).stdout.strip() == "denied"
     assert run({"X": "1"}).returncode != 0
+
+
+@linux_only
+def test_restrict_denies_leaving_the_process_group_and_caps_ocr_threads():
+    code = (
+        "import json, os, sys; sys.path.insert(0, sys.argv[1]);"
+        # Not a group leader here, so both calls would succeed without the filter.
+        "from app.parser.worker import restrict; restrict();"
+        "\ndef denied(call):\n try:\n  call()\n except PermissionError:\n  return True"
+        "\n return False"
+        "\nprint(json.dumps([denied(os.setsid), denied(lambda: os.setpgid(0, 0)),"
+        " os.environ.get('OMP_THREAD_LIMIT')]))"
+    )
+    run = subprocess.run(
+        [sys.executable, "-I", "-c", code, str(BACKEND)], env={}, capture_output=True, text=True
+    )
+    assert json.loads(run.stdout) == [True, True, "1"], run.stderr
 
 
 @linux_only

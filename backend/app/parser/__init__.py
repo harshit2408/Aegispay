@@ -33,6 +33,8 @@ class ParsedDocument(BaseModel):
 def _parse(pdf: bytes, detector: bool) -> ParsedDocument:
     if not pdf.startswith(b"%PDF-") or len(pdf) > MAX_BYTES:
         raise ParseUnavailable("PDF must be at most 10 MB")
+    if not hasattr(os, "killpg") or not hasattr(signal, "SIGKILL"):
+        raise ParseUnavailable("PDF parser needs POSIX process groups")
     try:
         with tempfile.TemporaryDirectory(prefix="aegis-parser-") as directory:
             with (
@@ -56,9 +58,12 @@ def _parse(pdf: bytes, detector: bool) -> ParsedDocument:
                     child.communicate(pdf, timeout=TIMEOUT_SECONDS)
                 finally:
                     # Always, not only on timeout: a crashed worker must not leave children behind.
-                    with contextlib.suppress(ProcessLookupError):
-                        os.killpg(child.pid, signal.SIGKILL)
-                    child.wait()
+                    try:
+                        with contextlib.suppress(ProcessLookupError):
+                            os.killpg(child.pid, signal.SIGKILL)
+                    finally:
+                        child.kill()  # fallback if the group kill failed; no-op once reaped
+                        child.wait()
                 if child.returncode:
                     raise ParseUnavailable("PDF parsing failed closed")
                 output.seek(0)
@@ -66,7 +71,7 @@ def _parse(pdf: bytes, detector: bool) -> ParsedDocument:
                 if len(raw) > MAX_RESULT:
                     raise ParseUnavailable("PDF parser output limit exceeded")
                 return ParsedDocument.model_validate(json.loads(raw))
-    except (OSError, subprocess.TimeoutExpired, ValueError):
+    except (OSError, subprocess.TimeoutExpired, ValueError, RecursionError):
         raise ParseUnavailable("PDF parsing unavailable or invalid") from None
 
 

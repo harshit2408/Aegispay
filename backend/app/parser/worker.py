@@ -32,7 +32,8 @@ def restrict() -> None:
     class Program(ctypes.Structure):
         _fields_ = [("length", ctypes.c_ushort), ("filters", ctypes.POINTER(Filter))]
 
-    # Check the syscall ABI before numbers; reject x32 and networking/io_uring syscalls.
+    # Check the syscall ABI before numbers; reject x32, networking/io_uring syscalls and
+    # setpgid (109) / setsid (112) so nothing can leave the group the parent SIGKILLs.
     rules = [
         (0x20, 0, 0, 4),
         (0x15, 1, 0, 0xC000003E),
@@ -41,7 +42,7 @@ def restrict() -> None:
         (0x35, 0, 1, 0x40000000),
         (0x06, 0, 0, 0x80000000),
     ]
-    for syscall in (*range(41, 56), 288, 299, 307, 425):
+    for syscall in (*range(41, 56), 109, 112, 288, 299, 307, 425):
         rules.extend([(0x15, 0, 1, syscall), (0x06, 0, 0, 0x00050000 | errno.EPERM)])
     rules.append((0x06, 0, 0, 0x7FFF0000))
     filters = (Filter * len(rules))(*(Filter(*row) for row in rules))
@@ -49,6 +50,8 @@ def restrict() -> None:
     libc = ctypes.CDLL(None, use_errno=True)
     if libc.prctl(38, 1, 0, 0, 0) or libc.prctl(22, 2, ctypes.byref(program), 0, 0):
         raise RuntimeError("parser network isolation unavailable")
+    # Worker-local, inherited by tesseract; the parent still passes env={}.
+    os.environ["OMP_THREAD_LIMIT"] = "1"
 
 
 def main() -> None:
