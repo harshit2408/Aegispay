@@ -138,7 +138,7 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
             ("S2", "SHORT_PAY", 42500),
             ("S3", "FREEZE", 40000),
         ):
-            response = await controller.post(f"/api/demo/scenarios/{scenario}/run")
+            response = await admin.post(f"/api/demo/scenarios/{scenario}/run")
             assert response.status_code == 202, response.text
             execution_id = response.json()["execution_id"]
             admitted[scenario] = execution_id
@@ -165,7 +165,7 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
                 async with pg_sessionmaker() as session:
                     assert (await session.get(InvoiceExecution, execution_id)).status == "REJECTED"
         start = perf_counter()
-        duplicate = await controller.post("/api/demo/scenarios/S4/run")
+        duplicate = await admin.post("/api/demo/scenarios/S4/run")
         elapsed = (perf_counter() - start) * 1000
         record_property("replay_s4_latency_ms", round(elapsed, 2))
         assert duplicate.status_code == 202, duplicate.text
@@ -174,7 +174,7 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
         admitted["S4"] = duplicate.json()["execution_id"]
         disabled = await admin.post("/api/demo/forensics-detector", json={"enabled": False})
         assert disabled.status_code == 200, disabled.text
-        killed = await controller.post("/api/demo/scenarios/S3/run")
+        killed = await admin.post("/api/demo/scenarios/S3/run")
         assert killed.status_code == 202, killed.text
         admitted["S3-off"] = killed.json()["execution_id"]
         snapshot = await dispatcher.snapshot(killed.json()["execution_id"])
@@ -207,6 +207,9 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
                 assert [event["replayed"] for event in events] == [True], execution_id
         assert attempts == []
         assert (await controller.post("/api/demo/reset")).status_code == 403
+        # PRD §14.5: the whole demo toolbar, scenario runs included, is admin only.
+        for denied in (controller, cfo):
+            assert (await denied.post("/api/demo/scenarios/S1/run")).status_code == 403
         admin.headers.pop("X-CSRF-Token")
         assert (await admin.post("/api/demo/reset")).status_code == 403
 

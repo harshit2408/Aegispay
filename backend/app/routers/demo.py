@@ -132,7 +132,8 @@ async def run_scenario(
     request: Request,
     background: BackgroundTasks,
     session: Session,
-    actor: Annotated[Operator, Depends(roles("controller"))],
+    # PRD §14.5 admin-only toolbar; admin cannot approve (R18), so the uploader never votes.
+    actor: Annotated[Operator, Depends(roles("admin"))],
 ):
     settings = replay_settings()
     run_case = getattr(request.app.state, "run_case", None)
