@@ -27,10 +27,12 @@ from app.schemas.decision import (
     RiskAssessment,
 )
 from tests.seed import PAYER_ID, make_execution, seed_world
-from tests.unit.test_case_settlement_view import case as case_view  # noqa: F401
+from tests.unit import test_case_settlement_view as case_view_module
 from tests.unit.test_case_settlement_view import seed_settled
 from tests.unit.test_decision_graph import EXECUTION, graph_for, seeded_case  # noqa: F401
 from tests.unit.test_match import extraction, report
+
+case = case_view_module.case  # fixture: GET /api/executions/e1 as op-ctl
 
 
 def pack(recommendation="REJECT"):
@@ -340,7 +342,7 @@ def test_case_view_hides_advisory_on_high_risk(g, shown):
     ],
 )
 async def test_case_endpoint_withholds_advisory_on_high_risk(
-    pg_sessionmaker, case, monkeypatch, status, reasons, dispatcher, shown
+    pg_sessionmaker, case, status, reasons, dispatcher, shown
 ):
     await seed_settled(pg_sessionmaker, status=status)
     async with pg_sessionmaker.begin() as session:
@@ -349,7 +351,7 @@ async def test_case_endpoint_withholds_advisory_on_high_risk(
     if dispatcher:
         snapshot = SimpleNamespace(values={"gate": gate(reasons)}, tasks=[])
         stub = SimpleNamespace(snapshot=AsyncMock(return_value=snapshot))
-        monkeypatch.setattr(app.state, "dispatcher", stub, raising=False)
+        app.state.dispatcher = stub  # the case fixture's monkeypatch restores it
     evidence = (await case())["evidence"]
     assert evidence["facts"] == pack().model_dump(mode="json")["facts"]
     assert evidence["advisory_recommendation"] == ("APPROVE" if shown else None)
