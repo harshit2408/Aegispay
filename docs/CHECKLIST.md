@@ -114,8 +114,8 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag (WIP A) (PARTIAL: reviewed replay completion seam merged in PR #39 — 805331c; runtime graph integration, replay tagging and flag acceptance remain)
 - [x] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order) — 514b238
 - [x] **P3-07** @B Widget: Settlement timeline with PayPal IDs, verified / simulated badges — 514b238
-- [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator) (WIP B) (BLOCKED: synthetic preview only; Dev A P3-02 authenticated notices and accept/contest integration pending)
-- [ ] **P3-09** @B Demo toolbar: reset, run S1–S4, forensics detector ON/OFF (kill-switch), replay banner (WIP B) (PARTIAL: admin reset/detector and controller scenario runner implemented; admin-only scenario contract and live reset remain)
+- [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator) (WIP A, taken over from B)
+- [ ] **P3-09** @B Demo toolbar: reset, run S1–S4, forensics detector ON/OFF (kill-switch), replay banner (WIP A, taken over from B; admin-only scenario contract and live reset remain)
 - [x] **P3-10** @B Custom dark theme shared by Studio and the app — 514b238
 - [x] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework — b7f26ce (#46; authenticated read-only status/list snapshots; live-model accuracy unmeasured)
 - [x] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) — 514b238
