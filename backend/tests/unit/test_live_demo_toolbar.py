@@ -1,17 +1,24 @@
 """P3-09: live (non-replay) demo toolbar: persisted detector toggle and S1–S4 admission (R24)."""
 
 import asyncio
+import subprocess
+import sys
 from dataclasses import replace
+from datetime import UTC, datetime
 
 import httpx
 import pytest
 from fastapi import FastAPI
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.orm import make_transient
 
+from app.audit.events import enqueue_event
 from app.config import get_settings
 from app.db import get_session
+from app.decision import analyze as analyze_module
 from app.demo import reset_runner, runtime
 from app.demo.seeder import seed_demo
+from app.models.core import MandatePolicy
 from app.models.payables import InvoiceDocument, InvoiceExecution
 from app.paypal.invoicing import Invoice, InvoiceItem
 from app.routers import auth, contracts, demo, documents
@@ -258,3 +265,160 @@ async def test_live_scenario_requires_session_and_csrf(live):
         response = await admin.post("/api/demo/scenarios/S1/run")
     assert response.status_code == 403
     assert response.json()["detail"] == "CSRF token required"
+
+
+PDF = {"file": ("invoice.pdf", b"%PDF-1.7 synthetic", "application/pdf")}
+S2_FORM = {"po_id": "PO-1043-base", "paypal_invoice_id": "INV2-AP-1043-BASE"}
+VALID = {"S1": "INV2-AP-1042-BASE", "S2": "INV2-AP-1043-BASE", "S3": "INV2-AP-1044-BASE"}
+
+
+async def forge(sessions, payload, **kwargs):
+    """An API-role writer can append control events; admission must still fail closed."""
+    async with sessions() as session, session.begin():
+        await enqueue_event(
+            session,
+            execution_id="demo-control",
+            actor="forger",
+            event_type=runtime.LIVE_INVOICES,
+            payload=payload,
+            **kwargs,
+        )
+
+
+@pytest.mark.parametrize(
+    ("payload", "detail"),
+    [
+        ({"run_id": "base", "invoices": {**VALID, "S1": "bad id!"}}, "invoices unavailable"),
+        ({"run_id": "base", "invoices": {"S1": VALID["S1"], "S2": VALID["S2"]}}, "invoices"),
+        # S1 pointed at S2's real invoice: the PayPal GET shows a different PO reference.
+        ({"run_id": "base", "invoices": {**VALID, "S1": VALID["S2"]}}, "does not match"),
+    ],
+)
+async def test_forged_invoice_mapping_fails_closed(live, payload, detail):
+    app, sessions, _, started = live
+    await forge(sessions, payload)
+    async with login(app, "admin") as admin:
+        response = await admin.post("/api/demo/scenarios/S1/run")
+    assert response.status_code == 409, response.text
+    assert detail in response.json()["detail"]
+    assert started == []
+
+
+async def test_mapping_for_another_run_is_ignored(live, tmp_path):
+    app, sessions, _, _ = live
+    await seed_demo(
+        sessions, config=seed("bare"), settings=get_settings(), manifest_dir=tmp_path / "bare"
+    )
+    await forge(sessions, {"run_id": "base", "invoices": VALID})  # valid IDs, wrong run
+    async with login(app, "admin") as admin:
+        response = await admin.post("/api/demo/scenarios/S1/run")
+    assert response.status_code == 409
+    assert "invoices" in response.json()["detail"]
+
+
+async def test_newest_mapping_wins_by_sequence_not_timestamp(live):
+    app, sessions, _, _ = live
+    # Newer row, older caller-supplied ts: it still wins (and is malformed, so 409).
+    await forge(
+        sessions,
+        {"run_id": "base", "invoices": {"S1": "bad id!"}},
+        ts=datetime(2000, 1, 1, tzinfo=UTC),
+    )
+    async with login(app, "admin") as admin:
+        assert (await admin.post("/api/demo/scenarios/S1/run")).status_code == 409
+
+
+async def test_live_scenario_attempts_are_throttled_including_failures(live):
+    app, *_ = live
+    async with login(app, "admin") as admin:
+        for _ in range(10):
+            early = await admin.post("/api/demo/scenarios/S4/run")
+            assert early.status_code == 409  # S4 before S1 still counts
+        assert (await admin.post("/api/demo/scenarios/S1/run")).status_code == 429
+
+
+async def test_live_detector_toggle_is_throttled(live):
+    app, *_ = live
+    async with login(app, "admin") as admin:
+        for _ in range(10):
+            ok = await admin.post("/api/demo/forensics-detector", json={"enabled": False})
+            assert ok.status_code == 200
+        throttled = await admin.post("/api/demo/forensics-detector", json={"enabled": True})
+        assert throttled.status_code == 429
+        assert (await admin.get("/api/demo/forensics-detector")).json()["detector_enabled"] is False
+
+
+async def test_non_demo_mandate_forces_detector_on(live):
+    app, sessions, _, _ = live
+    async with login(app, "admin") as admin:
+        await admin.post("/api/demo/forensics-detector", json={"enabled": False})
+    async with sessions() as session, session.begin():
+        policy = await session.get(MandatePolicy, ("demo-base", 1))
+        await session.execute(update(MandatePolicy).values(is_active=False))
+        session.expunge(policy)
+        make_transient(policy)
+        policy.policy_id = "corp-1"
+        policy.is_active = True
+        session.add(policy)
+    async with login(app, "controller1") as controller:
+        uploaded = await controller.post("/api/documents", data=S2_FORM, files=PDF)
+        assert uploaded.status_code == 202, uploaded.text
+    assert (await execution(sessions, uploaded.json()["execution_id"])).detector_enabled is True
+
+
+async def test_analysis_forces_detector_on_without_demo(live, monkeypatch):
+    app, sessions, _, _ = live
+    async with login(app, "admin") as admin:
+        await admin.post("/api/demo/forensics-detector", json={"enabled": False})
+    async with login(app, "controller1") as controller:
+        uploaded = await controller.post("/api/documents", data=S2_FORM, files=PDF)
+    execution_id = uploaded.json()["execution_id"]
+    assert (await execution(sessions, execution_id)).detector_enabled is False
+    seen = []
+
+    class Stop(Exception):
+        pass
+
+    async def parse(pdf, *, detector_enabled):
+        seen.append(detector_enabled)
+        raise Stop
+
+    monkeypatch.setattr(analyze_module, "parse_pdf", parse)
+    for demo_enabled in ("true", "false"):
+        monkeypatch.setenv("DEMO_ENABLED", demo_enabled)
+        get_settings.cache_clear()
+        with pytest.raises(Stop):
+            await analyze_module.build_analyzer(sessions, get_settings())(execution_id)
+    assert seen == [False, True]  # R24: a stored OFF is ignored outside demo deployments
+
+
+async def test_document_upload_regressions_after_refactor(live, monkeypatch):
+    app, sessions, _, _ = live
+    monkeypatch.setattr(documents, "MAX_PDF_BYTES", 32)
+    big = {"file": ("big.pdf", b"%PDF-" + b"0" * 40, "application/pdf")}
+    text = {"file": ("x.pdf", b"not a pdf", "application/pdf")}
+    receipts = []
+    async with login(app, "controller1") as controller:
+        assert (await controller.post("/api/documents", data=S2_FORM, files=big)).status_code == 413
+        assert (
+            await controller.post("/api/documents", data=S2_FORM, files=text)
+        ).status_code == 422
+        for _ in range(10):
+            response = await controller.post("/api/documents", data=S2_FORM, files=PDF)
+            assert response.status_code == 202, response.text
+            receipts.append(response.json())
+        assert (await controller.post("/api/documents", data=S2_FORM, files=PDF)).status_code == 429
+    first = receipts[0]["execution_id"]
+    assert all(r["duplicate_of_execution_id"] == first for r in receipts[1:])
+    async with sessions() as session:
+        document = await session.get(InvoiceDocument, first)
+    assert (document.source, document.uploaded_by) == ("PDF_UPLOAD", "demo-controller1")
+
+
+def test_documents_router_does_not_load_demo_code():
+    probe = (
+        "import sys, app.routers.documents; "
+        "loaded = [m for m in sys.modules if m.startswith('app.demo')]; "
+        "assert not loaded, loaded"
+    )
+    subprocess.run([sys.executable, "-c", probe], check=True)

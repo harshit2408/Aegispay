@@ -98,12 +98,14 @@ API reads the IDs from the database and holds only the Vendor read credential (R
 
 - `GET /api/demo/forensics-detector` (admin) returns the state for the active run. `POST` records a
   `DEMO_LIVE_DETECTOR` event bound to that run; a reset seeds a new run, so the detector is ON again.
-  `POST /api/documents` and the toolbar record the state on each execution; the analyze node honours
-  it. Without `DEMO_ENABLED` the detector is always ON.
+  OFF applies to every new upload while `DEMO_ENABLED`, not only toolbar scenarios: controller
+  uploads through `POST /api/documents` record it too, until the next reset. The analyze node honours
+  the recorded state. Without `DEMO_ENABLED` both admission and analysis force the detector ON.
+  Latest state wins by audit sequence, not timestamp.
 - `POST /api/demo/scenarios/{S1..S4}/run` (admin) builds the run's reportlab PDF and sends it with
   the seeded invoice through the same admission code as `POST /api/documents` (GET-verify,
   duplicate checks, 10/min per session). S3 is the look-alike payee with hidden text; S4 re-uploads
-  S1's PDF and invoice, so it is `DUPLICATE_BLOCKED` (409 until S1 has run). For the kill-switch
+  S1's PDF and invoice, so it is `DUPLICATE_BLOCKED` (409 until S1 has run). Each attempt (failed ones included) records `DEMO_RUN` and counts toward the 10/min demo limit. For the kill-switch
   re-run, reject the first S3 case, turn the detector OFF and run S3 again. A run seeded without
   invoices returns 409.
 
