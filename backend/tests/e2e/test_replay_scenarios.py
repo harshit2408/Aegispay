@@ -19,6 +19,7 @@ from app.decision.analyze import build_analyzer
 from app.decision.approve import approve_for_payment
 from app.decision.dispatch import Dispatcher
 from app.decision.graph import build_graph
+from app.decision.investigate import build_investigator
 from app.demo import runtime
 from app.demo.runtime import DemoUnavailable, ReplayReader
 from app.demo.seeder import OPERATORS, DemoSeed, seed_demo
@@ -93,6 +94,8 @@ async def replay_app(pg_url, pg_sessionmaker, tmp_path, monkeypatch):
             analyze=build_analyzer(pg_sessionmaker, settings),
             reader=LiveReader(),
             replay_reader=recorded,
+            # Real A4 wiring: a replayed case must never reach its governed provider run.
+            investigator=build_investigator(pg_sessionmaker, settings, run=tripwire("llm.a4")),
             transition=apply,
             approve=partial(approve_for_payment, pg_sessionmaker, apply, reserve),
         )

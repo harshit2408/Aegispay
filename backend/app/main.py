@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
                     if settings.demo_replay_mode
                     else None,
                     # A4 only with a configured provider; replayed cases never call it.
-                    investigator=build_investigator(sessions, settings, reader)
+                    investigator=build_investigator(sessions, settings)
                     if settings.llm_api_key
                     else None,
                     transition=apply,
