@@ -9,10 +9,15 @@ Stdlib only, so it runs on the host before any image exists.
 """
 
 import argparse
+import importlib.util
 import os
+import re
 import sys
 from collections.abc import Mapping
 from pathlib import Path
+
+# Single source of truth for reviewed (provider, model); stdlib-only file, loaded by path.
+_ALLOWLIST = Path(__file__).resolve().parents[1] / "app" / "agents" / "llm_allowlist.py"
 
 NONBLANK = (
     "TREASURY_CLIENT_ID",
@@ -48,8 +53,11 @@ def parse_env_file(text: str) -> dict[str, str]:
             continue
         name, value = line.split("=", 1)
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
+        quoted = re.fullmatch(r"([\"'])(.*?)\1\s*(?:#.*)?", value)
+        if quoted:
+            value = quoted.group(2)
+        elif value.startswith("#"):
+            value = ""  # `KEY=   # note` is blank to docker compose
         elif " #" in value:
             value = value.split(" #", 1)[0].rstrip()
         values[name.strip()] = value
@@ -69,6 +77,18 @@ def problems(env: Mapping[str, str], *, after_init: bool = False) -> list[str]:
         found.append("DEMO_REPLAY_MODE: must be false (replay is not sandbox evidence)")
     if env.get("PAYPAL_BASE_URL", SANDBOX_URLS[0]).strip().rstrip("/") not in SANDBOX_URLS:
         found.append("PAYPAL_BASE_URL: must be the PayPal sandbox origin")
+    if env.get("LLM_API_KEY", "").strip():
+        try:
+            spec = importlib.util.spec_from_file_location("llm_allowlist", _ALLOWLIST)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            provider, _ = module.select(env)
+            if not module.key_matches(provider, env["LLM_API_KEY"].strip()):
+                found.append("LLM_PROVIDER: LLM_API_KEY is not a key for this provider")
+        except ValueError:
+            found.append("LLM_PROVIDER: provider/model not on the reviewed allowlist")
+        except (OSError, AttributeError):
+            found.append("LLM_PROVIDER: allowlist file unreadable, cannot verify provider")
     treasury, vendor = env.get("TREASURY_ACCOUNT_EMAIL", ""), env.get("VENDOR_ACCOUNT_EMAIL", "")
     if treasury and treasury.casefold() == vendor.casefold():
         found.append("VENDOR_ACCOUNT_EMAIL: must differ from TREASURY_ACCOUNT_EMAIL")

@@ -40,6 +40,10 @@ class Settings(_PayPalSettings):
     database_url: str = Field(repr=False)
     checkpoint_db_url: str | None = Field(default=None, repr=False)
     llm_api_key: SecretStr | None = None
+    # Selectors only; app.agents.llm_allowlist membership decides (blank = openai defaults).
+    llm_provider: str = ""
+    llm_model_extract: str = ""
+    llm_model_reason: str = ""
     frontend_origin: str = "http://localhost:3000"
     storage_path: str = "/tmp/aegis-documents"
     demo_enabled: bool = False

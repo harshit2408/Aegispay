@@ -14,6 +14,8 @@ from chronicle.capabilities.record.record_environment_types import RecordEnviron
 from chronicle.capabilities.record.recorder import record_request
 from chronicle.framework.context.session_settings_types import SessionSettings
 
+from app.agents.llm_allowlist import OUTPUT_CAP, REVIEWED
+
 # TokenOps auto-loads dotenv at import; app.config alone owns secret configuration.
 os.environ["PYTHON_DOTENV_DISABLED"] = "1"
 
@@ -26,9 +28,8 @@ from tokenops.framework.core import Action, ActionKind, Observation, Usage  # no
 from tokenops.providers.types import ModelResponse  # noqa: E402
 
 _LOG = logging.getLogger(__name__)
-_PROVIDER = "openai"
-_MODEL = "gpt-6.1-sol"
-_OUTPUT_CAP = 1024
+_DEFAULT_LLM = ("openai", "gpt-6.1-sol")
+_OUTPUT_CAP = OUTPUT_CAP
 _GOVERNANCE = {
     "governance": {
         "budgets": [{"id": "invoice_llm_cap", "limit_micros": 1_000_000, "dimension": "trace"}],
@@ -41,8 +42,9 @@ _GOVERNANCE = {
 
 
 def _price(provider: str, model: str, usage: Usage) -> int:
-    # Standard <=272k pricing reviewed in TOOLS.md; cached input gets no discount.
-    if provider != _PROVIDER or model != _MODEL:
+    # Standard <=272k pricing reviewed in TOOLS.md; cached input gets no discount. Free
+    # OpenRouter models bill $0 but are charged at the same conservative rate (budget is a ceiling).
+    if (provider, model, _OUTPUT_CAP) not in REVIEWED:
         raise ValueError("unreviewed provider or model price")
     return 2 * (usage.input + usage.cached) + 10 * (usage.output + usage.reasoning)
 
@@ -66,7 +68,10 @@ class InvoiceRun:
     input_token_bound must include images, tool schemas and framing, from trusted code.
     """
 
-    def __init__(self, execution_id: UUID, dispatch: Callable, bound: TokenOpsBound):
+    def __init__(
+        self, execution_id: UUID, dispatch: Callable, bound: TokenOpsBound, llm: tuple[str, str]
+    ):
+        self._provider, self._model = llm
         self._execution_id = execution_id
         self._dispatch = dispatch
         self._bound = bound
@@ -106,8 +111,8 @@ class InvoiceRun:
                 controls=self._bound.controls,
                 service=node,
                 intent="invoice",
-                provider=_PROVIDER,
-                model=_MODEL,
+                provider=self._provider,
+                model=self._model,
                 open_ledger_run=False,
                 mode="enforce",
                 headers={},
@@ -157,7 +162,7 @@ class InvoiceRun:
                         "output_tokens": response.output_tokens,
                         "cached_tokens": response.cached_tokens,
                         "reasoning_tokens": response.reasoning_tokens,
-                        "cost_micros": _price(_PROVIDER, _MODEL, usage),
+                        "cost_micros": _price(self._provider, self._model, usage),
                     }
                     if rejected:
                         # The provider billed this request: log it and charge the budget
@@ -170,8 +175,8 @@ class InvoiceRun:
                                 boundary_id=f"{node}.chat",
                                 ts=time.time(),
                                 service=node,
-                                provider=_PROVIDER,
-                                model=_MODEL,
+                                provider=self._provider,
+                                model=self._model,
                                 usage=usage,
                             )
                         )
@@ -183,20 +188,22 @@ class InvoiceRun:
                     hop.governor,
                     hop.controls,
                     hop.attr,
-                    provider=_PROVIDER,
-                    model=_MODEL,
+                    provider=self._provider,
+                    model=self._model,
                     dispatch=dispatch,
                     service=node,
                     est_input_fn=lambda _: input_token_bound,
                     max_call_retries=0,
                 )
-                return governed(_PROVIDER, _MODEL, messages)
+                return governed(self._provider, self._model, messages)
         finally:
             self._calling = False
 
 
 @contextmanager
-def invoice_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRun]:
+def invoice_run(
+    execution_id: UUID, *, dispatch: Callable, llm: tuple[str, str] = _DEFAULT_LLM
+) -> Iterator[InvoiceRun]:
     """Tier 1: one run/trace, shared by all invoice agents, no trace body recording.
 
     shortcut: budget is process-local, add durable admission before graph restart/resume
@@ -204,6 +211,8 @@ def invoice_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRu
     """
     if not isinstance(execution_id, UUID):
         raise ValueError("execution_id must be a UUID")
+    if (*llm, _OUTPUT_CAP) not in REVIEWED:
+        raise ValueError("unreviewed provider or model")
     install_crossing_hook()
     environment = RecordEnvironment(
         service="aegispay.invoice",
@@ -218,8 +227,8 @@ def invoice_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRu
             config=_GOVERNANCE,
             service="aegispay.invoice",
             intent="invoice",
-            provider=_PROVIDER,
-            model=_MODEL,
+            provider=llm[0],
+            model=llm[1],
             price=_price,
             mode="enforce",
             headers={},
@@ -227,7 +236,7 @@ def invoice_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRu
             user_dims={},
         ) as bound,
     ):
-        run = InvoiceRun(execution_id, dispatch, bound)
+        run = InvoiceRun(execution_id, dispatch, bound, llm)
         try:
             yield run
         finally:
@@ -235,16 +244,20 @@ def invoice_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRu
 
 
 @contextmanager
-def mandate_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRun]:
+def mandate_run(
+    execution_id: UUID, *, dispatch: Callable, llm: tuple[str, str] = _DEFAULT_LLM
+) -> Iterator[InvoiceRun]:
     """A1 has its own authoring execution and cannot consume an invoice's allowance."""
-    with invoice_run(execution_id, dispatch=dispatch) as run:
+    with invoice_run(execution_id, dispatch=dispatch, llm=llm) as run:
         run._nodes = frozenset({"A1"})
         yield run
 
 
 @contextmanager
-def analyst_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRun]:
+def analyst_run(
+    execution_id: UUID, *, dispatch: Callable, llm: tuple[str, str] = _DEFAULT_LLM
+) -> Iterator[InvoiceRun]:
     """A7 has a separate bounded read-only question run, outside invoice approval."""
-    with invoice_run(execution_id, dispatch=dispatch) as run:
+    with invoice_run(execution_id, dispatch=dispatch, llm=llm) as run:
         run._nodes = frozenset({"A7"})
         yield run
