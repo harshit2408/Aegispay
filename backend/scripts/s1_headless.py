@@ -7,7 +7,9 @@ human, it stops and says so (R11). Credentials come from the process environment
   python scripts/s1_headless.py --pdf S1.pdf --po PO-1042-<run> --invoice INV2-XXXX --out s1.json
   ... --scenario S2 --pdf S2.pdf --po PO-1043-<run> --invoice INV2-YYYY   (short-pay)
   ... --scenario S4 --pdf S1.pdf --po PO-1042-<run> --invoice <S1 invoice> --original <S1 exec id>
-S3 (hidden-text FREEZE) is not driven here: it needs two real operators in the cockpit (R11).
+  ... --scenario S3 --pdf S3.pdf --po PO-1044-<run> --invoice <S3 invoice>   (attack: FROZEN)
+S3 stops at FROZEN. Only if AEGIS_REVIEWER_ID/AEGIS_REVIEWER_PASSWORD (a second real operator, never
+the uploader) are in the environment does it send REJECT. It never sends APPROVE or SHORT_PAY (R11).
 """
 
 import argparse
@@ -24,7 +26,8 @@ import httpx
 S1_CENTS = 48000  # PRD §15: 100 x $4.80, 100 accepted
 # PRD §15/§12.3: S2 bills 100 x $5.00, 85 accepted: pays 42500; expected cost 6592 vs 1500.
 SETTLED_SCENARIOS = {
-    "S1": {"cents": S1_CENTS, "route": "AUTO_SETTLE", "invoice": ("PAID", "MARKED_AS_PAID")},
+    # S1's AUTO_SETTLE route is recorded in the evidence; its verdict keeps the original checks.
+    "S1": {"cents": S1_CENTS, "route": None, "invoice": ("PAID", "MARKED_AS_PAID")},
     "S2": {
         "cents": 42500,
         "route": "SHORT_PAY",
@@ -62,7 +65,7 @@ def verdict(case: dict, scenario: str = "S1") -> list[str]:
     want = SETTLED_SCENARIOS[scenario]
     cents = want["cents"]
     problems = []
-    if (case.get("gate") or {}).get("route") != want["route"]:
+    if want["route"] and (case.get("gate") or {}).get("route") != want["route"]:
         problems.append(
             f"gate route is {(case.get('gate') or {}).get('route')}, expected {want['route']}"
         )
@@ -114,30 +117,80 @@ def verdict_duplicate(case: dict, original: str, elapsed: float) -> list[str]:
     return problems
 
 
+def verdict_frozen(case: dict) -> list[str]:
+    """S3 stage 1 (PRD §15): the attack is frozen with dual approval, nothing is paid."""
+    problems = []
+    gate = case.get("gate") or {}
+    if case.get("status") != "FROZEN" or gate.get("route") != "FREEZE":
+        problems.append(
+            f"status/route {case.get('status')}/{gate.get('route')}, expected FROZEN/FREEZE"
+        )
+    if gate.get("required_approvals") != 2:
+        problems.append(f"required_approvals {gate.get('required_approvals')}, expected 2")
+    if (case.get("risk") or {}).get("score", 0) < 80:
+        problems.append("risk score below the dual-approval threshold")
+    forensics = case.get("forensics") or {}
+    if not forensics.get("hidden_segments") and forensics.get("classifier_label") == "CLEAN":
+        problems.append("neither hidden text nor an injection label was detected")
+    if case.get("settlement_timeline") or (case.get("po_consumption") or {}).get("paid_cents"):
+        problems.append("money moved on a frozen case")
+    return problems
+
+
+def verdict_rejected(case: dict, reviewer: str) -> list[str]:
+    """S3 stage 2: a second real operator rejected it through the public API."""
+    problems = []
+    if case.get("status") != "REJECTED":
+        problems.append(f"status is {case.get('status')}, expected REJECTED")
+    votes = [(a["actor"]["operator_id"], a["action"]) for a in case.get("approvals", [])]
+    if (reviewer, "REJECT") not in votes:
+        problems.append("no REJECT approval recorded for the reviewer")
+    if case.get("settlement_timeline") or (case.get("po_consumption") or {}).get("paid_cents"):
+        problems.append("money moved on a rejected case")
+    return problems
+
+
+def _session(http: httpx.Client, operator_id: str, password: str) -> dict:
+    login = http.post("/api/auth/login", json={"operator_id": operator_id, "password": password})
+    login.raise_for_status()
+    # The session cookie is Secure; the jar would drop it over plain-http localhost.
+    cookie = login.cookies.get("aegis_session")
+    if not cookie:
+        raise SystemExit("login response carried no aegis_session cookie")
+    return {"Cookie": f"aegis_session={cookie}", "X-CSRF-Token": login.json()["csrf_token"]}
+
+
+def _reject(http: httpx.Client, execution_id: str, case: dict, reviewer: dict) -> None:
+    """The only write besides upload: REJECT (the safe direction) as the second operator."""
+    response = http.post(
+        f"/api/executions/{execution_id}/decisions",
+        headers=reviewer,
+        json={
+            "action": "REJECT",
+            "reason": "S3 sandbox run: look-alike payee and hidden instructions in the PDF.",
+            "gate_hash": case["gate"]["gate_hash"],
+        },
+    )
+    response.raise_for_status()
+
+
 def run(args: argparse.Namespace) -> int:
     scenario = getattr(args, "scenario", "S1")
+    reviewer_id = os.environ.get("AEGIS_REVIEWER_ID")
 
     def check(case: dict) -> list[str]:
         if scenario == "S4":
             return verdict_duplicate(case, args.original, elapsed)
+        if scenario == "S3":
+            return verdict_frozen(case)
         return verdict(case, scenario)
 
     elapsed = 0.0
     base = api_base(os.environ.get("AEGIS_API_URL", "http://127.0.0.1:8000"))
     with httpx.Client(base_url=base, timeout=30) as http:
-        login = http.post(
-            "/api/auth/login",
-            json={
-                "operator_id": os.environ["AEGIS_OPERATOR_ID"],
-                "password": os.environ["AEGIS_OPERATOR_PASSWORD"],
-            },
+        headers = _session(
+            http, os.environ["AEGIS_OPERATOR_ID"], os.environ["AEGIS_OPERATOR_PASSWORD"]
         )
-        login.raise_for_status()
-        # The session cookie is Secure; the jar would drop it over plain-http localhost.
-        cookie = login.cookies.get("aegis_session")
-        if not cookie:
-            raise SystemExit("login response carried no aegis_session cookie")
-        headers = {"Cookie": f"aegis_session={cookie}", "X-CSRF-Token": login.json()["csrf_token"]}
         started = time.monotonic()  # after login: Argon2 time is not the duplicate-check latency
         with Path(args.pdf).open("rb") as pdf:
             receipt = http.post(
@@ -162,8 +215,19 @@ def run(args: argparse.Namespace) -> int:
                 if not check(case) or time.monotonic() - terminal_at > args.grace:
                     break
             time.sleep(2)
-    problems = check(case)
-    if case.get("status") == "FROZEN":
+        frozen = case
+        if scenario == "S3" and reviewer_id and not check(case):
+            reviewer = _session(http, reviewer_id, os.environ["AEGIS_REVIEWER_PASSWORD"])
+            _reject(http, execution_id, case, reviewer)
+            for _ in range(max(1, args.timeout // 2)):
+                case = http.get(f"/api/executions/{execution_id}", headers=headers).json()
+                if case["status"] == "REJECTED":
+                    break
+                time.sleep(2)
+    problems = check(frozen)
+    if scenario == "S3" and reviewer_id and not problems:
+        problems = verdict_rejected(case, reviewer_id)
+    if case.get("status") == "FROZEN" and not (scenario == "S3" and not problems):
         sys.stdout.write("Needs human approval (R11); this CLI never approves. Stopping.\n")
     Path(args.out).write_text(
         json.dumps(
@@ -171,6 +235,7 @@ def run(args: argparse.Namespace) -> int:
                 "scenario": scenario,
                 "execution_id": execution_id,
                 "elapsed_seconds": round(elapsed, 3),
+                "frozen_case": frozen if scenario == "S3" else None,
                 "case": case,
                 "problems": problems,
             },
@@ -189,7 +254,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--scenario", choices=("S1", "S2", "S4"), default="S1")
+    parser.add_argument("--scenario", choices=("S1", "S2", "S3", "S4"), default="S1")
     parser.add_argument("--original", help="S4: execution id of the settled original")
     parser.add_argument("--pdf", required=True)
     parser.add_argument("--po", required=True)

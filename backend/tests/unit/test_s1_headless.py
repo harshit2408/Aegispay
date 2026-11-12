@@ -1,5 +1,6 @@
 import copy
 import importlib.util
+import json
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -258,3 +259,108 @@ def test_pdf_builder_scenarios(tmp_path):
         with pdfplumber.open(out) as pdf:
             text = pdf.pages[0].extract_text()
         assert f"AP-{number}-p215a" in text and f"PO-{number}-p215a" in text and total in text
+
+
+def _frozen(**over):
+    return {
+        "status": "FROZEN",
+        "gate": {"route": "FREEZE", "required_approvals": 2, "gate_hash": "a" * 64},
+        "risk": {"score": 100},
+        "forensics": {"hidden_segments": [{"text": "x"}], "classifier_label": "INJECTION"},
+        "settlement_timeline": [],
+        "po_consumption": {"paid_cents": 0},
+        "approvals": [],
+    } | over
+
+
+def test_s3_frozen_verdict():
+    assert s1.verdict_frozen(_frozen()) == []
+    for bad in (
+        {"status": "APPROVED_FOR_PAYMENT"},
+        {"gate": {"route": "AUTO_SETTLE", "required_approvals": 0}},
+        {"gate": {"route": "FREEZE", "required_approvals": 1}},
+        {"risk": {"score": 40}},
+        {"forensics": {"hidden_segments": [], "classifier_label": "CLEAN"}},
+        {"settlement_timeline": [{"status": "PAYOUT_SENDING"}]},
+        {"po_consumption": {"paid_cents": 1}},
+    ):
+        assert s1.verdict_frozen(_frozen(**bad)) != [], bad
+    # a label alone (no structural hidden text) still counts as detected
+    label_only = {"hidden_segments": [], "classifier_label": "INJECTION"}
+    assert s1.verdict_frozen(_frozen(forensics=label_only)) == []
+
+
+def test_s3_rejected_verdict_needs_the_reviewer_vote_and_no_money():
+    vote = {"actor": {"operator_id": "demo-cfo"}, "action": "REJECT"}
+    done = _frozen(status="REJECTED", approvals=[vote])
+    assert s1.verdict_rejected(done, "demo-cfo") == []
+    assert s1.verdict_rejected(done, "demo-controller2") != []
+    assert s1.verdict_rejected(_frozen(approvals=[vote]), "demo-cfo") != []
+    assert s1.verdict_rejected({**done, "settlement_timeline": [{"status": "x"}]}, "demo-cfo") != []
+
+
+def _s3_transport(state):
+    def handler(request):
+        path = request.url.path
+        if path == "/api/auth/login":
+            who = json.loads(request.content)["operator_id"]
+            return httpx.Response(
+                200,
+                json={"csrf_token": "csrf"},
+                headers=[("set-cookie", f"aegis_session={who}; Secure; HttpOnly; Path=/")],
+            )
+        if path == "/api/documents":
+            return httpx.Response(202, json={"execution_id": "ex3"})
+        if path.endswith("/decisions"):
+            state["decided_by"] = request.headers["cookie"]
+            state["body"] = json.loads(request.content)
+            return httpx.Response(200, json={"approval_id": "ap1"})
+        if "decided_by" in state:
+            vote = {"actor": {"operator_id": "demo-cfo"}, "action": "REJECT"}
+            return httpx.Response(200, json=_frozen(status="REJECTED", approvals=[vote]))
+        return httpx.Response(200, json=_frozen())
+
+    return handler
+
+
+def _s3_args(tmp_path):
+    pdf = tmp_path / "s3.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    return argparse.Namespace(
+        scenario="S3",
+        pdf=str(pdf),
+        po="PO-1",
+        invoice="INV-1",
+        out=str(tmp_path / "o.json"),
+        timeout=5,
+        grace=0,
+    )
+
+
+def _patch_s3(monkeypatch, state):
+    real = httpx.Client
+    transport = httpx.MockTransport(_s3_transport(state))
+    monkeypatch.setattr(s1.httpx, "Client", lambda **kw: real(transport=transport, **kw))
+    monkeypatch.setenv("AEGIS_OPERATOR_ID", "demo-controller1")
+    monkeypatch.setenv("AEGIS_OPERATOR_PASSWORD", "pw")
+    monkeypatch.delenv("AEGIS_API_URL", raising=False)
+
+
+def test_s3_without_reviewer_stops_frozen_and_never_decides(monkeypatch, tmp_path):
+    state = {}
+    _patch_s3(monkeypatch, state)
+    monkeypatch.delenv("AEGIS_REVIEWER_ID", raising=False)
+    assert s1.run(_s3_args(tmp_path)) == 0  # frozen with dual approval is the stage-1 pass
+    assert state == {}
+
+
+def test_s3_with_reviewer_sends_only_reject_as_that_operator(monkeypatch, tmp_path):
+    state = {}
+    _patch_s3(monkeypatch, state)
+    monkeypatch.setenv("AEGIS_REVIEWER_ID", "demo-cfo")
+    monkeypatch.setenv("AEGIS_REVIEWER_PASSWORD", "pw2")
+    assert s1.run(_s3_args(tmp_path)) == 0
+    assert state["decided_by"] == "aegis_session=demo-cfo"
+    assert state["body"]["action"] == "REJECT" and state["body"]["gate_hash"] == "a" * 64
+    saved = json.loads((tmp_path / "o.json").read_text())
+    assert saved["frozen_case"]["status"] == "FROZEN" and saved["case"]["status"] == "REJECTED"
