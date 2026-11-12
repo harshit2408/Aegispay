@@ -13,7 +13,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.payables import InvoiceExecution, Payout
+from app.models.payables import InvoiceExecution, Payout, ShortPayNotice
+from app.ops.alerts import enqueue_alert
 from app.paypal.client import PayPalError
 from app.paypal.payouts import PayoutCommand, PayoutItem, Payouts
 from app.settlement import halt as halt_flag
@@ -190,7 +191,15 @@ class Reconciler:
                 return execution.status
             await transitions.apply(s, execution, "SETTLED", actor="system:reconciler")
             if execution.route == "SHORT_PAY":
-                execution.short_pay_balance = "NOTICE_SENT"
+                # §12.4: only a stored A5 notice can be "sent"; settlement never drafts one (R22).
+                if await s.scalar(
+                    select(ShortPayNotice.notice_id).where(
+                        ShortPayNotice.execution_id == execution_id
+                    )
+                ):
+                    execution.short_pay_balance = "NOTICE_SENT"
+                else:
+                    await enqueue_alert(s, "SHORT_PAY_NOTICE_MISSING", execution_id)
         return "SETTLED"
 
     async def _mark_recordpay_sent(self, execution_id: str) -> bool:

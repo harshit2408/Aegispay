@@ -51,7 +51,7 @@ def drafter(content=PROSE):
     return draft
 
 
-async def seed_short_pay(sm, execution_id="e1", balance="NONE"):
+async def seed_short_pay(sm, execution_id="e1", balance="NONE", status="APPROVED_FOR_PAYMENT"):
     async with sm.begin() as s:
         if await s.get(GoodsReceipt, "grn-1") is None:
             await seed_world(s)
@@ -89,6 +89,7 @@ async def seed_short_pay(sm, execution_id="e1", balance="NONE"):
             invoice_number_norm=f"AP{execution_id}",
             paypal_invoice_id=f"INV2-{execution_id}",
             short_pay_balance=balance,
+            status=status,
             match_report_json={"paypal_invoice_status": "SENT"},
         )
 
@@ -187,7 +188,7 @@ async def test_graph_drafts_after_approval_only_for_short_pay(pg_sessionmaker, r
 @pytest.fixture
 async def client(pg_sessionmaker, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/unused")
-    monkeypatch.setenv("SESSION_SECRET", "synthetic-vendor-sim-secret-key-1234")
+    monkeypatch.setenv("SESSION_SECRET", "synthetic-only-session-secret-at-least-32")
     get_settings.cache_clear()
 
     async def sessions():

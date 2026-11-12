@@ -437,7 +437,7 @@ CREATE TABLE auth_attempts (
 CREATE TABLE ops_alerts (
     alert_id TEXT PRIMARY KEY,
     event TEXT NOT NULL CHECK (event IN ('HALT','VENDOR_CHANGE','MANDATE_ACTIVATED',
-      'WEBHOOK_SIGNATURE_FAILURE','APPROVAL_OUTSIDE_HOURS')),
+      'WEBHOOK_SIGNATURE_FAILURE','APPROVAL_OUTSIDE_HOURS','SHORT_PAY_NOTICE_MISSING')),
     execution_id TEXT, created_at TIMESTAMPTZ NOT NULL, delivered_at TIMESTAMPTZ
 );
 -- API appends alerts; settlement delivers HTTPS outside DB locks, or records log-only delivery.
@@ -590,6 +590,24 @@ CREATE UNIQUE INDEX uq_live_vendor_invoice ON invoice_executions (vendor_id, inv
 CREATE UNIQUE INDEX uq_live_paypal_invoice ON invoice_executions (paypal_invoice_id)
     WHERE status NOT IN ('REJECTED','DUPLICATE_BLOCKED') AND paypal_invoice_id IS NOT NULL;
 -- NULL invoice_number_norm never auto-settles (G13).
+
+CREATE TABLE short_pay_notices (          -- §12.4: one A5 notice per SHORT_PAY execution (P3-02)
+    notice_id      TEXT PRIMARY KEY,
+    execution_id   TEXT NOT NULL UNIQUE REFERENCES invoice_executions,
+    text           TEXT NOT NULL CHECK (char_length(text) BETWEEN 1 AND 2000),  -- numbers by template
+    delta_cents    BIGINT NOT NULL CHECK (delta_cents > 0),   -- billed − frozen approved; never a payout input (R3)
+    used_fallback  BOOLEAN NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    response       TEXT CHECK (response IN ('ACCEPTED','CONTESTED')),
+    reason         TEXT CHECK (reason IS NULL OR (response IS NOT NULL AND char_length(reason) <= 1000)),
+    responded_by   TEXT REFERENCES operators,                 -- from the session (R11)
+    responded_at   TIMESTAMPTZ,
+    CHECK ((response IS NULL) = (responded_at IS NULL) AND (response IS NULL) = (responded_by IS NULL))
+);
+-- Trigger: one response, then the row is frozen for every role. API: SELECT/INSERT + UPDATE of the
+-- response columns only. Settlement sets NOTICE_SENT at SETTLED only if this row exists, else it
+-- raises ops alert SHORT_PAY_NOTICE_MISSING. The API write guard lets the api role change a
+-- settlement-state execution only for NOTICE_SENT → ACCEPTED|CONTESTED with all else unchanged.
 
 CREATE TABLE approvals (
     approval_id     TEXT PRIMARY KEY,        -- the decision_id passed to resume (R11)

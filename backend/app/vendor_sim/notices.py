@@ -6,6 +6,7 @@ what is paid (R3). Visibility to the supplier starts when settlement sets NOTICE
 """
 
 import asyncio
+import hashlib
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -21,6 +22,7 @@ from app.models.core import GoodsReceipt
 from app.models.payables import InvoiceExecution, ShortPayNotice
 
 log = logging.getLogger(__name__)
+MAX_TEXT_CHARS = 2000  # = ck_notice_text
 Drafter = Callable[[InvoiceExecution, NoticeFacts], Notice]
 
 
@@ -65,10 +67,17 @@ def _facts(execution: InvoiceExecution, grn: GoodsReceipt) -> NoticeFacts:
         "rejected_qty": grn.rejected_qty,
         "inspection_note": grn.inspection_note or "",
     }
-    try:
-        return NoticeFacts(invoice_number=execution.vendor_invoice_number or "", **fields)
-    except ValidationError:  # vendor-asserted number outside the identifier whitelist
-        return NoticeFacts(invoice_number=execution.invoice_number_norm, **fields)
+    # The vendor-asserted number may fall outside the identifier whitelist: try safer ones.
+    for number in (
+        execution.vendor_invoice_number,
+        execution.invoice_number_norm,
+        execution.paypal_invoice_id,
+    ):
+        try:
+            return NoticeFacts(invoice_number=number or "", **fields)
+        except ValidationError:
+            continue
+    return NoticeFacts(invoice_number="unknown", **fields)
 
 
 async def create_notice(sessions, draft: Drafter, execution_id: str) -> str | None:
@@ -92,6 +101,8 @@ async def create_notice(sessions, draft: Drafter, execution_id: str) -> str | No
         grn = await session.get(GoodsReceipt, execution.grn_id)
         facts = _facts(execution, grn)
     notice = await asyncio.to_thread(draft, execution, facts)
+    if len(notice.text) > MAX_TEXT_CHARS:  # long prose can expand past the column bound
+        notice = draft_notice(_unavailable, facts)
     notice_id = f"NTC-{execution_id}"
     async with sessions() as session, session.begin():
         inserted = await session.scalar(
@@ -146,7 +157,12 @@ async def respond(session, notice_id: str, action: str, reason: str | None, acto
         execution_id=execution.execution_id,
         actor=actor,
         event_type=f"SHORT_PAY_NOTICE_{outcome}",
-        payload={"notice_id": notice_id, "delta_cents": notice.delta_cents},
+        payload={
+            "notice_id": notice_id,
+            "delta_cents": notice.delta_cents,
+            # Digest only: the free text stays in the notice row, the chain proves it unchanged.
+            "reason_sha256": hashlib.sha256(reason.encode()).hexdigest() if reason else None,
+        },
         ts=now,
     )
     return {"notice_id": notice_id, "short_pay_balance": outcome, "responded_at": now}

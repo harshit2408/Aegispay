@@ -1,5 +1,6 @@
 """Checkpointed orchestration of the invoice decision, with server-bound R11 resumes."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -16,9 +17,11 @@ from app.forensics.classifier import UNAVAILABLE
 from app.models.core import MandatePolicy as PolicyRow
 from app.models.core import Operator, VendorMaster
 from app.models.payables import Approval, InvoiceDocument, InvoiceExecution
+from app.ops.alerts import enqueue_alert
 from app.schemas.decision import AegisState, GateDecision, MandatePolicy
 
 log = logging.getLogger(__name__)
+NOTIFY_TIMEOUT_S = 90  # A5 provider call is bounded at 40 s; DB work is small
 
 
 class GraphState(AegisState, total=False):
@@ -323,16 +326,24 @@ def build_graph(
                 "approval_retry": False,
             }
 
+    async def notify_short_pay(execution_id: str) -> None:
+        """§12.4, idempotent on execution_id. Payment is already committed, so a failure only
+        alerts; settlement then leaves the balance unsent instead of claiming a notice."""
+        try:
+            await asyncio.wait_for(notify(execution_id), NOTIFY_TIMEOUT_S)
+        except Exception:
+            log.exception("notice failed execution_id=%s", execution_id)
+            try:
+                async with sessions.begin() as session:
+                    await enqueue_alert(session, "SHORT_PAY_NOTICE_MISSING", execution_id)
+            except Exception:
+                log.exception("notice alert failed execution_id=%s", execution_id)
+
     async def approve_for_payment(state: GraphState):
         await persist_result(state, state["gate"])
         if await approve(state["execution_id"], state):
             if notify is not None and state["gate"].route == "SHORT_PAY":
-                try:
-                    await notify(state["execution_id"])  # §12.4, idempotent on execution_id
-                except Exception:
-                    # shortcut: payment is already committed, so a notice DB failure only logs;
-                    # add a notice backfill sweep if this is ever seen outside tests.
-                    log.exception("notice failed execution_id=%s", state["execution_id"])
+                await notify_short_pay(state["execution_id"])
             return {"approval_retry": False}
         if not state.get("approval_retry"):
             return {"approval_retry": True}

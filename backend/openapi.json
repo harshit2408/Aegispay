@@ -1587,6 +1587,7 @@
             "anyOf": [
               {
                 "maxLength": 1000,
+                "pattern": "^[^\\x00-\\x1f\\x7f]*$",
                 "type": "string"
               },
               {
@@ -2222,7 +2223,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Present once settlement sent the notice"
           },
           "paypal_invoice_id": {
             "title": "Paypal Invoice Id",
@@ -2240,6 +2242,7 @@
             "title": "Paypal Status"
           },
           "received_cents": {
+            "description": "Payout item confirmed SUCCESS by PayPal, else 0",
             "minimum": 0.0,
             "title": "Received Cents",
             "type": "integer"
@@ -2306,6 +2309,7 @@
             "type": "string"
           },
           "text": {
+            "description": "Untrusted LLM prose with template-filled numbers; plain text",
             "title": "Text",
             "type": "string"
           }
@@ -3172,6 +3176,7 @@
     },
     "/api/vendor-sim/invoices": {
       "get": {
+        "description": "Role: any authenticated operator (PRD §13). Simulator only: the operator acts as the supplier; responses are attributable via responded_by and the audit chain. Open notices first, then newest; at most 50 rows.",
         "operationId": "list_vendor_sim_invoices",
         "responses": {
           "200": {
@@ -3187,9 +3192,19 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "No valid session"
           }
         },
-        "summary": "List Invoices",
+        "summary": "Supplier view: invoices, payments received and sent short-pay notices",
         "tags": [
           "vendor-sim"
         ]
@@ -3197,6 +3212,7 @@
     },
     "/api/vendor-sim/notices/{notice_id}/respond": {
       "post": {
+        "description": "Role: any authenticated operator (PRD §13). Simulator only: the operator acts as the supplier; responses are attributable via responded_by and the audit chain. Requires the X-CSRF-Token header. The paid amount never changes.",
         "operationId": "respond_vendor_sim_notice",
         "parameters": [
           {
@@ -3230,6 +3246,26 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Missing or invalid CSRF token"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3238,7 +3274,7 @@
                 }
               }
             },
-            "description": "Not Found"
+            "description": "Unknown notice"
           },
           "409": {
             "content": {
@@ -3248,7 +3284,7 @@
                 }
               }
             },
-            "description": "Conflict"
+            "description": "Notice not sent yet, or already answered"
           },
           "422": {
             "content": {
@@ -3261,7 +3297,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Respond To Notice",
+        "summary": "Supplier Accept / Contest of a sent short-pay notice (one response only)",
         "tags": [
           "vendor-sim"
         ]

@@ -347,7 +347,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Invoices */
+        /**
+         * Supplier view: invoices, payments received and sent short-pay notices
+         * @description Role: any authenticated operator (PRD §13). Simulator only: the operator acts as the supplier; responses are attributable via responded_by and the audit chain. Open notices first, then newest; at most 50 rows.
+         */
         get: operations["list_vendor_sim_invoices"];
         put?: never;
         post?: never;
@@ -366,7 +369,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Respond To Notice */
+        /**
+         * Supplier Accept / Contest of a sent short-pay notice (one response only)
+         * @description Role: any authenticated operator (PRD §13). Simulator only: the operator acts as the supplier; responses are attributable via responded_by and the audit chain. Requires the X-CSRF-Token header. The paid amount never changes.
+         */
         post: operations["respond_vendor_sim_notice"];
         delete?: never;
         options?: never;
@@ -1200,12 +1206,16 @@ export interface components {
             billed_cents: number | null;
             /** Invoice Number */
             invoice_number: string | null;
+            /** @description Present once settlement sent the notice */
             notice: components["schemas"]["SupplierNotice"] | null;
             /** Paypal Invoice Id */
             paypal_invoice_id: string;
             /** Paypal Status */
             paypal_status: string | null;
-            /** Received Cents */
+            /**
+             * Received Cents
+             * @description Payout item confirmed SUCCESS by PayPal, else 0
+             */
             received_cents: number;
             /** Vendor Name */
             vendor_name: string | null;
@@ -1228,7 +1238,10 @@ export interface components {
              * @enum {string}
              */
             status: "NOTICE_SENT" | "ACCEPTED" | "CONTESTED";
-            /** Text */
+            /**
+             * Text
+             * @description Untrusted LLM prose with template-filled numbers; plain text
+             */
             text: string;
         };
         /** ValidationError */
@@ -1870,6 +1883,15 @@ export interface operations {
                     "application/json": components["schemas"]["SupplierInvoice"][];
                 };
             };
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
         };
     };
     respond_vendor_sim_notice: {
@@ -1896,7 +1918,25 @@ export interface operations {
                     "application/json": components["schemas"]["NoticeReceipt"];
                 };
             };
-            /** @description Not Found */
+            /** @description No valid session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+            /** @description Missing or invalid CSRF token */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+            /** @description Unknown notice */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1905,7 +1945,7 @@ export interface operations {
                     "application/json": components["schemas"]["APIError"];
                 };
             };
-            /** @description Conflict */
+            /** @description Notice not sent yet, or already answered */
             409: {
                 headers: {
                     [name: string]: unknown;

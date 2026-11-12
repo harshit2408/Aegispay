@@ -160,6 +160,11 @@ class ShortPayNotice(Base):
     __tablename__ = "short_pay_notices"
     __table_args__ = (
         CheckConstraint("delta_cents > 0", name="ck_notice_delta"),
+        CheckConstraint("char_length(text) BETWEEN 1 AND 2000", name="ck_notice_text"),
+        CheckConstraint(
+            "reason IS NULL OR (response IS NOT NULL AND char_length(reason) <= 1000)",
+            name="ck_notice_reason",
+        ),
         CheckConstraint(
             "response IS NULL OR response IN ('ACCEPTED','CONTESTED')", name="ck_notice_response"
         ),

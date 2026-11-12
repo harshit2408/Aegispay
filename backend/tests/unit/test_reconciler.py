@@ -9,6 +9,7 @@ import pytest
 import respx
 from sqlalchemy import select, text
 
+from app.models.auth import OpsAlert
 from app.models.core import PurchaseOrder
 from app.models.payables import (
     InvoiceExecution,
@@ -165,9 +166,23 @@ async def test_settled_execution_is_not_recorded_twice(env):
 
 async def test_short_pay_route_marks_notice_sent(env):
     await env.sql("update invoice_executions set route = 'SHORT_PAY'")
+    await env.sql(
+        "insert into short_pay_notices (notice_id, execution_id, text, delta_cents, used_fallback)"
+        " values ('NTC-e1', 'e1', 'notice', 7500, true)"
+    )
     env.set_item("SUCCESS")
     await env.rec.reconcile("e1")
     assert (await env.execution()).short_pay_balance == "NOTICE_SENT"
+    assert await env.rows(OpsAlert) == []
+
+
+async def test_short_pay_without_a_notice_stays_unsent_and_alerts(env):
+    await env.sql("update invoice_executions set route = 'SHORT_PAY'")
+    env.set_item("SUCCESS")
+    assert await env.rec.reconcile("e1") == "SETTLED"
+    assert (await env.execution()).short_pay_balance == "NONE"
+    (alert,) = await env.rows(OpsAlert)
+    assert (alert.event, alert.execution_id) == ("SHORT_PAY_NOTICE_MISSING", "e1")
 
 
 async def _crash_after_record_call(env, sent_at=NOW - timedelta(minutes=10)):
