@@ -274,7 +274,7 @@ async def get_execution(execution_id: str, request: Request, session: Session, v
         forensics=doc.forensics_json,
         match=match,
         risk=row.risk_json,
-        evidence=row.evidence_pack_json,
+        evidence=_evidence_view(row.evidence_pack_json, gate),
         short_pay=row.short_pay_json,
         gate=gate,
         approvals=[
@@ -291,6 +291,18 @@ async def get_execution(execution_id: str, request: Request, session: Session, v
         settlement_timeline=timeline,
         audit_anchor=anchor,
     )
+
+
+def _evidence_view(evidence: dict | None, gate) -> dict | None:
+    """R14: show A4's advisory recommendation only when the gate is known and not HIGH_RISK."""
+    if evidence is None:
+        return None
+    reasons = None if gate is None else getattr(gate, "reasons", None)
+    if reasons is None and isinstance(gate, dict):
+        reasons = gate.get("reasons")
+    if reasons is None or "HIGH_RISK" in reasons:
+        return {**evidence, "advisory_recommendation": None}
+    return evidence
 
 
 @router.post(
