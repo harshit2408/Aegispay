@@ -1221,8 +1221,9 @@ All routes except `/api/health`, `/api/auth/login` and the PayPal webhook routes
 | `GET` | `/api/vendor-sim/invoices` | any | Supplier-side view of invoices, payments and notices (no risk or gate data) |
 | `POST` | `/api/vendor-sim/notices/{notice_id}/respond` | any | Accept / contest (P1: triggers the Vendor Agent) |
 | `POST` | `/api/demo/reset` | admin, **only if `DEMO_ENABLED`** | New run suffix; recreate PayPal invoices, PDFs, POs, GRNs; mark executions archived (audit chain kept) |
-| `POST` | `/api/demo/scenarios/{scenario_id}/run` | admin (§14.5 toolbar; admin cannot approve, R18), **only if `DEMO_ENABLED`**; replay mode only until live scenario admission exists | Feed the seeded PDF for S1–S5 into `/api/documents` |
+| `POST` | `/api/demo/scenarios/{scenario_id}/run` | admin (§14.5 toolbar; admin cannot approve, R18), **only if `DEMO_ENABLED`** | Feed the run's seeded PDF and its owner-seeded PayPal invoice for S1–S4 through the `/api/documents` admission path (live) or the recorded replay path |
 | `POST` | `/api/demo/forensics-detector` | admin, **only if `DEMO_ENABLED`** | `{enabled: bool}` for the kill-switch proof; recorded on each execution |
+| `GET` | `/api/demo/forensics-detector` | admin, **only if `DEMO_ENABLED`** | Current detector state for the active run (`DemoControlView`); a reset turns it back ON |
 | `GET` | `/api/health` | — | DB, both OAuth tokens (settlement reports its own), both webhook registrations, distinct accounts (R12), demo/replay flags, halt state, last anchor age |
 
 When `DEMO_ENABLED=false` the `demo` router is not mounted at all (R24). SSE fan-out uses Postgres `LISTEN/NOTIFY` (settlement runs in its own process, ADR-007).
@@ -1279,7 +1280,7 @@ Settlement halt toggle with reason, velocity breaker status, recent alerts, vend
 
 ## 15. Demo scenarios (`backend/app/demo/`)
 
-Seeded for each run: operators (2 × controller, cfo, receiver, 2 × vendor_admin, admin — R18), vendor master (one verified supplier, `onboarded_at` 90 days ago, payer ID captured from the supplier sandbox account, one already-effective change record so the history panel is real), POs (created by admin), GRNs (`source=SEEDED`, recorded by the receiver), PDFs generated with `reportlab`, and PayPal invoices created and sent from the Vendor app. Scenario PDFs are uploaded as controller #1; approvals in the video use controller #2 and cfo. `demo/reset` starts a new mandate `policy_id` and archives prior executions, so rehearsal runs do not trip the daily, per-vendor or velocity limits; real sandbox payouts stay in the ledger and audit chain.
+Seeded for each run: operators (2 × controller, cfo, receiver, 2 × vendor_admin, admin — R18), vendor master (one verified supplier, `onboarded_at` 90 days ago, payer ID captured from the supplier sandbox account, one already-effective change record so the history panel is real), POs (created by admin), GRNs (`source=SEEDED`, recorded by the receiver), PDFs generated with `reportlab`, and PayPal invoices created and sent from the Vendor app. Scenario PDFs are admitted by admin via the toolbar (live and replay); approvals use controller #1, controller #2 and cfo. `demo/reset` starts a new mandate `policy_id` and archives prior executions, so rehearsal runs do not trip the daily, per-vendor or velocity limits; real sandbox payouts stay in the ledger and audit chain.
 
 | ID | PO | Seeded state | Expected route and PayPal effects |
 |---|---|---|---|

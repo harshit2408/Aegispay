@@ -177,6 +177,8 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
         admitted["S4"] = duplicate.json()["execution_id"]
         disabled = await admin.post("/api/demo/forensics-detector", json={"enabled": False})
         assert disabled.status_code == 200, disabled.text
+        state = (await admin.get("/api/demo/forensics-detector")).json()
+        assert (state["detector_enabled"], state["replayed"]) == (False, True)
         killed = await admin.post("/api/demo/scenarios/S3/run")
         assert killed.status_code == 202, killed.text
         admitted["S3-off"] = killed.json()["execution_id"]
@@ -228,9 +230,10 @@ async def test_demo_disabled_and_live_mode_fail_closed(replay_app, monkeypatch):
         monkeypatch.setattr(runtime, "LIVE_RESET_WAIT_SECONDS", 0.05)
         # Live reset is owner-runner work: with no runner the request stays pending (504)...
         assert (await client.post("/api/demo/reset")).status_code == 504
-        # ...and live mode still refuses the replay-only controls.
+        # ...and the live toggle (P3-09) is a live control, never a replay one.
         detector = await client.post("/api/demo/forensics-detector", json={"enabled": True})
-        assert detector.status_code == 503
+        assert detector.status_code == 200, detector.text
+        assert detector.json()["replayed"] is False
         monkeypatch.setenv("DEMO_ENABLED", "false")
         get_settings.cache_clear()
         assert (await client.post("/api/demo/reset")).status_code == 404

@@ -50,7 +50,8 @@ python -m app.demo --config ../operator-seed-demo.json --apply-db --send-invoice
 
 `run_id` is 1–12 lowercase letters, digits or hyphens. POs are `PO-1042-<run>` through
 `PO-1044-<run>`; invoice numbers carry the same suffix. S1 is 48,000 cents; S2 bills
-50,000 cents with 42,500 accepted; S3 deliberately has no PayPal invoice. GRNs are recorded by
+50,000 cents with 42,500 accepted. `--send-invoices` creates and sends S1, S2 and S3 invoices; S3's
+is only a reference invoice because admission GET-verifies one (PRD §15 S3 variant, `docs/EVAL.md`). GRNs are recorded by
 `demo-receiver`; POs by `demo-admin`. Upload as `demo-controller1`, approve as
 `demo-controller2` and `demo-cfo`. Vendor history has distinct vendor administrators and an
 already-elapsed 72-hour cooling period, with onboarding 90 days earlier.
@@ -78,7 +79,7 @@ python -m app.demo --config ../operator-seed-demo.json --apply-db --send-invoice
 ```
 
 For each request the runner takes the seed file as a template, replaces `run_id` with a fresh
-12-character suffix, seeds a new run (POs, `SEEDED` receiver GRNs, new active demo mandate, S1/S2
+12-character suffix, seeds a new run (POs, `SEEDED` receiver GRNs, new active demo mandate, S1–S3
 Vendor invoices) and records `DEMO_RESET_DONE` or `DEMO_RESET_FAILED`. Responses: `200` with the
 new `run_id` and `previous_run_id`; `504` while the runner has not finished (repeat the request: it
 waits on the same pending request); `502` when seeding failed (only the error class is recorded);
@@ -88,6 +89,23 @@ and every call returns `504`.
 "Archived" is derived, not stored: once a newer demo mandate is active, finished cases of earlier
 runs (`SETTLED`, `REJECTED`, `DUPLICATE_BLOCKED`) leave the `GET /api/executions` grid. Cases still
 in flight or needing review stay visible, and no execution row or audit event is changed.
+
+## Live toolbar: detector and scenarios (`DEMO_ENABLED=true`, replay off)
+
+After sending invoices the seeder records a `DEMO_INVOICES` control event (`run_id` and the S1–S3
+invoice IDs) in the audit queue. The `.demo-runs` journal stays the PayPal idempotency record; the
+API reads the IDs from the database and holds only the Vendor read credential (R22).
+
+- `GET /api/demo/forensics-detector` (admin) returns the state for the active run. `POST` records a
+  `DEMO_LIVE_DETECTOR` event bound to that run; a reset seeds a new run, so the detector is ON again.
+  `POST /api/documents` and the toolbar record the state on each execution; the analyze node honours
+  it. Without `DEMO_ENABLED` the detector is always ON.
+- `POST /api/demo/scenarios/{S1..S4}/run` (admin) builds the run's reportlab PDF and sends it with
+  the seeded invoice through the same admission code as `POST /api/documents` (GET-verify,
+  duplicate checks, 10/min per session). S3 is the look-alike payee with hidden text; S4 re-uploads
+  S1's PDF and invoice, so it is `DUPLICATE_BLOCKED` (409 until S1 has run). For the kill-switch
+  re-run, reject the first S3 case, turn the detector OFF and run S3 again. A run seeded without
+  invoices returns 409.
 
 `GET /api/health` is public and returns only booleans and ages. `200` with `status` `ok` or
 `degraded`; `503` only when the database is unreachable. Settlement reports the Treasury and Vendor

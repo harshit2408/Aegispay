@@ -138,13 +138,13 @@ async def test_new_run_preserves_old_rows_and_rejects_payee_change(pg_sessionmak
         )
 
 
-async def test_invoice_setup_resumes_saved_draft_and_never_creates_s3(pg_sessionmaker, tmp_path):
+async def test_invoice_setup_resumes_saved_draft_and_creates_s1_to_s3(pg_sessionmaker, tmp_path):
     gateway = AsyncMock(spec=VendorGateway)
-    gateway.create_draft.side_effect = ["INV2-S1", "INV2-S2"]
+    gateway.create_draft.side_effect = ["INV2-S1", "INV2-S2", "INV2-S3"]
     invoice = AsyncMock()
     invoice.status = "DRAFT"
     gateway.get_invoice.return_value = invoice
-    gateway.send.side_effect = [RuntimeError("interrupted"), None, None]
+    gateway.send.side_effect = [RuntimeError("interrupted"), None, None, None]
     with pytest.raises(RuntimeError, match="interrupted"):
         await seed_demo(
             pg_sessionmaker,
@@ -162,9 +162,10 @@ async def test_invoice_setup_resumes_saved_draft_and_never_creates_s3(pg_session
         manifest_dir=tmp_path,
         gateway=gateway,
     )
-    assert gateway.create_draft.await_count == 2
+    assert gateway.create_draft.await_count == 3
     assert gateway.send.await_args_list[0] == gateway.send.await_args_list[1]
     assert {c.args[0].reference for c in gateway.create_draft.await_args_list} == {
         "PO-1042-run1",
         "PO-1043-run1",
+        "PO-1044-run1",  # S3 reference invoice: admission GET-verifies one
     }

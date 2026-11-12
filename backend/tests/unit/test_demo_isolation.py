@@ -24,9 +24,14 @@ async def test_disabled_demo_has_no_method_or_schema_discovery():
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="https://test"
     ) as client:
-        for method in ("GET", "POST", "OPTIONS"):
-            response = await client.request(method, "/api/demo/reset")
-            assert response.status_code == 404
+        for path in (
+            "/api/demo/reset",
+            "/api/demo/scenarios/S1/run",
+            "/api/demo/forensics-detector",
+        ):
+            for method in ("GET", "POST", "OPTIONS"):
+                response = await client.request(method, path)
+                assert response.status_code == 404, (method, path)
     assert not any(path.startswith("/api/demo/") for path in app.openapi()["paths"])
 
 
