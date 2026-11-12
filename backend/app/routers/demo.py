@@ -184,7 +184,9 @@ async def live_scenario(request, background, session, actor, scenario):
     actor_id = actor.operator_id  # read before rollbacks expire the ORM row
     source = "S1" if scenario == "S4" else scenario
     try:
-        run_id = (await runtime.seeded_policy(session)).policy_id.removeprefix("demo-")
+        run_id = await runtime.record_live_run(
+            session, actor_id, bucket=token_hash(request.cookies[COOKIE]), scenario=scenario
+        )
         invoice_id = (await runtime.live_invoices(session, run_id))[source]
     except DemoUnavailable as error:
         await session.rollback()

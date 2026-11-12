@@ -12,6 +12,7 @@ from uuid import uuid4
 from reportlab.pdfgen import canvas
 from sqlalchemy import and_, false, func, or_, select, text, union_all
 
+from app.audit.control import LIVE_DETECTOR, latest_for_run, live_detector
 from app.audit.events import enqueue_event
 from app.decision.match import normalize_invoice_number
 from app.demo.seeder import LIVE_INVOICES, SCENARIOS
@@ -34,7 +35,6 @@ RESET_STALE = timedelta(minutes=10)
 LIVE_RESET_WAIT_SECONDS = 25.0
 LIVE_RESET_POLL_SECONDS = 0.5
 RUN_ID = re.compile(r"[a-z0-9-]{1,12}")
-LIVE_DETECTOR = "DEMO_LIVE_DETECTOR"  # live-mode toggle, bound to one seeded run (R24)
 INVOICE_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 # Only cases needing no action leave the grid; in-flight or manual-review cases stay visible.
 ARCHIVABLE_STATUSES = ("SETTLED", "REJECTED", "DUPLICATE_BLOCKED")
@@ -217,33 +217,6 @@ async def archive_filter(session, settings):
 CONTROL_EVENTS = ("DEMO_RUN", "DEMO_RESET", "DEMO_DETECTOR", RESET_REQUEST, LIVE_DETECTOR)
 
 
-async def _latest_for_run(session, event_type, run_id):
-    """Newest demo-control payload of this type recorded for this seeded run, queued or signed."""
-    events = union_all(
-        *(
-            select(table.ts, table.payload).where(
-                table.execution_id == "demo-control",
-                table.event_type == event_type,
-                table.payload["run_id"].astext == run_id,
-            )
-            for table in (AuditQueue, ExecutionEvent)
-        )
-    ).subquery()
-    return await session.scalar(select(events.c.payload).order_by(events.c.ts.desc()).limit(1))
-
-
-async def live_detector(session):
-    """Live toggle for the active demo run; ON unless an admin turned it off for this run.
-
-    A reset seeds a new run, so the detector is back ON for it (same as replay control()).
-    """
-    active = await session.scalar(select(MandatePolicy.policy_id).where(MandatePolicy.is_active))
-    if not active or not active.startswith("demo-"):
-        return True
-    payload = await _latest_for_run(session, LIVE_DETECTOR, active.removeprefix("demo-"))
-    return not (payload and payload.get("detector_enabled") is False)  # fail safe: ON
-
-
 async def live_control(session, actor=None, *, bucket=None, detector_enabled=None):
     """Read (no actor) or record the live detector toggle for the active seeded run."""
     if actor is not None:
@@ -273,9 +246,25 @@ async def live_control(session, actor=None, *, bucket=None, detector_enabled=Non
     }
 
 
+async def record_live_run(session, actor, *, bucket, scenario):
+    """Throttle and record a live scenario attempt before any work, failed attempts included."""
+    await session.execute(text("SELECT pg_advisory_xact_lock(9140013)"))
+    await throttle(session, bucket)
+    run_id = (await seeded_policy(session)).policy_id.removeprefix("demo-")
+    await enqueue_event(
+        session,
+        execution_id="demo-control",
+        actor=actor,
+        event_type="DEMO_RUN",
+        payload={"scenario": scenario, "run_id": run_id, "session_hash": bucket, "replayed": False},
+    )
+    await session.commit()
+    return run_id
+
+
 async def live_invoices(session, run_id):
     """S1-S3 invoice IDs the owner seeder recorded for this run (GET-verified at admission)."""
-    payload = await _latest_for_run(session, LIVE_INVOICES, run_id)
+    payload = await latest_for_run(session, LIVE_INVOICES, run_id)
     invoices = (payload or {}).get("invoices") or {}
     if not all(
         isinstance(invoices.get(name), str) and INVOICE_ID.fullmatch(invoices[name])

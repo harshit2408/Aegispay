@@ -50,6 +50,8 @@ def build_analyzer(sessions, settings):
                     .where(InvoiceExecution.execution_id == execution_id)
                 )
             ).one()
+        # R24: the detector can be OFF only in a demo deployment, whatever the row says.
+        detector_enabled = detector_enabled if settings.demo_enabled else True
         if document.forensics_json is not None:
             if document.extraction_json is None:
                 extraction = ExtractionResult(extraction=None, freeze_reason=FREEZE_REASON)

@@ -1271,7 +1271,7 @@ Actions (only when allowed by `GateDecision.allowed_actions` and the viewer is a
 Invoices issued by the supplier account, PayPal status per invoice, payments received, short-pay notices with Accept / Contest. P1: show the Vendor Agent's structured reply. Never shows risk scores, gate reasons, thresholds or mandate values (R14).
 
 ### 14.5 Demo toolbar (admin only, rendered only when `DEMO_ENABLED`, R24)
-Reset run · Run S1 / S2 / S3 / S4 / (S5) · Forensics detector ON/OFF · Replay-mode indicator. A persistent "SANDBOX DEMO" banner is shown whenever `DEMO_ENABLED`.
+Reset run · Run S1 / S2 / S3 / S4 / (S5) · Forensics detector ON/OFF · Replay-mode indicator. Detector OFF applies to every new upload (toolbar and `POST /api/documents`) while `DEMO_ENABLED`, until the next reset; without `DEMO_ENABLED` admission and analysis always run it ON. A persistent "SANDBOX DEMO" banner is shown whenever `DEMO_ENABLED`.
 
 ### 14.6 Ops (cfo/admin)
 Settlement halt toggle with reason, velocity breaker status, recent alerts, vendor-master change queue (requests, approvals, cooling countdown), last audit anchor time.

@@ -22,12 +22,12 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.control import live_detector
 from app.audit.events import enqueue_event
 from app.auth import COOKIE, roles, token_hash, utc
 from app.config import get_settings
 from app.db import get_session
 from app.decision.match import normalize_invoice_number
-from app.demo.runtime import live_detector
 from app.models.auth import OperatorSession
 from app.models.core import MandatePolicy, Operator, PurchaseOrder, VendorMaster
 from app.models.payables import InvoiceDocument, InvoiceExecution
@@ -71,10 +71,6 @@ async def upload_document(
 ):
     require_live_admission(request)
     pdf = await file.read(MAX_PDF_BYTES + 1)
-    if len(pdf) > MAX_PDF_BYTES:
-        raise HTTPException(413, "PDF exceeds 10 MiB")
-    if not pdf.startswith(b"%PDF-"):
-        raise HTTPException(422, "A PDF is required")
     return await admit_pdf(
         request, background, session, actor.operator_id, pdf, po_id, paypal_invoice_id
     )
@@ -100,6 +96,10 @@ async def admit_pdf(
     note: dict | None = None,
 ) -> DocumentReceipt:
     """The one live admission path: /api/documents and the live demo toolbar (PRD §13)."""
+    if len(pdf) > MAX_PDF_BYTES:
+        raise HTTPException(413, "PDF exceeds 10 MiB")
+    if not pdf.startswith(b"%PDF-"):
+        raise HTTPException(422, "A PDF is required")
     settings = get_settings()
     reader = request.app.state.vendor_reader
     # Count attempts against the authenticated session before external work.
