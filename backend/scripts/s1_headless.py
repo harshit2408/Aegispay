@@ -181,7 +181,7 @@ def run(args: argparse.Namespace) -> int:
     for problem in problems:
         sys.stdout.write(f"FAIL: {problem}\n")
     if not problems:
-        sys.stdout.write(f"S1 PASS: evidence saved to {args.out}\n")
+        sys.stdout.write(f"{scenario} PASS: evidence saved to {args.out}\n")
     return 1 if problems else 0
 
 

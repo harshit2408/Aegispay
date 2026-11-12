@@ -1,0 +1,101 @@
+{
+  "item": "P1-12",
+  "date": "2026-11-12",
+  "environment": "PayPal sandbox; compose project aegispay-s1; run id s1a; synthetic PDF only",
+  "llm": {
+    "provider": "openrouter",
+    "model": "nvidia/nemotron-3.5-super-vl:free",
+    "provider_requests_for_this_execution": 2,
+    "note": "free model; see docs/TOOLS.md and docs/EVAL.md"
+  },
+  "execution_id": "0b8d5a89-8f39-46f3-8c01-bd1f461165bf",
+  "cli_elapsed_seconds": 50.752,
+  "verdict_problems": [],
+  "status": "SETTLED",
+  "gate": {
+    "route": "AUTO_SETTLE",
+    "payable_cents": 48000,
+    "required_approvals": 0,
+    "gate_hash": "3e23a18e8f8309044db56971d232f6c6d7c87ca8c8c3b99faa9f800489dc5794"
+  },
+  "risk_score": 0,
+  "forensics": {
+    "classifier_label": "CLEAN",
+    "hidden_segments": 0
+  },
+  "extraction_total_cents": 48000,
+  "paypal_invoice": {
+    "invoice_id": "INV2-3SN3-SSCP-88S2-ZSYX",
+    "status": "MARKED_AS_PAID",
+    "total_cents": 48000
+  },
+  "po_consumption": {
+    "accepted_value_cents": 48000,
+    "paid_cents": 48000,
+    "reserved_cents": 0,
+    "this_payable_cents": 48000
+  },
+  "short_pay": {
+    "delta_cents": 0,
+    "expected_cost_pay_and_claim_cents": 3500,
+    "expected_cost_short_pay_cents": 1500,
+    "chosen": "NOT_APPLICABLE"
+  },
+  "settlement_timeline": [
+    {
+      "status": "PAYOUT_SENDING",
+      "occurred_at": "2026-11-12T09:46:34.497774+00:00",
+      "paypal_id": null,
+      "verified": false,
+      "simulated": false
+    },
+    {
+      "status": "PAYOUT_SUBMITTED",
+      "occurred_at": "2026-11-12T09:46:38.282998+00:00",
+      "paypal_id": "3A2D4AFSPLMDG",
+      "verified": true,
+      "simulated": false
+    },
+    {
+      "status": "PAYOUT_SUCCEEDED",
+      "occurred_at": "2026-11-12T09:47:04.558227+00:00",
+      "paypal_id": "3A2D4AFSPLMDG",
+      "verified": true,
+      "simulated": false
+    },
+    {
+      "status": "SETTLED",
+      "occurred_at": "2026-11-12T09:47:07.517258+00:00",
+      "paypal_id": "3A2D4AFSPLMDG",
+      "verified": true,
+      "simulated": false
+    }
+  ],
+  "audit_anchor": {
+    "verified": true,
+    "anchored_at": "2026-11-12T09:47:05.873795+00:00",
+    "head_hmac": "9c5091c208a8487786e4898b7654b58751b606372ed63e2292d9b3742bbc2209"
+  },
+  "cli_output_verbatim": [
+    "execution 0b8d5a89-8f39-46f3-8c01-bd1f461165bf: SETTLED",
+    "S1 PASS: evidence saved to /out/s1-evidence.json"
+  ],
+  "db": {
+    "status": "SETTLED",
+    "route": "AUTO_SETTLE",
+    "paypal_invoice_id": "INV2-3SN3-SSCP-88S2-ZSYX",
+    "approved_cents": 48000,
+    "po_id": "PO-1042-s1a",
+    "po_status": "CLOSED",
+    "payout_batch_id": "3A2D4AFSPLMDG",
+    "payout_item_id": "ZC7SF9D7VA4CG",
+    "sender_batch_id": "AEGIS-0b8d5a89-8f39-46f3-8c01-bd1f461165bf",
+    "item_status": "SUCCESS",
+    "payout_amount_cents": 48000,
+    "paypal_amount_cents": 48000,
+    "receiver_payer_id": "ZA2K93NPYUXXC",
+    "paypal_receiver": "ZA2K93NPYUXXC",
+    "vendor_master_payer_id": "ZA2K93NPYUXXC",
+    "recordpay_sent_at": "2026-11-12T09:47:05.03762+00:00"
+  }
+}
