@@ -3,7 +3,7 @@ import type { components } from "../lib/api.ts";
 // Synthetic P1 fixture; these values are never sent to an API or payment service.
 export const previewCase = {
   duplicate_of_execution_id: null,
-  execution_id: "synthetic-s3", status: "FROZEN", replayed: true, uploaded_by: "mock-uploader",
+  execution_id: "synthetic-s3", status: "FROZEN", replayed: true, uploaded_by: "mock-uploader", short_pay_balance: "NONE",
   viewer: { operator_id: "mock-controller", role: "controller" },
   vendor: {
     vendor_id: "vendor-demo", name: "Northstar Office · synthetic", version: 3,

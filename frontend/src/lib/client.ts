@@ -61,6 +61,9 @@ export const api = {
     if (!csrfToken.trim()) return Promise.reject(new Error("An operator session CSRF token is required"));
     return request("/api/documents", { method: "POST", headers: { "X-CSRF-Token": csrfToken }, body: data });
   },
+  vendorInvoices: (signal?: AbortSignal): Promise<components["schemas"]["SupplierInvoice"][]> => request("/api/vendor-sim/invoices", { signal }),
+  respondNotice: (noticeId: string, body: components["schemas"]["NoticeResponse"], csrfToken: string): Promise<operations["respond_vendor_sim_notice"]["responses"][200]["content"]["application/json"]> =>
+    post(`/api/vendor-sim/notices/${encodeURIComponent(noticeId)}/respond`, { action: body.action, reason: body.reason }, csrfToken),
   getExecution: (id: string, signal?: AbortSignal): Promise<CaseDetail> => request(`/api/executions/${encodeURIComponent(id)}`, { signal }),
   // The case preview never calls this method. A real session must supply its CSRF token.
   submitDecision: (id: string, decision: Decision, csrfToken: string): Promise<Receipt> => {
