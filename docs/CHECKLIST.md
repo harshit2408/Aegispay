@@ -62,7 +62,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P1-09** @A `paypal/webhooks.py` self-verification from raw bytes (R10) + both webhook routes + `webhook_events` dedupe — ef630d5, review fixes 34de277
 - [x] **P1-10** @B `demo/seeder.py`: vendor master, PO-1042…1044, GRNs, PayPal invoices with per-run suffix — b198658 (#29)
 - [x] **P1-11** @B `audit/events.py` global HMAC hash chain + verification — b198658 (#29) (integrated audit foundation; anchors/runtime remain P2-26)
-- [ ] **P1-12** @A EXIT: headless S1 passes against the sandbox (WIP A) (BLOCKED: pipeline, sessions, parser fixes and headless CLI are merged through #40/#43/#45; owner-configured sandbox/provider/operator values and a real CLI run with saved execution, invoice and payout IDs remain; see S1_RUNBOOK.md)
+- [x] **P1-12** @A EXIT: headless S1 passes against the sandbox — 06c4a5d (#48); real sandbox S1 2026-11-12: execution 0b8d5a89, payout batch 3A2D4AFSPLMDG item SUCCESS 48000 cents to the vendor-master payer ID, invoice MARKED_AS_PAID, PO-1042 closed, audit anchor verified, `verdict()` clean; evidence `docs/evidence/P1-12-s1.json`; ran on a free OpenRouter model (n=1), not gpt-6.1-sol
 - [x] **P1-13** @B App shell on the official PayPal + AG Grid boilerplate (Next.js App Router) — e49f599 (#24) (PRD §14.1 routes, judge guide, shared dark shell; backend integrations remain later tasks)
 - [x] **P1-14** @B `lib/api.ts` typed client generated from FastAPI OpenAPI — b198658 (#29)
 - [x] **P1-15** @B Mocked Case view: Evidence · Security · Money panes (PRD §14.3) — b198658 (#29)
@@ -92,7 +92,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P2-12** @A A1 Mandate compiler + clamp to `ORG_HARD_*` + diff + explicit activation (R13) — 0e00757 (#40)
 - [ ] **P2-13** @A Routers: documents, executions, decisions (R11), mandates, demo, health, SSE stream (WIP A, taken over from B) (PARTIAL: authenticated replay routes verified 0e00757 (#40); live reset owner orchestration and full PRD health probes remain)
 - [x] **P2-14** @B S4 duplicate blocked in < 1 s with link to original execution — 0e00757 (#40)
-- [ ] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` (WIP A, taken over from B) (PARTIAL: local headless/browser replay S1–S4 and first EVAL numbers verified through #46; real sandbox payout/invoice acceptance remains)
+- [x] **P2-15** @A EXIT: headless S1–S4 green; first numbers in `docs/EVAL.md` — 06c4a5d (#48); real sandbox 2026-11-12: S1 settled 48000 cents, S2 SHORT_PAY paid 42500 (batch YXGQMUP6QARVA), S3 FREEZE rejected by demo-cfo with 0 cents paid (variant: needs a reference invoice the PRD omits), S4 duplicate blocked in 41–43 ms; evidence `docs/evidence/`; n=1 per scenario on a free model, S1/S2 ran before the 4096-cap and A3-prompt fixes; detector-off S3, two-operator approve path, S2 vendor notice and the 50-PDF eval not run
 - [x] **P2-16** @B Widget: Payables ledger (triad pills, risk meter, status; row → case) — a95ef4c (#32)
 - [x] **P2-17** @B Widget: Mandate gauge (committed vs daily cap) — a95ef4c (#32)
 - [x] **P2-18** @B Widget: Exposure by reason (G2–G10) — a95ef4c (#32)
