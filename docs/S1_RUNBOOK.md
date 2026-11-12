@@ -25,7 +25,10 @@ All commands are PowerShell, run from the repository root. Nothing below prints 
 $envFile = 'C:\Users\Admin\Desktop\projects\Aegispay\.env.s1'
 # Load the file into THIS process only (compose and the preflight both read the process environment). Prints nothing.
 Get-Content $envFile | ForEach-Object {
-  if ($_ -match '^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { Set-Item "Env:$($Matches[1])" ($Matches[2].Trim().Trim('"').Trim("'")) }
+  if ($_ -match '^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$') {
+    $v = $Matches[2].Trim(); if ($v.StartsWith('#')) { $v = '' }   # `KEY=   # note` is blank
+    Set-Item "Env:$($Matches[1])" ($v.Trim('"').Trim("'"))
+  }
 }
 $env:COMPOSE_PROJECT_NAME = 'aegispay-s1'; $env:API_PORT = '8000'; $env:POSTGRES_PORT = '25436'
 ```
@@ -37,7 +40,9 @@ python backend/scripts/s1_preflight.py --env-file $envFile
 ```
 
 Exit 1 prints `MISSING NAME: reason` lines. Fix `.env.s1` and rerun. Do not continue on a failure. The LLM key is
-also only usable once the configurable provider adapter has landed (`LLM_PROVIDER`, `LLM_MODEL_*`).
+sent only to the provider named by `LLM_PROVIDER` (`openai` default, or `openrouter` with the pinned free model; blank
+`LLM_MODEL_*` = that provider's reviewed default, see docs/TOOLS.md). The preflight fails on an unreviewed selection.
+A value written as `KEY=   # note` is blank, exactly as in `docker compose`.
 
 ## 2. Generate operator passwords, Argon2id hashes and the two runtime DB passwords
 

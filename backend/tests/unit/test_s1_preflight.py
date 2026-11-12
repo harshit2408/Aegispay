@@ -82,3 +82,47 @@ def test_after_init_requires_generated_names_and_later_file_wins(tmp_path, monke
     second.write_text("X_TEST_NAME=two\n")
     monkeypatch.delenv("X_TEST_NAME", raising=False)
     assert pre.load([first, second])["X_TEST_NAME"] == "two"
+
+
+def test_blank_value_with_inline_comment_is_blank():
+    # compose reads `KEY=   # note` as empty; so must the preflight (false-positive regression).
+    text = (
+        "A=      # USER: paste it\nB=# glued\nC=\"x # y\"\nD='p q' # note\nE=real # note\nF=a#b\n"
+    )
+    assert pre.parse_env_file(text) == {
+        "A": "",
+        "B": "",
+        "C": "x # y",
+        "D": "p q",
+        "E": "real",
+        "F": "a#b",
+    }
+
+
+def test_commented_blank_key_fails_the_preflight(tmp_path, monkeypatch, capsys):
+    env_file = tmp_path / "s1.env"
+    env_file.write_text("LLM_API_KEY=      # USER: paste\n", encoding="utf-8")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    assert pre.main(["--env-file", str(env_file)]) == 1
+    assert "MISSING LLM_API_KEY" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"LLM_PROVIDER": "evil"},
+        {"LLM_PROVIDER": "openrouter", "LLM_MODEL_EXTRACT": "gpt-6.1-sol"},
+        {"LLM_PROVIDER": "openai", "LLM_MODEL_REASON": "some/other:free"},
+        {"LLM_MODEL_EXTRACT": "x", "LLM_MODEL_REASON": "y"},
+    ],
+)
+def test_unreviewed_llm_selection_fails_when_key_is_set(extra):
+    assert [p.split(":")[0] for p in pre.problems(GOOD | extra)] == ["LLM_PROVIDER"]
+
+
+def test_reviewed_llm_selections_pass_and_blank_key_skips_the_llm_check():
+    assert pre.problems(GOOD | {"LLM_PROVIDER": "openrouter"}) == []
+    assert pre.problems(GOOD | {"LLM_PROVIDER": "openai", "LLM_MODEL_EXTRACT": ""}) == []
+    # no key: only the key itself is reported, not a second provider complaint
+    env = GOOD | {"LLM_PROVIDER": "evil", "LLM_API_KEY": ""}
+    assert [p.split(":")[0] for p in pre.problems(env)] == ["LLM_API_KEY"]
