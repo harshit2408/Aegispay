@@ -120,7 +120,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework — b7f26ce (#46; authenticated read-only status/list snapshots; live-model accuracy unmeasured)
 - [x] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) — 514b238
 - [x] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) — ef30156 (#52; webhook 60/min per app, R25 clause→test matrix; follow-up hardening PR pending)
-- [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
+- [x] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) — b3ee7cd (#56; 512 MB RLIMIT_AS, process-group kill on timeout, empty env, seccomp no-network, 20 pages / 10 MB, R22 clause→test matrix; defence-in-depth follow-up PR pending)
 - [x] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24) — 514b238
 - [x] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6) — 514b238
 
