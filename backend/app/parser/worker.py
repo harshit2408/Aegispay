@@ -16,7 +16,7 @@ def restrict() -> None:
     if sys.platform != "linux" or platform.machine() != "x86_64" or set(os.environ) - {"LC_CTYPE"}:
         raise RuntimeError("parser isolation unavailable")
     resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
-    resource.setrlimit(resource.RLIMIT_AS, (768 * 1024 * 1024,) * 2)
+    resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024,) * 2)  # PRD §16
     resource.setrlimit(resource.RLIMIT_FSIZE, (16 * 1024 * 1024,) * 2)
     resource.setrlimit(resource.RLIMIT_NOFILE, (64, 64))
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
