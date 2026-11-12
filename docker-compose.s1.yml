@@ -21,6 +21,10 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://aegis_api:${S1_API_DB_PASSWORD}@postgres:5432/aegis
       CHECKPOINT_DB_URL: postgresql://aegis_api:${S1_API_DB_PASSWORD}@postgres:5432/aegis
+      # Blank model = the reviewed default of LLM_PROVIDER (app/agents/llm_allowlist.py); the base file's
+      # gpt-6.1-sol default would otherwise fail closed when LLM_PROVIDER=openrouter.
+      LLM_MODEL_EXTRACT: ${LLM_MODEL_EXTRACT:-}
+      LLM_MODEL_REASON: ${LLM_MODEL_REASON:-}
 
   settlement:
     environment:

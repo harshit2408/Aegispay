@@ -121,8 +121,18 @@ def test_unreviewed_llm_selection_fails_when_key_is_set(extra):
 
 
 def test_reviewed_llm_selections_pass_and_blank_key_skips_the_llm_check():
-    assert pre.problems(GOOD | {"LLM_PROVIDER": "openrouter"}) == []
+    assert pre.problems(GOOD | {"LLM_PROVIDER": "openrouter", "LLM_API_KEY": "sk-or-v1-x"}) == []
     assert pre.problems(GOOD | {"LLM_PROVIDER": "openai", "LLM_MODEL_EXTRACT": ""}) == []
     # no key: only the key itself is reported, not a second provider complaint
     env = GOOD | {"LLM_PROVIDER": "evil", "LLM_API_KEY": ""}
     assert [p.split(":")[0] for p in pre.problems(env)] == ["LLM_API_KEY"]
+
+
+@pytest.mark.parametrize(
+    ("provider", "key"),
+    [("", "sk-or-v1-abc"), ("openai", "sk-or-v1-abc"), ("openrouter", "sk-proj-abc")],
+)
+def test_key_for_another_provider_fails(provider, key):
+    env = GOOD | {"LLM_PROVIDER": provider, "LLM_API_KEY": key}
+    assert [p.split(":")[0] for p in pre.problems(env)] == ["LLM_PROVIDER"]
+    assert pre.problems(env | {"LLM_PROVIDER": "openrouter", "LLM_API_KEY": "sk-or-v1-abc"}) == []

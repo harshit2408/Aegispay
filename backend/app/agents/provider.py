@@ -7,6 +7,7 @@ import psycopg
 from sqlalchemy.engine import make_url
 
 from app.agents import ModelResponse, analyst_run, invoice_run, mandate_run
+from app.agents.llm_allowlist import REVIEWED, key_matches, select
 
 
 def postgres_dsn(url: str) -> str:
@@ -17,6 +18,34 @@ class ProviderUnavailable(ValueError):
     pass
 
 
+def selected_llm(settings) -> tuple[str, str]:
+    """The reviewed (provider, model) the LLM_* settings select; anything else fails closed."""
+    try:
+        return select(
+            {
+                "LLM_PROVIDER": settings.llm_provider,
+                "LLM_MODEL_EXTRACT": settings.llm_model_extract,
+                "LLM_MODEL_REASON": settings.llm_model_reason,
+            }
+        )
+    except ValueError:
+        raise ProviderUnavailable("unreviewed provider request") from None
+
+
+def _request(provider, model, messages, max_output_tokens, api_key):
+    """(url, headers, json) for one reviewed provider; url comes only from the allowlist."""
+    url = REVIEWED[(provider, model, max_output_tokens)]
+    headers = {"Authorization": "Bearer " + api_key}
+    payload = {"model": model, "messages": messages}
+    if provider == "openai":
+        payload |= {"max_completion_tokens": max_output_tokens, "store": False}
+        payload["service_tier"] = "default"
+    else:  # openrouter: no OpenAI-only fields; X-Title carries no user data
+        payload["max_tokens"] = max_output_tokens
+        headers["X-Title"] = "AegisPay"
+    return url, headers, payload
+
+
 class DurableDispatch:
     def __init__(self, *, run_id: UUID, database_url: str, api_key: str):
         self.run_id, self.dsn, self.api_key = str(run_id), postgres_dsn(database_url), api_key
@@ -24,10 +53,12 @@ class DurableDispatch:
 
     def __call__(self, provider, model, messages, *, max_output_tokens=None):
         bound = self.input_token_bound
-        if (provider, model, max_output_tokens) != ("openai", "gpt-6.1-sol", 1024):
+        if (provider, model, max_output_tokens) not in REVIEWED:
             raise ProviderUnavailable("unreviewed provider request")
         if type(bound) is not int or not 0 < bound <= 272000 or not self.api_key:
             raise ProviderUnavailable("provider not configured or bound invalid")
+        if not key_matches(provider, self.api_key):
+            raise ProviderUnavailable("API key does not belong to the selected provider")
         reserve = 2 * bound + 10 * max_output_tokens
         with psycopg.connect(self.dsn, connect_timeout=5) as connection:
             connection.execute(
@@ -45,18 +76,11 @@ class DurableDispatch:
             raise ProviderUnavailable("durable provider budget refused")
         # The committed charge/halt survives a crash or uncertain provider outcome.
         try:
+            url, headers, payload = _request(
+                provider, model, messages, max_output_tokens, self.api_key
+            )
             with httpx.Client(timeout=40, follow_redirects=False, trust_env=False) as client:
-                response = client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": "Bearer " + self.api_key},
-                    json={
-                        "model": model,
-                        "messages": messages,
-                        "max_completion_tokens": max_output_tokens,
-                        "store": False,
-                        "service_tier": "default",
-                    },
-                )
+                response = client.post(url, headers=headers, json=payload)
                 response.raise_for_status()
                 body = response.json()
             choice, usage = body["choices"][0], body["usage"]
@@ -66,8 +90,8 @@ class DurableDispatch:
             tokens = (
                 usage["prompt_tokens"],
                 usage["completion_tokens"],
-                usage.get("prompt_tokens_details", {}).get("cached_tokens", 0),
-                usage.get("completion_tokens_details", {}).get("reasoning_tokens", 0),
+                (usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0,
+                (usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0,
             )
             if (
                 any(type(n) is not int or n < 0 for n in tokens)
@@ -98,12 +122,13 @@ class DurableDispatch:
 
 def governed_analysis(run_id: UUID, *, settings, action):
     """Run all initial invoice calls in one owning thread and one TokenOps scope."""
+    llm = selected_llm(settings)  # before any budget row or HTTP
     dispatch = DurableDispatch(
         run_id=run_id,
         database_url=settings.database_url,
         api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else "",
     )
-    with invoice_run(run_id, dispatch=dispatch) as run:
+    with invoice_run(run_id, dispatch=dispatch, llm=llm) as run:
 
         def complete(node, messages, *, input_token_bound):
             dispatch.input_token_bound = input_token_bound
@@ -114,6 +139,7 @@ def governed_analysis(run_id: UUID, *, settings, action):
 
 def mandate_completion(settings):
     def complete(node, messages, *, input_token_bound):
+        llm = selected_llm(settings)
         run_id = uuid4()
         dispatch = DurableDispatch(
             run_id=run_id,
@@ -121,7 +147,7 @@ def mandate_completion(settings):
             api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else "",
         )
         dispatch.input_token_bound = input_token_bound
-        with mandate_run(run_id, dispatch=dispatch) as run:
+        with mandate_run(run_id, dispatch=dispatch, llm=llm) as run:
             return run.complete(node, messages, input_token_bound=input_token_bound)
 
     return complete
@@ -129,6 +155,7 @@ def mandate_completion(settings):
 
 def analyst_completion(settings):
     def complete(node, messages, *, input_token_bound):
+        llm = selected_llm(settings)
         run_id = uuid4()
         dispatch = DurableDispatch(
             run_id=run_id,
@@ -136,7 +163,7 @@ def analyst_completion(settings):
             api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else "",
         )
         dispatch.input_token_bound = input_token_bound
-        with analyst_run(run_id, dispatch=dispatch) as run:
+        with analyst_run(run_id, dispatch=dispatch, llm=llm) as run:
             return run.complete(node, messages, input_token_bound=input_token_bound)
 
     return complete

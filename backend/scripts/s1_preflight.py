@@ -82,7 +82,9 @@ def problems(env: Mapping[str, str], *, after_init: bool = False) -> list[str]:
             spec = importlib.util.spec_from_file_location("llm_allowlist", _ALLOWLIST)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
-            module.select(env)
+            provider, _ = module.select(env)
+            if not module.key_matches(provider, env["LLM_API_KEY"].strip()):
+                found.append("LLM_PROVIDER: LLM_API_KEY is not a key for this provider")
         except ValueError:
             found.append("LLM_PROVIDER: provider/model not on the reviewed allowlist")
         except (OSError, AttributeError):

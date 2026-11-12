@@ -33,3 +33,11 @@ def select(env: Mapping[str, str]) -> tuple[str, str]:
     if extract != reason or (provider, extract, OUTPUT_CAP) not in REVIEWED:
         raise ValueError("unreviewed LLM provider or model")
     return provider, extract
+
+
+OPENROUTER_KEY_PREFIX = "sk-or-"
+
+
+def key_matches(provider: str, api_key: str) -> bool:
+    """Never send one provider's key to another (OpenRouter keys are `sk-or-...`)."""
+    return api_key.startswith(OPENROUTER_KEY_PREFIX) == (provider == "openrouter")
