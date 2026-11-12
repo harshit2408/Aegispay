@@ -15,7 +15,8 @@ COPY pyproject.toml ./
 COPY app ./app
 COPY alembic.ini ./
 COPY migrations ./migrations
-RUN packages=""; \
+# tini runs as PID 1 and reaps orphans, e.g. tesseract left behind by a killed parser (R22).
+RUN packages="tini"; \
     if [ "$INSTALL_GIT" = "1" ]; then packages="$packages git ca-certificates"; fi; \
     if [ "$INSTALL_TESSERACT" = "1" ]; then packages="$packages tesseract-ocr"; fi; \
     if [ -n "$packages" ]; then \
@@ -28,4 +29,5 @@ RUN packages=""; \
 
 USER aegis
 EXPOSE 8000
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
