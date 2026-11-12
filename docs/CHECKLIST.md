@@ -111,7 +111,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow (WIP A) (PARTIAL: reviewed drafter merged in PR #38 — db942a3; graph/eval wiring and vendor accept/contest flow remain)
 - [x] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only — b7f26ce (#46; authenticated role/CSRF/session/CORS regressions verified in the 1153-test backend run)
 - [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health` (WIP B) (BLOCKED: blueprint ready; owner will supply hosted URLs and uptime evidence)
-- [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag (WIP A) (PARTIAL: reviewed replay completion seam merged in PR #39 — 805331c; runtime graph integration, replay tagging and flag acceptance remain)
+- [x] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag — a642967 (#53; S1–S4 replay with live-call tripwire, replayed=true + DEMO_RUN audit on all 5 runs, ledgers untouched, health + banner flag)
 - [x] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order) — 514b238
 - [x] **P3-07** @B Widget: Settlement timeline with PayPal IDs, verified / simulated badges — 514b238
 - [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator) (WIP A, taken over from B)
@@ -119,7 +119,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [x] **P3-10** @B Custom dark theme shared by Studio and the app — 514b238
 - [x] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework — b7f26ce (#46; authenticated read-only status/list snapshots; live-model accuracy unmeasured)
 - [x] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) — 514b238
-- [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
+- [x] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) — ef30156 (#52; webhook 60/min per app, R25 clause→test matrix; follow-up hardening PR pending)
 - [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
 - [x] **P3-15** @B `DEMO_ENABLED` gating (router not mounted), `replayed=true` tagging, boot refusal with live URL (R24) — 514b238
 - [x] **P3-16** @B Ops panel (halt, alerts, vendor change queue) + case-view v2.1 badges: untrusted/vendor-asserted, quoted A4 facts, voided approvals (PRD §14.3, §14.6) — 514b238

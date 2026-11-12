@@ -8,10 +8,11 @@ from unittest.mock import AsyncMock
 import pytest
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy import update
-from tokenops.framework import Halt
+from tokenops.framework.core import Action, ActionKind
 from tokenops.providers.types import ModelResponse
 
 import app.decision.investigate as wiring
+from app.agents import Halt
 from app.agents.extractor import ExtractionResult
 from app.agents.provider import postgres_dsn
 from app.decision.investigate import TOOL_NAMES, build_investigator, read_tools
@@ -135,7 +136,8 @@ async def slow(execution_id, state):
 
 
 async def halting(execution_id, state):
-    raise Halt.__new__(Halt)
+    # TokenOps budget halt (BaseException): A4 is advisory, the case must still reach the gate.
+    raise Halt(Action(kind=ActionKind.HALT, trace_id="t", reason="cap"))
 
 
 @pytest.mark.usefixtures("seeded_case")
@@ -153,6 +155,7 @@ async def test_timeout_or_halt_means_unavailable_and_case_freezes(
             investigate_timeout_s=0.1,
         )
     assert values["evidence"] is None and values["gate"].route == "FREEZE"
+    assert "HIGH_RISK" in values["gate"].reasons  # the gate still ran on full facts
     assert (await stored(pg_sessionmaker)).status == "FROZEN"  # never stuck in ANALYZING
 
 
