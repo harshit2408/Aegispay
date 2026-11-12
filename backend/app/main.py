@@ -12,11 +12,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.middleware.cors import CORSMiddleware
 
-from app.agents.provider import mandate_completion, postgres_dsn
+from app.agents.provider import analyst_completion, mandate_completion, postgres_dsn
 from app.config import get_settings
 from app.db import get_session, get_sessionmaker
 from app.paypal.client import PayPalClient
 from app.routers import (
+    analyst,
     auth,
     contracts,
     demo,
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     app.state.sessions = sessions
     if settings.llm_api_key:
         app.state.mandate_complete = mandate_completion(settings)
+        app.state.analyst_complete = analyst_completion(settings)
     app.state.runtime_dsn = postgres_dsn(settings.database_url)
     try:
         async with AsyncExitStack() as stack:
@@ -204,7 +206,18 @@ def create_app(*, demo_enabled: bool = False) -> FastAPI:
     application = FastAPI(title="AegisPay API", lifespan=lifespan)
     application.add_middleware(RequestLimits)
     application.add_middleware(ConfiguredCORS)
-    for router in (auth, contracts, documents, grns, mandates, ops, stream, vendors, webhooks):
+    for router in (
+        analyst,
+        auth,
+        contracts,
+        documents,
+        grns,
+        mandates,
+        ops,
+        stream,
+        vendors,
+        webhooks,
+    ):
         application.include_router(router.router)
     application.add_api_route("/api/health", health, methods=["GET"])
     configure_demo_routes(application, enabled=demo_enabled)

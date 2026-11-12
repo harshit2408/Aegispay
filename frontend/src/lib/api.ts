@@ -1,4 +1,21 @@
 export interface paths {
+    "/api/analyst/widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Widget */
+        post: operations["widget_api_analyst_widgets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -448,6 +465,49 @@ export interface components {
             event: string;
             /** Execution Id */
             execution_id: string | null;
+        };
+        /** AnalystCount */
+        AnalystCount: {
+            /** Count */
+            count: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "RECEIVED" | "ANALYZING" | "FROZEN" | "REJECTED" | "DUPLICATE_BLOCKED" | "APPROVED_FOR_PAYMENT" | "PAYOUT_SENDING" | "PAYOUT_SUBMITTED" | "PAYOUT_SUCCEEDED" | "PAYOUT_FAILED" | "SETTLED" | "NEEDS_MANUAL_REVIEW";
+        };
+        /** AnalystRequest */
+        AnalystRequest: {
+            /** Question */
+            question: string;
+        };
+        /** AnalystWidget */
+        AnalystWidget: {
+            /**
+             * As Of
+             * Format: date-time
+             */
+            as_of: string;
+            /** Counts */
+            counts: components["schemas"]["AnalystCount"][];
+            /**
+             * Days
+             * @enum {integer}
+             */
+            days: 1 | 7 | 30;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "status_summary" | "execution_list";
+            /** Replayed */
+            replayed: boolean;
+            /** Rows */
+            rows: components["schemas"]["ExecutionRow"][];
+            /** Status */
+            status: ("RECEIVED" | "ANALYZING" | "FROZEN" | "REJECTED" | "DUPLICATE_BLOCKED" | "APPROVED_FOR_PAYMENT" | "PAYOUT_SENDING" | "PAYOUT_SUBMITTED" | "PAYOUT_SUCCEEDED" | "PAYOUT_FAILED" | "SETTLED" | "NEEDS_MANUAL_REVIEW") | null;
+            /** Truncated */
+            truncated: boolean;
         };
         /** ApprovalView */
         ApprovalView: {
@@ -1119,6 +1179,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    widget_api_analyst_widgets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalystRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalystWidget"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_api_auth_login_post: {
         parameters: {
             query?: never;

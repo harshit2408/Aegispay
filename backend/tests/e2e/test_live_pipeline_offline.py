@@ -182,7 +182,7 @@ def cli_args(tmp_path, pdf, out_name):
         po=f"PO-1042-{RUN}",
         invoice="INV2-OFFLINE",
         out=str(tmp_path / out_name),
-        timeout=6,
+        timeout=30,  # Parser alone allows 15 s; leave room for HTTP and graph dispatch.
         grace=0,
     )
 

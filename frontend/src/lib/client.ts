@@ -33,12 +33,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }) as Promise<T>;
 }
 
-function post<T>(path: string, body: unknown, csrfToken: string): Promise<T> {
+function post<T>(path: string, body: unknown, csrfToken: string, signal?: AbortSignal): Promise<T> {
   if (!csrfToken.trim()) return Promise.reject(new Error("An operator session CSRF token is required"));
-  return request(path, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken }, body: JSON.stringify(body) });
+  return request(path, { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken }, body: JSON.stringify(body), signal });
 }
 
 export const api = {
+  analystWidget: (question: string, csrfToken: string, signal?: AbortSignal): Promise<components["schemas"]["AnalystWidget"]> => post("/api/analyst/widgets", { question }, csrfToken, signal),
   opsStatus: (signal?: AbortSignal): Promise<components["schemas"]["OpsStatusView"]> => request("/api/ops/status", { signal }),
   setHalt: (halted: boolean, reason: string, csrfToken: string): Promise<components["schemas"]["HaltView"]> => post("/api/ops/settlement-halt", { halted, reason }, csrfToken),
   health: (signal?: AbortSignal): Promise<unknown> => request("/api/health", { signal }),

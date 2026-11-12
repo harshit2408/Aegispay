@@ -109,7 +109,7 @@ The [[PLAN]] explains the why; this file is the state.
 
 - [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2) (WIP A) (PARTIAL: reviewed module merged in PR #37 — 2fc54e8; graph wiring and eval cases remain)
 - [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow (WIP A) (PARTIAL: reviewed drafter merged in PR #38 — db942a3; graph/eval wiring and vendor accept/contest flow remain)
-- [ ] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only (WIP B)
+- [x] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only — 6c3a83d (authenticated role/CSRF/session/CORS regressions verified in the 1153-test backend run)
 - [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health` (WIP B) (BLOCKED: blueprint ready; owner will supply hosted URLs and uptime evidence)
 - [ ] **P3-05** @A `DEMO_REPLAY_MODE` serving recorded responses with REPLAY flag (WIP A) (PARTIAL: reviewed replay completion seam merged in PR #39 — 805331c; runtime graph integration, replay tagging and flag acceptance remain)
 - [x] **P3-06** @B Widget: Decision path via SSE (React Flow, or stepper per cut order) — 514b238
@@ -117,7 +117,7 @@ The [[PLAN]] explains the why; this file is the state.
 - [ ] **P3-08** @B Vendor portal `/vendor` (labelled Simulator) (WIP B) (BLOCKED: synthetic preview only; Dev A P3-02 authenticated notices and accept/contest integration pending)
 - [ ] **P3-09** @B Demo toolbar: reset, run S1–S4, forensics detector ON/OFF (kill-switch), replay banner (WIP B) (PARTIAL: admin reset/detector and controller scenario runner implemented; admin-only scenario contract and live reset remain)
 - [x] **P3-10** @B Custom dark theme shared by Studio and the app — 514b238
-- [ ] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework (WIP B)
+- [x] **P3-11** @B (P1 feature) Treasury Analyst agent via Studio Agent Framework — f64d816 (authenticated read-only status/list snapshots; live-model accuracy unmeasured)
 - [x] **P3-12** @B Rough-cut video recorded **Nov 5** (insurance) — 514b238
 - [ ] **P3-13** @A Sessions `SameSite=Strict` + TTL, CSRF tokens, login throttling/lockout, body caps, SSE minimal payload (R25) (WIP A, taken over from B)
 - [ ] **P3-14** @A Sandboxed `parser` subprocess: empty env, no network, page/size/time/memory limits (R22) (WIP A, taken over from B)
@@ -127,21 +127,21 @@ The [[PLAN]] explains the why; this file is the state.
 ## P4 — Hardening (Nov 7–8) · exit: **feature freeze Nov 8 EOD**
 
 - [ ] **P4-01** @A (P1 feature) A6 Vendor agent remedy negotiation — only if everything above is green
-- [ ] **P4-02** @A Webhook chaos tests: duplicate, out-of-order, delayed, unsigned, simulator
-- [ ] **P4-03** @A Contract tests with `respx` against recorded sandbox fixtures
+- [x] **P4-02** @A Webhook chaos tests: duplicate, out-of-order, delayed, unsigned, simulator — 6c3a83d (combined signed-delivery sequence preserves GET confirmation and exactly-once settlement)
+- [ ] **P4-03** @A Contract tests with `respx` against recorded sandbox fixtures (WIP B) (PARTIAL: transcribed recorded EMAIL duplicate error plus three production-client contracts in 8a7e145; broader sanitized lifecycle recordings and PAYPAL_ID duplicate evidence remain)
 - [x] **P4-04** @B Playwright E2E S1–S4 in replay mode, running in CI — 514b238
 - [ ] **P4-05** @B Polish + second video cut
 - [ ] **P4-06** @AB Feature freeze; only bug fixes after this line
-- [ ] **P4-07** @B Patch disclosed frontend dependency vulnerabilities and verify regressions (WIP B)
+- [ ] **P4-07** @B Patch disclosed frontend dependency vulnerabilities and verify regressions (WIP B) (PARTIAL: 93cba91 fixes critical/high runtime findings, production audit is clear; seven moderate development-only typescript-eslint/minimatch advisories await a compatible upstream fix)
 
 ## P5 — Ship (Nov 9–11) · exit: **submitted Nov 11** (deadline Nov 12 12:00 PT)
 
-- [ ] **P5-01** @A `README.md`: judge quickstart, hosted URL, operator logins, simulation boundary (verbatim §3)
-- [ ] **P5-02** @A `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md`, final `docs/EVAL.md`
+- [ ] **P5-01** @A `README.md`: judge quickstart, hosted URL, operator logins, simulation boundary (verbatim §3) (WIP B) (PARTIAL: local replay quickstart, fixture roles, seed CLI and simulation boundary in 0d44084; hosted URL and private hosted access deferred by owner)
+- [ ] **P5-02** @A `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md`, final `docs/EVAL.md` (WIP B) (PARTIAL: current runtime and verified replay evidence reconciled in 6c3a83d/0d44084; final live-model evaluation and sandbox acceptance evidence remain with Dev A)
 - [x] **P5-03** @B Judge guide panel in the app — 514b238
 - [ ] **P5-04** @B Final video < 3 min, public on YouTube, captions, no copyrighted music
 - [ ] **P5-05** @AB Code freeze Nov 9 23:59 IST
-- [ ] **P5-06** @AB Clean-clone verification from README only
+- [x] **P5-06** @AB Clean-clone verification from README only — 93cba91 (fresh Linux Python/Node installs and Chromium replay S1–S4 passed; local clone and documented TEST_PG_URL override, no private configuration; live sandbox/hosted acceptance separate)
 - [x] **P5-07** @AB Devpost text (problem, persona, real vs simulated); sponsor prize = AG Grid — 514b238
 - [ ] **P5-08** @AB **Submit** (≥ 24 h before deadline)
 

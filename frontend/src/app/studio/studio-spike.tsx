@@ -1,7 +1,7 @@
 "use client";
 
 // Adapted from the official starter's app/dashboard/dashboard.tsx and studio/ai.ts.
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AgStudioAiModule,
   createAiHarness,
@@ -15,6 +15,11 @@ import {
 } from "ag-studio";
 import { AgStudio, AgStudioProvider, createWidgets, type AgWidgetDefinition } from "ag-studio-react";
 import { helloAgent } from "./hello-agent";
+import { createAnalystAgent } from "./analyst-agent";
+import { AnalystWidget, type AnalystData } from "./analyst-widget";
+import type { components } from "../../lib/api";
+import { api as applicationApi } from "../../lib/client";
+import { useSession } from "../session";
 import { ReactProbe, type ReactProbeData } from "./react-probe";
 import { agStudioPayPalTheme } from "./theme";
 import { cockpitPreview } from "../../fixtures/cockpit-preview";
@@ -28,6 +33,13 @@ type GaugeDefinition = AgWidgetDefinition<"mandate-gauge", GaugeData>;
 type ExposureDefinition = AgWidgetDefinition<"frozen-exposure", ExposureData>;
 type PathDefinition = AgWidgetDefinition<"decision-path", PathData>;
 type TimelineDefinition = AgWidgetDefinition<"settlement-timeline", TimelineData>;
+type AnalystDefinition = AgWidgetDefinition<"analyst-snapshot", AnalystData>;
+
+const analystWidget: AnalystDefinition = {
+  id: "analyst-snapshot", label: "Treasury Analyst snapshot", comp: AnalystWidget,
+  form: (params) => params.createDefaults({ dataMappingItems: [] }),
+  defaultSize: { width: 1000, height: 500 }, minSize: { width: 280, height: 220 },
+};
 
 const pathWidget: PathDefinition = {
   id: "decision-path", label: "Decision path", comp: PathWidget,
@@ -66,11 +78,11 @@ const reactWidget: ReactProbeDefinition = {
 };
 
 interface SpikeRegistry extends AgBaseRegistry {
-  widgets: readonly (AgDefaultRegistry["widgets"][number] | ReactProbeDefinition | LedgerDefinition | GaugeDefinition | ExposureDefinition | PathDefinition | TimelineDefinition)[];
+  widgets: readonly (AgDefaultRegistry["widgets"][number] | ReactProbeDefinition | LedgerDefinition | GaugeDefinition | ExposureDefinition | PathDefinition | TimelineDefinition | AnalystDefinition)[];
 }
 
 const widgets = createWidgets<SpikeRegistry>({
-  additionalTypes: [reactWidget, ledgerWidget, gaugeWidget, exposureWidget, pathWidget, timelineWidget],
+  additionalTypes: [reactWidget, ledgerWidget, gaugeWidget, exposureWidget, pathWidget, timelineWidget, analystWidget],
   menu: [{ label: "AegisPay", widgetIds: ["payables-ledger", "mandate-gauge", "frozen-exposure", "decision-path", "settlement-timeline", "react-probe"] }],
 });
 
@@ -95,6 +107,10 @@ const initialState: AgReportState<SpikeRegistry> = {
       gauge: { xTrack: 0, yTrack: 16, xSpan: 10, ySpan: 22 },
       exposure: { xTrack: 10, yTrack: 16, xSpan: 14, ySpan: 22 },
     },
+  }, {
+    id: "analyst",
+    widgets: { snapshot: { type: "analyst-snapshot", dataMapping: {} } },
+    widgetLayout: { snapshot: { xTrack: 0, yTrack: 0, xSpan: 24, ySpan: 34 } },
   }, {
     id: "execution",
     widgets: {
@@ -124,19 +140,40 @@ const initialState: AgReportState<SpikeRegistry> = {
   panels: { data: { collapsed: true }, filters: { collapsed: true } },
 };
 
-const ai: AgAiHarnessSetup = ({ api }) => createAiHarness(api, () => ({
-  agents: [helloAgent],
-  primary: helloAgent.id,
-  promptStarters: [{ label: "Say hello (scripted)", prompt: "Hello" }],
-}));
-
 export function StudioSpike() {
+  const { operator, busy } = useSession();
+  return <StudioWorkspace key={busy ? "pending" : `${operator?.operator_id ?? "anonymous"}:${operator?.csrf_token ?? ""}`} operator={busy ? null : operator} />;
+}
+
+function StudioWorkspace({ operator }: { operator: components["schemas"]["SessionView"] | null }) {
   const studioApi = useRef<AgStudioApi | null>(null);
   const [mode, setMode] = useState<AgStudioMode>("view");
   const [ready, setReady] = useState(false);
   const [selectedPage, setSelectedPage] = useState("cockpit");
   const [executionId, setExecutionId] = useState("");
   const [selectedExecutionId, setSelectedExecutionId] = useState("");
+  const [analystResult, setAnalystResult] = useState<components["schemas"]["AnalystWidget"]>();
+  const [analystError, setAnalystError] = useState("");
+  const ai = useMemo<AgAiHarnessSetup>(() => ({ api }) => {
+    const analyst = createAnalystAgent(
+      (question, signal) => {
+        if (!operator || !["controller", "cfo"].includes(operator.role)) throw new Error("Sign in as a controller or CFO to use the Treasury Analyst.");
+        return applicationApi.analystWidget(question, operator.csrf_token, signal);
+      },
+      (widget) => {
+        setAnalystResult(widget);
+        if (widget) { api.setState({ ...api.getState(), selectedPageId: "analyst" }); setSelectedPage("analyst"); }
+      },
+      setAnalystError,
+    );
+    return createAiHarness(api, () => ({
+      agents: [analyst, helloAgent], primary: analyst.id,
+      promptStarters: [
+        { label: "Frozen invoices · 7 days", prompt: "Show frozen invoices in the last 7 days" },
+        { label: "Status summary · 7 days", prompt: "Summarize invoices by status in the last 7 days" },
+      ],
+    }));
+  }, [operator]);
 
   function selectPage(page: string) {
     if (!studioApi.current) return;
@@ -145,16 +182,19 @@ export function StudioSpike() {
   }
   return (
     <>
-      {selectedPage !== "execution" && <div className="replay-banner">REPLAY · Studio preview · Synthetic data only</div>}
+      {!["execution", "analyst"].includes(selectedPage) && <div className="replay-banner">REPLAY · Studio preview · Synthetic data only</div>}
+      {selectedPage === "analyst" && analystResult?.replayed && <div className="replay-banner">REPLAY · Analyst snapshot includes recorded executions</div>}
+      {analystError && <p role="alert">Treasury Analyst: {analystError}</p>}
       <div className="studio-toolbar">
         <button type="button" disabled={!ready} aria-pressed={selectedPage === "cockpit"} onClick={() => selectPage("cockpit")}>Cockpit widgets</button>
         <button type="button" disabled={!ready} aria-pressed={selectedPage === "spike"} onClick={() => selectPage("spike")}>Integration probes</button>
         <button type="button" disabled={!ready} aria-pressed={selectedPage === "execution"} onClick={() => selectPage("execution")}>Follow execution</button>
+        <button type="button" disabled={!ready} aria-pressed={selectedPage === "analyst"} onClick={() => selectPage("analyst")}>Treasury Analyst</button>
         <button type="button" aria-pressed={mode === "edit"} onClick={() => setMode(mode === "view" ? "edit" : "view")}>
           {mode === "view" ? "Edit Studio layout" : "View Studio layout"}
         </button>
         <span role="status">{ready ? "Studio ready" : "Loading Studio…"}</span>
-        <span>{selectedPage === "execution" ? "Authenticated case updates · Read-only widgets" : "Synthetic read-only snapshot · No live payments or API calls."}</span>
+        <span>{selectedPage === "execution" ? "Authenticated case updates · Read-only widgets" : selectedPage === "analyst" ? "Ask in Studio chat · Authenticated read-only snapshots" : "Synthetic read-only snapshot · No live payments or API calls."}</span>
       </div>
       {selectedPage === "execution" && <form className="studio-toolbar" onSubmit={(event) => { event.preventDefault(); setSelectedExecutionId(executionId.trim()); }}>
         <label htmlFor="studio-execution">Execution ID from the inbox</label>
@@ -171,7 +211,7 @@ export function StudioSpike() {
             widgets={widgets}
             ai={ai}
             initialState={initialState}
-            context={{ ...cockpitPreview, selectedExecutionId }}
+            context={{ ...cockpitPreview, selectedExecutionId, analystResult }}
             mode={mode}
             onStudioReady={({ api }) => { studioApi.current = api; setReady(true); }}
           />

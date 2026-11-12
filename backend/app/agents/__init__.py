@@ -240,3 +240,11 @@ def mandate_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRu
     with invoice_run(execution_id, dispatch=dispatch) as run:
         run._nodes = frozenset({"A1"})
         yield run
+
+
+@contextmanager
+def analyst_run(execution_id: UUID, *, dispatch: Callable) -> Iterator[InvoiceRun]:
+    """A7 has a separate bounded read-only question run, outside invoice approval."""
+    with invoice_run(execution_id, dispatch=dispatch) as run:
+        run._nodes = frozenset({"A7"})
+        yield run

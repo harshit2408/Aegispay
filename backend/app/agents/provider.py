@@ -6,7 +6,7 @@ import httpx
 import psycopg
 from sqlalchemy.engine import make_url
 
-from app.agents import ModelResponse, invoice_run, mandate_run
+from app.agents import ModelResponse, analyst_run, invoice_run, mandate_run
 
 
 def postgres_dsn(url: str) -> str:
@@ -122,6 +122,21 @@ def mandate_completion(settings):
         )
         dispatch.input_token_bound = input_token_bound
         with mandate_run(run_id, dispatch=dispatch) as run:
+            return run.complete(node, messages, input_token_bound=input_token_bound)
+
+    return complete
+
+
+def analyst_completion(settings):
+    def complete(node, messages, *, input_token_bound):
+        run_id = uuid4()
+        dispatch = DurableDispatch(
+            run_id=run_id,
+            database_url=settings.database_url,
+            api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else "",
+        )
+        dispatch.input_token_bound = input_token_bound
+        with analyst_run(run_id, dispatch=dispatch) as run:
             return run.complete(node, messages, input_token_bound=input_token_bound)
 
     return complete

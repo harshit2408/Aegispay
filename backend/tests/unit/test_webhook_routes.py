@@ -1,6 +1,7 @@
 """P1-09: webhook routes + dedupe (R10, R24, R25) and the settlement-side consumer."""
 
 import json
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -10,15 +11,17 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.db import get_session
 from app.main import create_app
-from app.models.payables import InvoiceExecution, Payout, WebhookEvent
+from app.models.core import PurchaseOrder
+from app.models.payables import InvoiceExecution, Payout, POLedger, SpendLedger, WebhookEvent
 from app.paypal.client import PayPalClient
 from app.paypal.invoicing import Invoicing
 from app.paypal.payouts import Payouts
 from app.routers import webhooks
+from app.settlement import po_ledger, spend_ledger
 from app.settlement.reconciler import Reconciler
 from app.settlement.webhook_consumer import WebhookConsumer
 from app.vendor_sim.gateway import VendorGateway
-from tests.seed import PAYER_ID, seed_approved, seed_world
+from tests.seed import PAYER_ID, POLICY_ID, seed_approved, seed_world
 from tests.webhook_signing import make_verifier, sign
 
 pytestmark = pytest.mark.usefixtures("pg_template")
@@ -248,3 +251,101 @@ async def test_a_success_webhook_is_only_a_hint_the_get_decides(hook):
         assert not record.called
     async with hook.sm() as s:
         assert (await s.get(InvoiceExecution, "e1")).status == "PAYOUT_SUBMITTED"
+
+
+async def test_duplicate_out_of_order_and_delayed_hints_settle_once(hook, monkeypatch):
+    """P4-02: mixed deliveries never override GET or duplicate money/record-payment writes."""
+    monkeypatch.setenv("DEMO_ENABLED", "true")
+    get_settings.cache_clear()
+    now = datetime.now(UTC)
+    async with hook.sm() as s, s.begin():
+        await spend_ledger.reserve(
+            s, execution_id="e1", policy_id=POLICY_ID, vendor_id="v1", amount_cents=48000, now=now
+        )
+        await po_ledger.reserve(s, execution_id="e1", po_id="PO-1042", amount_cents=48000)
+
+    async def deliver(event_id, event_type, age):
+        body = json.loads(event(event_id, event_type))
+        # The event happened earlier; this delivery has a fresh, verified transmission signature.
+        body["create_time"] = (now - age).isoformat()
+        raw = json.dumps(body).encode()
+        assert (await post(hook, TREASURY, raw)).status_code == 204
+        return raw
+
+    success = await deliver("WH-SUCCESS", "PAYMENT.PAYOUTS-ITEM.SUCCEEDED", timedelta())
+    assert (await post(hook, TREASURY, success)).status_code == 204
+    assert (await hook.post(TREASURY, content=event("WH-UNSIGNED"))).status_code == 400
+    assert (
+        await post(hook, f"{SIMULATOR}/treasury", event("WH-SIM"), "WEBHOOK_ID")
+    ).status_code == 204
+    item = {
+        "payout_item_id": "ITEM1",
+        "transaction_status": "PENDING",
+        "payout_batch_id": "BATCH1",
+        "payout_item": {
+            "recipient_type": "PAYPAL_ID",
+            "receiver": PAYER_ID,
+            "amount": {"value": "480.00", "currency": "USD"},
+            "sender_item_id": "e1-1",
+        },
+    }
+    with respx.mock(assert_all_called=False) as router:
+        router.post(f"{BASE}/v1/oauth2/token").mock(
+            return_value=httpx.Response(200, json={"access_token": "t", "expires_in": 3600})
+        )
+        lookup = router.get(f"{BASE}/v1/payments/payouts-item/ITEM1").mock(
+            return_value=httpx.Response(200, json=item)
+        )
+        router.get(f"{BASE}/v2/invoicing/invoices/INV2-ABC").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "id": "INV2-ABC",
+                    "status": "SENT",
+                    "detail": {"currency_code": "USD"},
+                    "items": [],
+                    "amount": {"currency_code": "USD", "value": "480.00"},
+                },
+            )
+        )
+        record = router.post(f"{BASE}/v2/invoicing/invoices/INV2-ABC/payments").mock(
+            return_value=httpx.Response(200, json={"payment_id": "P1"})
+        )
+        consumer = WebhookConsumer(
+            hook.sm,
+            Reconciler(
+                hook.sm, Payouts(_paypal("TREASURY")), VendorGateway(Invoicing(_paypal("VENDOR")))
+            ),
+        )
+        assert await consumer.run_once() == 1  # unsigned/simulator noise is never consumed
+        assert lookup.call_count == 1 and record.call_count == 0
+        async with hook.sm() as s:
+            assert (await s.get(InvoiceExecution, "e1")).status == "PAYOUT_SUBMITTED"
+
+        await deliver("WH-OLD-FAILED", "PAYMENT.PAYOUTS-ITEM.FAILED", timedelta(minutes=5))
+        lookup.mock(return_value=httpx.Response(200, json=item | {"transaction_status": "SUCCESS"}))
+        assert await consumer.run_once() == 1
+        assert lookup.call_count == 2 and record.call_count == 1
+        assert record.calls[0].request.headers["paypal-request-id"] == "aegis-e1-recordpay"
+
+        delayed = await deliver("WH-DELAYED", "PAYMENT.PAYOUTS-ITEM.FAILED", timedelta(hours=1))
+        assert (await post(hook, TREASURY, delayed)).status_code == 204
+        lookup.mock(return_value=httpx.Response(200, json=item))
+        assert await consumer.run_once() == 1
+        assert await consumer.run_once() == 0
+        assert lookup.call_count == 3 and record.call_count == 1
+
+    async with hook.sm() as s:
+        assert (await s.get(InvoiceExecution, "e1")).status == "SETTLED"
+        assert (await s.get(PurchaseOrder, "PO-1042")).status == "CLOSED"
+        for model in (SpendLedger, POLedger):
+            (reservation,) = list(await s.scalars(select(model)))
+            assert (reservation.kind, reservation.amount_cents) == ("RESERVE", 48000)
+    rows = await stored(hook)
+    assert len(rows) == 5  # three real hints, one unverified sample, one simulator hint
+    assert all(row.processed_at is not None for row in rows)
+    assert {row.event_id for row in rows if row.confirmed_by_get} == {
+        "WH-SUCCESS",
+        "WH-OLD-FAILED",
+        "WH-DELAYED",
+    }
