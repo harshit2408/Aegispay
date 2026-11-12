@@ -2392,6 +2392,26 @@
       }
     },
     "/api/demo/forensics-detector": {
+      "get": {
+        "description": "Current kill-switch state for newly admitted scenarios (PRD §14.5).",
+        "operationId": "detector_state_api_demo_forensics_detector_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoControlView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Detector State",
+        "tags": [
+          "demo"
+        ]
+      },
       "post": {
         "operationId": "detector_api_demo_forensics_detector_post",
         "requestBody": {

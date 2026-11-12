@@ -74,7 +74,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Detector State
+         * @description Current kill-switch state for newly admitted scenarios (PRD §14.5).
+         */
+        get: operations["detector_state_api_demo_forensics_detector_get"];
         put?: never;
         /** Detector */
         post: operations["detector_api_demo_forensics_detector_post"];
@@ -1279,6 +1283,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionView"];
+                };
+            };
+        };
+    };
+    detector_state_api_demo_forensics_detector_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoControlView"];
                 };
             };
         };

@@ -2,6 +2,8 @@
 
 The operator supplies the verified identity and Argon2id hashes. No document or invoice can onboard
 a payee. The local manifest journals draft IDs before sending; this module never submits payouts.
+Once S1-S3 invoices are sent, their IDs are recorded as a DEMO_INVOICES control event so the API
+(Vendor read credentials only, R22) can admit live scenarios without a local file.
 """
 
 import json
@@ -14,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.audit.events import enqueue_event
 from app.config import Settings
 from app.models.core import (
     GoodsReceipt,
@@ -41,6 +44,7 @@ SCENARIOS = (
     ("S3", "1044", "Flight controller", 80, 500, 80),
 )
 VENDOR_ID = "demo-supplier"
+LIVE_INVOICES = "DEMO_INVOICES"
 
 
 class DemoSeed(BaseModel):
@@ -127,7 +131,7 @@ async def seed_demo(
     manifest_dir: Path,
     gateway: VendorGateway | None = None,
 ) -> dict:
-    """Commit local trust roots, then optionally create/send S1/S2 invoices through VendorGateway.
+    """Commit local trust roots, then optionally create/send S1-S3 invoices through VendorGateway.
 
     Reusing a run is idempotent. A different vendor identity is an error, never an implicit change.
     Keep the manifest directory for retries; PayPal's own idempotency retention is bounded.
@@ -265,7 +269,8 @@ async def seed_demo(
                 )
     _save(path, manifest)
     if gateway is not None:
-        for name, number, item, qty, price, _ in SCENARIOS[:2]:
+        # S3 gets a reference invoice: admission GET-verifies one (docs/EVAL.md S3 variant).
+        for name, number, item, qty, price, _ in SCENARIOS:
             row = manifest["scenarios"][name]
             if row["paypal_invoice_id"] is None:
                 row["paypal_invoice_id"] = await gateway.create_draft(
@@ -296,4 +301,18 @@ async def seed_demo(
                 "MARKED_AS_PAID",
             ):
                 raise ValueError("demo invoice is not in a resumable state")
+        async with sessions() as s, s.begin():
+            await enqueue_event(
+                s,
+                execution_id="demo-control",
+                actor="demo-seeder",
+                event_type=LIVE_INVOICES,
+                payload={
+                    "run_id": config.run_id,
+                    "invoices": {
+                        name: row["paypal_invoice_id"]
+                        for name, row in manifest["scenarios"].items()
+                    },
+                },
+            )
     return manifest

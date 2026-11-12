@@ -45,6 +45,7 @@ export const api = {
   setHalt: (halted: boolean, reason: string, csrfToken: string): Promise<components["schemas"]["HaltView"]> => post("/api/ops/settlement-halt", { halted, reason }, csrfToken),
   health: (signal?: AbortSignal): Promise<unknown> => request("/api/health", { signal }),
   resetDemo: (csrfToken: string): Promise<components["schemas"]["DemoControlView"]> => post("/api/demo/reset", {}, csrfToken),
+  detector: (signal?: AbortSignal): Promise<components["schemas"]["DemoControlView"]> => request("/api/demo/forensics-detector", { signal }),
   setDetector: (enabled: boolean, csrfToken: string): Promise<components["schemas"]["DemoControlView"]> => post("/api/demo/forensics-detector", { enabled }, csrfToken),
   runScenario: (scenario: "S1" | "S2" | "S3" | "S4", csrfToken: string): Promise<components["schemas"]["DocumentReceipt"]> =>
     post(`/api/demo/scenarios/${scenario}/run`, {}, csrfToken),

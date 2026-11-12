@@ -27,6 +27,7 @@ from app.auth import COOKIE, roles, token_hash, utc
 from app.config import get_settings
 from app.db import get_session
 from app.decision.match import normalize_invoice_number
+from app.demo.runtime import live_detector
 from app.models.auth import OperatorSession
 from app.models.core import MandatePolicy, Operator, PurchaseOrder, VendorMaster
 from app.models.payables import InvoiceDocument, InvoiceExecution
@@ -68,17 +69,39 @@ async def upload_document(
     po_id: Reference,
     paypal_invoice_id: Reference,
 ):
-    dispatcher = getattr(request.app.state, "dispatcher", None)
-    settings = get_settings()
-    reader = getattr(request.app.state, "vendor_reader", None)
-    if dispatcher is None or reader is None or settings.demo_replay_mode:
-        raise HTTPException(503, "Live document admission is unavailable")
+    require_live_admission(request)
     pdf = await file.read(MAX_PDF_BYTES + 1)
     if len(pdf) > MAX_PDF_BYTES:
         raise HTTPException(413, "PDF exceeds 10 MiB")
     if not pdf.startswith(b"%PDF-"):
         raise HTTPException(422, "A PDF is required")
+    return await admit_pdf(
+        request, background, session, actor.operator_id, pdf, po_id, paypal_invoice_id
+    )
 
+
+def require_live_admission(request: Request) -> None:
+    dispatcher = getattr(request.app.state, "dispatcher", None)
+    reader = getattr(request.app.state, "vendor_reader", None)
+    if dispatcher is None or reader is None or get_settings().demo_replay_mode:
+        raise HTTPException(503, "Live document admission is unavailable")
+
+
+async def admit_pdf(
+    request: Request,
+    background: BackgroundTasks,
+    session: AsyncSession,
+    actor_id: str,
+    pdf: bytes,
+    po_id: str,
+    paypal_invoice_id: str,
+    *,
+    source: str = "PDF_UPLOAD",
+    note: dict | None = None,
+) -> DocumentReceipt:
+    """The one live admission path: /api/documents and the live demo toolbar (PRD §13)."""
+    settings = get_settings()
+    reader = request.app.state.vendor_reader
     # Count attempts against the authenticated session before external work.
     auth = await session.get(
         OperatorSession, token_hash(request.cookies[COOKIE]), with_for_update=True
@@ -105,6 +128,8 @@ async def upload_document(
     mandate = await session.scalar(select(MandatePolicy).where(MandatePolicy.is_active))
     if mandate is None:
         raise HTTPException(409, "No active mandate")
+    # R24: the kill-switch toggle exists only in demo deployments; otherwise always ON.
+    detector = await live_detector(session) if settings.demo_enabled else True
     original = await _duplicate(session, paypal_invoice_id, vendor_id)
     normalized = invoice_number = None
     await session.commit()
@@ -136,10 +161,10 @@ async def upload_document(
         session.add(
             InvoiceDocument(
                 document_id=execution_id,
-                source="PDF_UPLOAD",
+                source=source,
                 sha256=hashlib.sha256(pdf).hexdigest(),
                 storage_path=str(storage.resolve()),
-                uploaded_by=actor.operator_id,
+                uploaded_by=actor_id,
             )
         )
         await session.flush()
@@ -156,7 +181,7 @@ async def upload_document(
                 invoice_number_norm=normalized,
                 policy_id=mandate.policy_id,
                 policy_version=mandate.version,
-                detector_enabled=True,
+                detector_enabled=detector,
                 status="DUPLICATE_BLOCKED" if duplicate else "RECEIVED",
                 route="DUPLICATE_BLOCKED" if duplicate else None,
                 match_report_json={"duplicate_of": duplicate} if duplicate else None,
@@ -175,9 +200,9 @@ async def upload_document(
         await enqueue_event(
             session,
             execution_id=execution_id,
-            actor=actor.operator_id,
+            actor=actor_id,
             event_type="DUPLICATE_BLOCKED" if original else "DOCUMENT_RECEIVED",
-            payload={"duplicate_of": original} if original else {},
+            payload={**(note or {}), **({"duplicate_of": original} if original else {})},
         )
         await session.commit()
     except Exception:
