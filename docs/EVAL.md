@@ -1,5 +1,25 @@
 # AegisPay evaluation results
 
+## Real PayPal sandbox S1-S4 with a free model: 2026-11-12 (P1-12, P2-15)
+
+These are single live runs, not a statistical evaluation. Model: OpenRouter `nvidia/nemotron-3.5-super-vl:free`, a **free reasoning model, not `gpt-6.1-sol`**; free tier = demo only, synthetic PDFs only, 20 requests/min and 50/day, prompts may be logged by the free provider (docs/TOOLS.md). No accuracy, Wilson-interval or held-out claim is made from n = 1 per scenario; the 50-PDF/5-run evaluation of PRD §10.1 was **not run**. Stack: Docker compose project `aegispay-s1` (Postgres 16, API with role-separated DB login, separate settlement worker), PayPal **sandbox** Treasury and Vendor apps, run id `s1a`, driven only through the public API by `backend/scripts/s1_headless.py`. Raw evidence: `docs/evidence/P1-12-s1.json`, `docs/evidence/P2-15-s2-s3-s4.json`.
+
+| Scenario | Runs | Actual result | Measured |
+|---|---|---|---|
+| S1 clean | 1 | AUTO_SETTLE, risk 0, payout 48,000 cents, item SUCCESS, receiver = vendor-master payer ID, invoice MARKED_AS_PAID, case SETTLED, PO-1042 CLOSED, audit anchor verified | CLI upload to SETTLED 50.8 s; 2 provider requests |
+| S2 damaged delivery | 1 | SHORT_PAY, billed 50,000, accepted 42,500, payout 42,500 cents SUCCESS, invoice PARTIALLY_PAID, PO-1043 CLOSED, anchor verified; expected cost **6,592 vs 1,500 cents** as in §12.3 | 67.1 s; 2 provider requests |
+| S3 injection / BEC | 3 executions (1 pass) | FREEZE, risk 100 (INJECTION 60, HIDDEN_TEXT 25, PAYEE_MISMATCH 40, PAYEE_LOOKALIKE 10, SOURCE_MISMATCH 40), HIGH_RISK, 2 approvals required, 13 hidden segments (COLOR_MATCH, OCR_DIFF); `demo-cfo` (not the uploader) REJECTED through `POST /decisions`; REJECTED, 0 settlement events, 0 cents paid | 2 provider requests in the passing run |
+| S4 duplicate | 3 | DUPLICATE_BLOCKED, linked to the S1 execution, 0 settlement events | upload + first read 43, 43, 41 ms (CLI, loopback; not a percentile) |
+
+Failures observed (all fail closed, none moved money): (1) first S3 attempt, A2 provider outcome uncertain, run halted (`CLASSIFIER_UNAVAILABLE`, 99 approvals, REJECT only); probable cause the 1024-token output cap, because this reasoning model spends 700-780 of its ~880-975 completion tokens on reasoning; the adapter intentionally does not log the cause. Fix: per-provider cap 4096 for the OpenRouter entry. (2) second S3 attempt, A2 fine, A3 returned invalid JSON (`"rationale": The document ...`, unquoted) so A3 failed closed. Fix: the A3 prompt now demands quoted strings with an example (3 of 3 live replies valid afterwards); the parser and the fail-closed rule are unchanged. Both frozen executions were REJECTED by `demo-cfo`. Of 5 live-LLM executions, 3 completed their intended path and 2 fail-closed FREEZEs preceded the fixes; the S1 and S2 passes ran on the build **before** those two fixes (1024 cap, original A3 prompt); they were not re-run because the vendor daily cap (150,000 cents) would freeze a second S1 + S2 on the same day.
+
+Limits and deviations:
+- **S3 is a variant.** PRD §15 S3 has no PayPal invoice, but `POST /api/documents` requires a PayPal invoice that references the PO, so the real-API S3 needed a reference invoice (`backend/scripts/s3_seed_invoice.py`). SOURCE_MISMATCH still fired because that invoice does not match the PDF. The detector-OFF kill-switch variant was not run live.
+- S2 and S3 reuse run `s1a` (the seeder already creates PO-1043/PO-1044 there) instead of a separate `p215` run.
+- S3 approval: the CLI sent only REJECT as a second real operator; it never approves (R11). An approve path with two distinct operators was not exercised live.
+- The notice/vendor-portal remedy step of S2 and the Playwright browser S1-S4 were not run.
+- Provider cost is $0 (free tier); `llm_budgets` charged 12,938-14,814 conservative micros per passing execution at the OpenAI price formula.
+
 ## Local P2 integration — 2026-11-10
 
 Implementation: `b4e4f5f`, branch `b/P2-07-phase-completion`. These are local replay and deterministic integration results, not live-provider accuracy or sandbox payout acceptance.

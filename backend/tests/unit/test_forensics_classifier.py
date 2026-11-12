@@ -4,7 +4,12 @@ import pytest
 from tokenops.framework import Halt
 from tokenops.providers.types import ModelResponse
 
-from app.forensics.classifier import MAX_RATIONALE_CHARS, MAX_SEGMENT_PROMPT_CHARS, classify
+from app.forensics.classifier import (
+    _SYSTEM,
+    MAX_RATIONALE_CHARS,
+    MAX_SEGMENT_PROMPT_CHARS,
+    classify,
+)
 from app.schemas.decision import HiddenSegment
 
 SEG = HiddenSegment(page=1, bbox=(0, 0, 1, 1), technique="TINY_FONT", text="hi")
@@ -106,3 +111,11 @@ def test_fail_closed(payload):
     assert r.classifier_label == "INJECTION"
     assert r.classifier_rationale == "CLASSIFIER_UNAVAILABLE"
     assert r.hidden_segments == [SEG]
+
+
+def test_unquoted_rationale_fails_closed_and_prompt_demands_quotes():
+    # Real free-model failure: `"rationale": The document ...` (unquoted). Parsing is not loosened;
+    # the prompt instead spells out quoted strings with an example.
+    r = run('{"label": "INJECTION", "rationale": The document embeds a notice."}')
+    assert r.classifier_rationale == "CLASSIFIER_UNAVAILABLE"
+    assert "double quotes" in _SYSTEM and "Example reply" in _SYSTEM

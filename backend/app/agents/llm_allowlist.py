@@ -7,14 +7,16 @@ own endpoint, so an API key can only ever be sent to that provider's host.
 
 from collections.abc import Mapping
 
-OUTPUT_CAP = 1024
+# Per-provider output cap. The OpenRouter model is a reasoning model: reasoning tokens count against
+# the cap (measured 880-975 of 1024 on a one-page invoice), so 1024 fails closed on ordinary runs.
+OUTPUT_CAPS = {"openai": 1024, "openrouter": 4096}
 # Free models: demo only, synthetic PDFs only; free providers may log prompts (docs/TOOLS.md).
 REVIEWED = {
-    ("openai", "gpt-6.1-sol", OUTPUT_CAP): "https://api.openai.com/v1/chat/completions",
+    ("openai", "gpt-6.1-sol", OUTPUT_CAPS["openai"]): "https://api.openai.com/v1/chat/completions",
     (
         "openrouter",
         "nvidia/nemotron-3.5-super-vl:free",
-        OUTPUT_CAP,
+        OUTPUT_CAPS["openrouter"],
     ): "https://openrouter.ai/api/v1/chat/completions",
 }
 DEFAULT_MODEL = {
@@ -30,7 +32,7 @@ def select(env: Mapping[str, str]) -> tuple[str, str]:
     extract = (env.get("LLM_MODEL_EXTRACT") or "").strip() or default
     reason = (env.get("LLM_MODEL_REASON") or "").strip() or default
     # One model per run: the TokenOps run, price and budget are keyed on a single (provider, model).
-    if extract != reason or (provider, extract, OUTPUT_CAP) not in REVIEWED:
+    if extract != reason or (provider, extract, OUTPUT_CAPS.get(provider)) not in REVIEWED:
         raise ValueError("unreviewed LLM provider or model")
     return provider, extract
 
