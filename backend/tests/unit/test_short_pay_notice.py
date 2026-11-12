@@ -187,7 +187,7 @@ async def test_graph_drafts_after_approval_only_for_short_pay(pg_sessionmaker, r
 @pytest.fixture
 async def client(pg_sessionmaker, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/unused")
-    monkeypatch.setenv("SESSION_SECRET", "synthetic-vendor-sim-secret-key-1234")
+    monkeypatch.setenv("SESSION_SECRET", "s" * 32)  # low-entropy synthetic value (gitleaks)
     get_settings.cache_clear()
 
     async def sessions():
