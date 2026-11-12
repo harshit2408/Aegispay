@@ -1,87 +1,102 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { components } from "@/lib/api";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { APIError, api } from "@/lib/client";
-import { REASON_MAX, respondBlock, respondToNotice, supplierRow, type NoticeAction } from "@/lib/vendor-portal";
+import {
+  REASON_MAX, displayTime, initialPortal, loadErrorMessage, portalReducer, recheckOnce, respondBlock, respondToNotice,
+  type NoticeAction, type RespondOutcome, type Row,
+} from "@/lib/vendor-portal";
 import { useSession } from "../session";
 
-type Row = ReturnType<typeof supplierRow>;
-
 export default function VendorPortal() {
-  const { operator, busy } = useSession();
+  const { operator, busy, refresh } = useSession();
+  const [state, dispatch] = useReducer(portalReducer, initialPortal);
+  const generation = useRef(0);
+  const inFlight = useRef<AbortController | null>(null);
+  const rechecked = useRef(false);
+  const sessionKey = operator ? `${operator.operator_id}:${operator.csrf_token}` : "";
+
+  const sessionExpired = useCallback(() => { if (recheckOnce(rechecked)) void refresh(); }, [refresh]);
+
+  const load = useCallback(async (): Promise<boolean> => {
+    inFlight.current?.abort();
+    const controller = new AbortController();
+    inFlight.current = controller;
+    const current = ++generation.current;
+    dispatch({ type: "load", generation: current });
+    try {
+      const invoices = await api.vendorInvoices(controller.signal);
+      dispatch({ type: "loaded", generation: current, invoices });
+      rechecked.current = false;
+      return true;
+    } catch (error) {
+      if (controller.signal.aborted) return false;
+      dispatch({ type: "failed", generation: current, error: loadErrorMessage(error) });
+      if (error instanceof APIError && error.status === 401) sessionExpired();
+      return false;
+    }
+  }, [sessionExpired]);
+
+  useEffect(() => {
+    if (!sessionKey) return;
+    void load();
+    return () => inFlight.current?.abort();
+  }, [sessionKey, load]);
+
+  const toolbarStatus = busy ? "Checking operator session…" : state.loading ? "Loading supplier invoices…" : `${state.rows.length} invoices loaded.`;
   return <>
     <section className="page-header" aria-labelledby="vendor-title">
       <p className="eyebrow">SUPPLIER / SIMULATOR</p>
       <h1 id="vendor-title">Supplier portal <span className="simulator-badge">Simulator</span></h1>
       <p>Simulated supplier view: invoices issued, PayPal status, payments received and short-pay notices. Operators sign in to play the supplier.</p>
     </section>
-    {!operator || busy ? <p role="status">{busy ? "Checking operator session…" : "Sign in above to open the supplier simulator."}</p>
-      : <SupplierInvoices key={`${operator.operator_id}:${operator.csrf_token}`} />}
+    {!operator ? <p role="status">{busy ? "Checking operator session…" : "Sign in above to open the supplier simulator."}</p> : <>
+      <div className="studio-toolbar">
+        <p role="status">{toolbarStatus}</p>
+        <button type="button" aria-disabled={state.loading} onClick={() => { if (!state.loading) void load(); }}>Refresh invoices</button>
+      </div>
+      {state.error && <p role="alert">{state.error}</p>}
+      {!state.loading && !state.error && state.rows.length === 0 && <section className="case-pane" aria-labelledby="vendor-empty-title">
+        <h2 id="vendor-empty-title">Invoices issued</h2><p>No supplier invoices yet. Run a demo scenario to issue one.</p>
+      </section>}
+      {state.rows.map((row) => <InvoiceCard key={row.id} row={row} csrfToken={operator.csrf_token} reload={load} onSessionExpired={sessionExpired} />)}
+    </>}
   </>;
 }
 
-function SupplierInvoices() {
-  const { refresh } = useSession();
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-
-  const load = useCallback((signal?: AbortSignal) => {
-    return api.vendorInvoices(signal).then((invoices: components["schemas"]["SupplierInvoice"][]) => {
-      if (!signal?.aborted) { setRows(invoices.map(supplierRow)); setError(""); }
-    }).catch((failure: unknown) => {
-      if (signal?.aborted) return;
-      setRows([]);
-      if (failure instanceof APIError && failure.status === 401) { setError("Session expired. Sign in again."); void refresh(); }
-      else setError(failure instanceof Error ? failure.message : "Supplier invoices could not be loaded.");
-    }).finally(() => { if (!signal?.aborted) setLoading(false); });
-  }, [refresh]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
-
-  return <>
-    <p role="status" aria-live="polite" className="local-status">{message}</p>
-    <div className="studio-toolbar">
-      <p role="status">{loading ? "Loading supplier invoices…" : `${rows.length} invoices loaded.`}</p>
-      <button type="button" disabled={loading} onClick={() => { setMessage(""); setLoading(true); void load(); }}>Refresh invoices</button>
-    </div>
-    {error && <p role="alert">{error}</p>}
-    {!loading && !error && rows.length === 0 && <section className="case-pane"><h2>Invoices issued</h2><p>No supplier invoices yet. Run a demo scenario to issue one.</p></section>}
-    {rows.map((row) => <InvoiceCard key={row.id} row={row} onMessage={setMessage} reload={load} />)}
-  </>;
+function When({ iso }: { iso: string }) {
+  const text = displayTime(iso);
+  return text ? <time dateTime={iso}>{text}</time> : <>an unknown time</>;
 }
 
-function InvoiceCard({ row, onMessage, reload }: { row: Row; onMessage: (text: string) => void; reload: () => Promise<unknown> }) {
-  const session = useSession();
+type CardProps = { row: Row; csrfToken: string; reload: () => Promise<boolean>; onSessionExpired: () => void };
+
+function InvoiceCard({ row, csrfToken, reload, onSessionExpired }: CardProps) {
   const [reason, setReason] = useState("");
   const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<RespondOutcome | null>(null);
+  const lock = useRef(false);
+  const heading = useRef<HTMLHeadingElement>(null);
   const notice = row.notice;
-  const titleId = `invoice-${row.id}`;
-  const reasonId = `reason-${row.id}`;
-  const helpId = `reason-help-${row.id}`;
+  const ids = { title: `invoice-${row.id}`, reason: `reason-${row.id}`, help: `reason-help-${row.id}`, text: `notice-text-${row.id}` };
 
   async function respond(action: NoticeAction) {
-    const operator = session.operator;
-    if (!notice || !operator || sending) return;
-    setSending(true); onMessage("");
-    try {
-      onMessage(await respondToNotice(notice.id, action, reason, operator.csrf_token, reload));
-      setReason("");
-    } catch (failure) {
-      onMessage(failure instanceof Error ? failure.message : "The response could not be confirmed. Review the refreshed invoices.");
-      if (failure instanceof APIError && [401, 403].includes(failure.status)) void session.refresh();
-    } finally { setSending(false); }
+    if (!notice || sending || lock.current) return;
+    const blocked = respondBlock(action, reason);
+    if (blocked) { setResult({ ok: false, message: blocked, sessionExpired: false }); return; }
+    setSending(true); setResult(null);
+    const outcome = await respondToNotice(notice.id, action, reason, csrfToken, reload, lock);
+    setSending(false);
+    if (!outcome) return;
+    setResult(outcome);
+    if (outcome.ok) setReason("");
+    if (outcome.sessionExpired) onSessionExpired();
+    heading.current?.focus(); // the buttons may be gone once the response is recorded
   }
 
   const contestBlock = respondBlock("CONTEST", reason);
-  return <section className="case-pane" aria-labelledby={titleId}>
-    <h2 id={titleId}>Invoice {row.number}</h2>
+  return <section className="case-pane" aria-labelledby={ids.title}>
+    <h2 id={ids.title} ref={heading} tabIndex={-1}>Invoice {row.number}</h2>
     <dl>
       <dt>Supplier</dt><dd>{row.vendor}</dd>
       <dt>PayPal invoice</dt><dd><code>{row.id}</code></dd>
@@ -89,19 +104,21 @@ function InvoiceCard({ row, onMessage, reload }: { row: Row; onMessage: (text: s
       <dt>Invoice total</dt><dd>{row.billed}</dd>
       <dt>Payments received</dt><dd>{row.received}</dd>
     </dl>
+    <p role="status" className={result ? "local-status" : undefined}>{result?.message ?? ""}</p>
     <h3>Short-pay notice</h3>
     {!notice ? <p className="muted">No short-pay notice for this invoice.</p> : <>
-      <p><span className="case-badge">{notice.statusLabel}</span> · Short by {notice.shortfall} · Sent {new Date(notice.sentAt).toLocaleString()}
-        {notice.respondedAt && <> · Answered {new Date(notice.respondedAt).toLocaleString()}</>}</p>
-      <blockquote style={{ whiteSpace: "pre-wrap" }}>{notice.text}</blockquote>
+      <p><span className="case-badge">{notice.statusLabel}</span> · Short by {notice.shortfall} · Sent <When iso={notice.sentAt} />
+        {notice.respondedAt && <> · Answered <When iso={notice.respondedAt} /></>}</p>
+      <p id={ids.text} className="muted">Notice text (generated)</p>
+      <p className="notice-text" role="note" aria-labelledby={ids.text}>{notice.text}</p>
       {notice.canRespond ? <form className="decision-form" onSubmit={(event) => event.preventDefault()}>
-        <label htmlFor={reasonId}>Reason (required to contest)</label>
-        <textarea id={reasonId} value={reason} maxLength={REASON_MAX} rows={3} disabled={sending}
-          aria-describedby={helpId} onChange={(event) => setReason(event.target.value)} />
-        <p id={helpId} className="muted">{sending ? "Sending your response…" : contestBlock ?? "One response only. It cannot be changed afterwards."}</p>
+        <label htmlFor={ids.reason}>Reason (required to contest)</label>
+        <textarea id={ids.reason} value={reason} maxLength={REASON_MAX} rows={3} readOnly={sending}
+          aria-describedby={ids.help} onChange={(event) => setReason(event.target.value)} />
+        <p id={ids.help} className="muted">{sending ? "Sending your response…" : contestBlock ?? "One response only. It cannot be changed afterwards."}</p>
         <div>
-          <button type="button" disabled={sending} onClick={() => void respond("ACCEPT")}>Accept short payment</button>{" "}
-          <button type="button" disabled={sending || Boolean(contestBlock)} aria-describedby={helpId} onClick={() => void respond("CONTEST")}>Contest</button>
+          <button type="button" aria-disabled={sending} onClick={() => void respond("ACCEPT")}>Accept short payment</button>{" "}
+          <button type="button" aria-disabled={sending || Boolean(contestBlock)} aria-describedby={ids.help} onClick={() => void respond("CONTEST")}>Contest</button>
         </div>
       </form> : <p className="muted">This notice has been answered. Only one response is allowed.</p>}
     </>}

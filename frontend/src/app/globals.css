@@ -132,7 +132,8 @@ p { line-height: 1.6; }
 .decision-form { display: grid; gap: 10px; padding-top: 12px; }
 .decision-form input, .decision-form select, .decision-form textarea { width: 100%; min-width: 0; padding: 11px; border: 1px solid var(--pp-border); border-radius: 5px; font: inherit; background: var(--pp-canvas); color: var(--pp-ink); }
 .decision-form textarea { resize: vertical; }
-button:disabled { opacity: 0.65; cursor: not-allowed; }
+button:disabled, button[aria-disabled="true"] { opacity: 0.65; cursor: not-allowed; }
+.notice-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; padding-left: 16px; border-left: 3px solid var(--pp-border); }
 .mock-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .local-status { padding: 14px; border-left: 3px solid var(--pp-blue); background: var(--pp-canvas); }
 .session-panel { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0; padding: 14px 18px; border: 1px solid var(--pp-border); border-radius: 8px; }
