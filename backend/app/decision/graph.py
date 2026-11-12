@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 from sqlalchemy import select, update
 
+from app.agents import Halt
 from app.decision.match import match
 from app.decision.policy_gate import _hash, evaluate
 from app.decision.risk import assess
@@ -199,7 +200,7 @@ def build_graph(
             return {"evidence": None}
         try:
             return {"evidence": await investigator(state["execution_id"], state)}
-        except Exception as exc:
+        except (Exception, Halt) as exc:  # Halt is a BaseException; its flag is already durable
             log.warning(
                 "investigate failed execution_id=%s error=%s",
                 state["execution_id"],

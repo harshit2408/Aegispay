@@ -1,6 +1,8 @@
 """PRD R22 / P3-14: parser subprocess fails closed; Linux-only tests prove the real sandbox."""
 
 import io
+import json
+import os
 import platform
 import subprocess
 import sys
@@ -28,9 +30,36 @@ def _pdf(pages: int = 1) -> bytes:
     return buf.getvalue()
 
 
-class _Done:
-    def __init__(self, code=0):
-        self.returncode = code
+def _fake_child(monkeypatch, *, stdout=b"", code=0, error=None):
+    """Replace the parser process; returns what it saw and the process groups killed."""
+    seen, killed = {}, []
+
+    class Child:
+        pid, returncode = 4242, code
+
+        def __init__(self, cmd, **kw):
+            seen.update(cmd=cmd, **kw)
+            if isinstance(error, OSError):
+                raise error
+            kw["stdout"].write(stdout)
+
+        def communicate(self, data, timeout):
+            seen["timeout"] = timeout
+            if isinstance(error, subprocess.TimeoutExpired):
+                raise error
+
+        def wait(self):
+            return code
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(subprocess, "Popen", Child)
+    monkeypatch.setattr(os, "killpg", lambda pid, sig: killed.append(pid), raising=False)
+    return seen, killed
 
 
 @pytest.mark.parametrize(
@@ -39,42 +68,35 @@ class _Done:
     ids=["empty", "not_pdf", "oversize"],
 )
 async def test_rejects_bad_or_oversize_input_before_spawn(data, monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("spawned"))
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: pytest.fail("spawned"))
     with pytest.raises(ParseUnavailable):
         await parse_pdf(data)
 
 
-async def test_spawn_uses_empty_env_isolated_interpreter_and_timeout(monkeypatch):
-    seen = {}
-
-    def fake(cmd, **kw):
-        seen.update(cmd=cmd, **kw)
-        kw["stdout"].write(b'{"text":"x","segments":[],"images":[]}')
-        return _Done()
-
-    monkeypatch.setattr(subprocess, "run", fake)
+async def test_spawn_uses_empty_env_isolated_interpreter_own_group_and_timeout(monkeypatch):
+    seen, killed = _fake_child(monkeypatch, stdout=b'{"text":"x","segments":[],"images":[]}')
     doc = await parse_pdf(b"%PDF-1.4")
     assert doc.text == "x"
     assert seen["env"] == {} and "-I" in seen["cmd"] and seen["timeout"] <= 30
+    assert seen["start_new_session"] is True and killed == [4242]
 
 
 @pytest.mark.parametrize(
     "outcome",
     [
-        _Done(1),
-        subprocess.TimeoutExpired("w", 15),
-        OSError("no exec"),
+        {"code": 1},
+        {"error": subprocess.TimeoutExpired("w", 15)},
+        {"error": OSError("no exec")},
     ],
+    ids=["crash", "timeout", "no_exec"],
 )
 async def test_crash_timeout_oserror_fail_closed(outcome, monkeypatch):
-    def fake(cmd, **kw):
-        if isinstance(outcome, Exception):
-            raise outcome
-        return outcome
-
-    monkeypatch.setattr(subprocess, "run", fake)
+    _, killed = _fake_child(monkeypatch, **outcome)
     with pytest.raises(ParseUnavailable):
         await parse_pdf(b"%PDF-1.4")
+    assert killed == (
+        [] if "error" in outcome and isinstance(outcome["error"], OSError) else [4242]
+    )
 
 
 @pytest.mark.parametrize(
@@ -82,11 +104,7 @@ async def test_crash_timeout_oserror_fail_closed(outcome, monkeypatch):
     [b"", b"not json", b'{"text":"x","segments":[],"images":[],"extra":1}', b'{"text":1}'],
 )
 async def test_malformed_child_output_never_partial(stdout, monkeypatch):
-    def fake(cmd, **kw):
-        kw["stdout"].write(stdout)
-        return _Done()
-
-    monkeypatch.setattr(subprocess, "run", fake)
+    _fake_child(monkeypatch, stdout=stdout)
     with pytest.raises(ParseUnavailable):
         await parse_pdf(b"%PDF-1.4")
 
@@ -123,3 +141,41 @@ def test_restrict_denies_network_and_requires_empty_env():
     )
     assert run({}).stdout.strip() == "denied"
     assert run({"X": "1"}).returncode != 0
+
+
+@linux_only
+def test_restrict_applies_prd_resource_limits():
+    code = (
+        "import json, resource, sys; sys.path.insert(0, sys.argv[1]);"
+        "from app.parser.worker import restrict; restrict();"
+        "print(json.dumps([resource.getrlimit(getattr(resource, 'RLIMIT_' + n))[1]"
+        " for n in ('CPU', 'AS', 'FSIZE', 'NOFILE', 'CORE')]))"
+    )
+    run = subprocess.run(
+        [sys.executable, "-I", "-c", code, str(BACKEND)], env={}, capture_output=True, text=True
+    )
+    cpu, memory, fsize, nofile, core = json.loads(run.stdout)
+    assert 0 < cpu <= 30 and memory == 512 * 1024 * 1024  # PRD §16: 30 s / 512 MB
+    assert fsize <= 16 * 1024 * 1024 and nofile <= 64 and core == 0
+
+
+def _alive(pid: int) -> bool:
+    try:
+        state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+    except FileNotFoundError:
+        return False
+    return state != "Z"  # an unreaped zombie holds no CPU, memory or files
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="process groups and /proc are Linux-only")
+async def test_timeout_kills_the_parser_and_everything_it_spawned(tmp_path, monkeypatch):
+    pids = tmp_path / "pids"
+    fake = tmp_path / "hung-parser"
+    fake.write_text(f"#!/bin/sh\n/bin/sleep 60 &\necho $$ $! > {pids}\nwait\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr(sys, "executable", str(fake))
+    monkeypatch.setattr("app.parser.TIMEOUT_SECONDS", 1)
+    with pytest.raises(ParseUnavailable):
+        await parse_pdf(b"%PDF-1.4")
+    parser, grandchild = map(int, pids.read_text().split())
+    assert not _alive(parser) and not _alive(grandchild)
