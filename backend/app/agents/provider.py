@@ -21,7 +21,7 @@ class ProviderUnavailable(ValueError):
 def selected_llm(settings) -> tuple[str, str]:
     """The reviewed (provider, model) the LLM_* settings select; anything else fails closed."""
     try:
-        return select(
+        llm = select(
             {
                 "LLM_PROVIDER": settings.llm_provider,
                 "LLM_MODEL_EXTRACT": settings.llm_model_extract,
@@ -30,6 +30,10 @@ def selected_llm(settings) -> tuple[str, str]:
         )
     except ValueError:
         raise ProviderUnavailable("unreviewed provider request") from None
+    # Free OpenRouter models may log/train on prompts: demo (sandbox-only, synthetic PDFs) only.
+    if llm[0] == "openrouter" and not settings.demo_enabled:
+        raise ProviderUnavailable("free provider is demo-only (DEMO_ENABLED)")
+    return llm
 
 
 def _request(provider, model, messages, max_output_tokens, api_key):

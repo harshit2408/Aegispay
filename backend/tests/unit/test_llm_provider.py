@@ -249,7 +249,7 @@ async def test_key_is_never_sent_to_the_wrong_provider(pg_url, selection, key):
 def test_selection_follows_settings_and_unknown_values_fail_closed():
     base = {"database_url": "sqlite+aiosqlite:///:memory:"}
     assert Settings(**base).llm_provider == ""
-    ok = Settings(**base, llm_provider="openrouter", llm_model_extract=ROUTER[1])
+    ok = Settings(**base, llm_provider="openrouter", llm_model_extract=ROUTER[1], demo_enabled=True)
     from app.agents.provider import selected_llm
 
     assert selected_llm(Settings(**base)) == OPENAI
@@ -282,6 +282,30 @@ def test_run_is_keyed_to_the_selected_model_and_unreviewed_price_is_refused():
 async def test_governed_analysis_with_unreviewed_selection_never_dispatches(pg_url):
     settings = Settings(
         database_url=pg_url, llm_api_key=KEY, llm_provider="openrouter", llm_model_extract="x:free"
+    )
+    with respx.mock(assert_all_called=False) as router:
+        route = router.route().mock(return_value=httpx.Response(200, json=_body()))
+        with pytest.raises(ProviderUnavailable):
+            governed_analysis(uuid4(), settings=settings, action=lambda complete: complete)
+    assert not route.called
+
+
+def test_free_provider_is_refused_outside_the_demo():
+    """TOOLS.md: free models are demo-only (may log prompts); outside DEMO_ENABLED, fail closed."""
+    from app.agents.provider import selected_llm
+
+    settings = Settings(
+        database_url="sqlite+aiosqlite:///:memory:",
+        llm_provider="openrouter",
+        llm_model_extract=ROUTER[1],
+    )
+    with pytest.raises(ProviderUnavailable):
+        selected_llm(settings)
+
+
+async def test_governed_analysis_outside_demo_never_reaches_the_free_provider(pg_url):
+    settings = Settings(
+        database_url=pg_url, llm_api_key=KEY, llm_provider="openrouter", llm_model_extract=ROUTER[1]
     )
     with respx.mock(assert_all_called=False) as router:
         route = router.route().mock(return_value=httpx.Response(200, json=_body()))
