@@ -20,8 +20,10 @@ async def run(args: argparse.Namespace) -> dict:
     config = DemoSeed.model_validate_json(args.config.read_text(encoding="utf-8"))
     serve_resets = getattr(args, "serve_resets", False)
     if not args.apply_db:
-        if args.send_invoices or serve_resets:
-            raise ValueError("--send-invoices and --serve-resets also require --apply-db")
+        if args.send_invoices:
+            raise ValueError("--send-invoices also requires --apply-db")
+        if serve_resets:
+            raise ValueError("--serve-resets also requires --apply-db")
         return manifest_for(config)
     gateway = None
     client = None

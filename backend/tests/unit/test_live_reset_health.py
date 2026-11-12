@@ -3,6 +3,7 @@
 import asyncio
 import json
 from argparse import Namespace
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -103,14 +104,17 @@ async def live(pg_url, pg_sessionmaker, tmp_path, monkeypatch):
         get_settings.cache_clear()
 
 
+@asynccontextmanager
 async def login(app, name):
-    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://test")
-    result = await client.post(
-        "/api/auth/login", json={"operator_id": "demo-" + name, "password": PASSWORD}
-    )
-    assert result.status_code == 200, result.text
-    client.headers["X-CSRF-Token"] = result.json()["csrf_token"]
-    return client
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="https://test"
+    ) as client:
+        result = await client.post(
+            "/api/auth/login", json={"operator_id": "demo-" + name, "password": PASSWORD}
+        )
+        assert result.status_code == 200, result.text
+        client.headers["X-CSRF-Token"] = result.json()["csrf_token"]
+        yield client
 
 
 async def active_policy(sessions):
@@ -120,7 +124,7 @@ async def active_policy(sessions):
 
 async def test_live_reset_is_fulfilled_by_the_owner_runner(live):
     app, sessions, *_ = live
-    async with await login(app, "admin") as admin:
+    async with login(app, "admin") as admin:
         first = await admin.post("/api/demo/reset")
         assert first.status_code == 200, first.text
         one = first.json()
@@ -143,7 +147,7 @@ async def test_live_reset_is_fulfilled_by_the_owner_runner(live):
 
 async def test_only_admin_can_reset(live):
     app, sessions, *_ = live
-    async with await login(app, "controller1") as controller:
+    async with login(app, "controller1") as controller:
         assert (await controller.post("/api/demo/reset")).status_code == 403
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="https://test"
@@ -159,7 +163,7 @@ async def test_failed_seed_returns_502_and_records_only_the_error_class(live, mo
         raise RuntimeError("secret-bearing PayPal body must not be recorded")
 
     monkeypatch.setattr(reset_runner, "seed_demo", broken)
-    async with await login(app, "admin") as admin:
+    async with login(app, "admin") as admin:
         response = await admin.post("/api/demo/reset")
     assert response.status_code == 502
     assert "secret" not in response.text
@@ -174,7 +178,7 @@ async def test_pending_request_is_reused_and_times_out_with_504(live, monkeypatc
     stop.set()
     await runner  # no runner is serving: the request stays pending
     monkeypatch.setattr(runtime, "LIVE_RESET_WAIT_SECONDS", 0.15)
-    async with await login(app, "admin") as admin:
+    async with login(app, "admin") as admin:
         assert (await admin.post("/api/demo/reset")).status_code == 504
         assert (await admin.post("/api/demo/reset")).status_code == 504
     async with sessions() as session:
@@ -206,7 +210,7 @@ async def test_stale_request_is_not_pending(live):
 
 async def test_reset_requests_are_throttled_per_session(live):
     app, *_ = live
-    async with await login(app, "admin") as admin:
+    async with login(app, "admin") as admin:
         statuses = [(await admin.post("/api/demo/reset")).status_code for _ in range(11)]
     assert statuses[:10] == [200] * 10
     assert statuses[10] == 429
@@ -241,12 +245,12 @@ async def test_completed_runs_leave_the_grid_but_in_flight_cases_stay(live):
                     status=status,
                 )
             )
-    async with await login(app, "controller1") as controller:
+    async with login(app, "controller1") as controller:
         rows = (await controller.get("/api/executions")).json()
         assert {row["execution_id"] for row in rows} == {"old-done", "old-paying"}
-    async with await login(app, "admin") as admin:
+    async with login(app, "admin") as admin:
         assert (await admin.post("/api/demo/reset")).status_code == 200
-    async with await login(app, "controller1") as controller:
+    async with login(app, "controller1") as controller:
         rows = (await controller.get("/api/executions")).json()
     assert {row["execution_id"] for row in rows} == {"old-paying"}
     async with sessions() as session:  # archived rows still exist; only the grid hides them
@@ -271,7 +275,7 @@ async def test_cli_serve_flag_needs_database_and_once_is_idle_without_a_request(
         serve_resets=True,
         once=True,
     )
-    with pytest.raises(ValueError, match="require --apply-db"):
+    with pytest.raises(ValueError, match="also requires --apply-db"):
         await cli.run(args)
     args.apply_db = True
     assert await cli.run(args) == {"handled_request": None}
@@ -420,7 +424,7 @@ async def test_probe_reports_each_check_independently():
     assert ok == dict.fromkeys(ok, True) and len(ok) == 5
     bad = await settlement_health.probe(
         FakePayPal(token=False, webhooks=()),
-        FakePayPal(fail_get=True),
+        FakePayPal(token=False, fail_get=True),
         probe_settings(vendor_account_email=" buyer@example.TEST "),
     )
     assert bad == dict.fromkeys(bad, False)
@@ -524,7 +528,7 @@ async def test_only_one_reset_runner_may_hold_the_lock(live):
 async def test_concurrent_reset_waiters_are_capped(live, monkeypatch):
     app, *_ = live
     monkeypatch.setattr(demo, "WAITERS", asyncio.Semaphore(0))
-    async with await login(app, "admin") as admin:
+    async with login(app, "admin") as admin:
         assert (await admin.post("/api/demo/reset")).status_code == 429
 
 
