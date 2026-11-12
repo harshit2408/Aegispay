@@ -591,7 +591,7 @@ export interface components {
             audit_anchor: components["schemas"]["AuditAnchorView"];
             /** Duplicate Of Execution Id */
             duplicate_of_execution_id?: string | null;
-            evidence: components["schemas"]["EvidencePack"] | null;
+            evidence: components["schemas"]["EvidenceView"] | null;
             /** Execution Id */
             execution_id: string;
             extraction: components["schemas"]["InvoiceExtraction"] | null;
@@ -686,13 +686,13 @@ export interface components {
             /** Vendor Asserted */
             vendor_asserted: boolean;
         };
-        /** EvidencePack */
-        EvidencePack: {
-            /**
-             * Advisory Recommendation
-             * @enum {string}
-             */
-            advisory_recommendation: "APPROVE" | "SHORT_PAY" | "REJECT" | "NEEDS_INFO";
+        /**
+         * EvidenceView
+         * @description A4 pack as served: the advisory recommendation is withheld on HIGH_RISK cases (R14).
+         */
+        EvidenceView: {
+            /** Advisory Recommendation */
+            advisory_recommendation: ("APPROVE" | "SHORT_PAY" | "REJECT" | "NEEDS_INFO") | null;
             /** Facts */
             facts: components["schemas"]["EvidenceFact"][];
             /** Summary */

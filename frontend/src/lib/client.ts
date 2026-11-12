@@ -21,7 +21,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    const detail = response.status === 409 ? "Case changed, review again." :
+    // Demo 409s are control-state conflicts ("Run S1 before the duplicate scenario"), not stale cases.
+    const detail = response.status === 409 && !path.startsWith("/api/demo/") ? "Case changed, review again." :
       typeof body?.detail === "string" ? body.detail : `API request failed (${response.status})`;
     throw new APIError(response.status, detail);
   }

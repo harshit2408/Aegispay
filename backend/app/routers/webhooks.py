@@ -1,10 +1,11 @@
 """PayPal webhook routes (PRD §9.4, R10, R25).
 
-Order: size cap -> verify from the raw bytes -> check the resource is ours -> dedupe by event id
--> store. A verified webhook is stored as a hint for the settlement process, which confirms it with
-a GET before any money transition; this router writes no money state. Simulator events verify with
-the literal WEBHOOK_ID, are stored `simulated=true` and are never consumed; their routes exist only
-when DEMO_ENABLED (R24). Unverified bodies keep a 2 KB sample only (R25).
+Order: per-app rate limit (60/min, §13) -> size cap -> verify from the raw bytes -> check the
+resource is ours -> dedupe by event id -> store. A verified webhook is stored as a hint for the
+settlement process, which confirms it with a GET before any money transition; this router writes
+no money state. Simulator events verify with the literal WEBHOOK_ID, are stored `simulated=true`
+and are never consumed; their routes exist only when DEMO_ENABLED (R24). Unverified bodies keep a
+2 KB sample only (R25).
 """
 
 import hashlib
@@ -19,6 +20,7 @@ from sqlalchemy import exists, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import bucket_hit
 from app.config import get_settings
 from app.db import get_session
 from app.models.payables import InvoiceExecution, Payout, WebhookEvent
@@ -34,6 +36,7 @@ from app.paypal.webhooks import (
 log = logging.getLogger("aegis.webhooks")
 
 SAMPLE_BYTES = 2048
+PER_APP_PER_MINUTE = 60
 KEPT_HEADERS = (
     "paypal-transmission-id",
     "paypal-transmission-time",
@@ -117,6 +120,13 @@ async def receive(
     verifier: WebhookVerifier,
     webhook_ids: dict[str, str],
 ) -> Response:
+    # Counted before reading or verifying, so a flood cannot spend PayPal verification calls.
+    # PayPal retries non-2xx deliveries and the reconciler polls, so a 429 only delays a hint.
+    bucket = f"webhook:{app}:{'simulated' if simulated else 'live'}"
+    if await bucket_hit(session, bucket, datetime.now(UTC)) > PER_APP_PER_MINUTE:
+        await session.commit()
+        raise HTTPException(429, "webhook rate limited")
+    await session.commit()
     raw = await _read_capped(request)
     try:
         await verifier.verify(

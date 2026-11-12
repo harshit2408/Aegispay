@@ -108,6 +108,7 @@ def build_graph(
     transition,
     replay_reader=None,
     notify=None,
+    investigator=None,
     vendor_new_days=7,
     max_vendor_invoices=5,
 ):
@@ -192,9 +193,19 @@ def build_graph(
             )
         }
 
-    def investigate(state: GraphState):
-        # shortcut: A4 evidence is unavailable until the P3-01 investigator lands.
-        return {"evidence": None}
+    async def investigate(state: GraphState):
+        # A4 is advisory (R3): any failure means "investigation unavailable", never a freeze.
+        if investigator is None:
+            return {"evidence": None}
+        try:
+            return {"evidence": await investigator(state["execution_id"], state)}
+        except Exception as exc:
+            log.warning(
+                "investigate failed execution_id=%s error=%s",
+                state["execution_id"],
+                type(exc).__name__,
+            )
+            return {"evidence": None}
 
     def short_pay_decide(state: GraphState):
         if state.get("match_failure"):

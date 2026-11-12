@@ -6,7 +6,7 @@ import httpx
 import pytest
 from argon2 import PasswordHasher
 from fastapi import FastAPI
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from app.auth import COOKIE, token_hash
 from app.db import get_session
@@ -96,6 +96,20 @@ async def test_persistent_throttle_and_account_lockout(auth_client):
             "/api/auth/login", json={"operator_id": "alice", "password": "correct password"}
         )
     ).status_code == 429
+
+
+async def test_five_failures_lock_the_account_for_15_minutes(auth_client, pg_sessionmaker):
+    for _ in range(5):
+        await auth_client.post("/api/auth/login", json={"operator_id": "alice", "password": "x"})
+    async with pg_sessionmaker() as session, session.begin():
+        alice = await session.get(Operator, "alice")
+        remaining = alice.locked_until - datetime.now(UTC)
+        assert timedelta(minutes=14) < remaining <= timedelta(minutes=15)
+        await session.execute(delete(AuthAttempt))  # the 1-minute IP/account window has passed
+    response = await auth_client.post(
+        "/api/auth/login", json={"operator_id": "alice", "password": "correct password"}
+    )
+    assert response.status_code == 401 and "set-cookie" not in response.headers
 
 
 @pytest.mark.parametrize(

@@ -95,7 +95,7 @@ export function CaseDetails({ data, preview = false, decisionControls }: {
         </article>
         <h3>Investigator facts</h3>
         {data.evidence?.facts.map((fact) => <article className="quoted-fact" key={fact.tool_call_id}><p>{fact.claim} {fact.vendor_asserted && <span className="case-badge warning">Vendor-asserted</span>}</p><blockquote>{fact.excerpt}</blockquote><p className="muted">Tool-call ID: <code>{fact.tool_call_id}</code></p></article>)}
-        {!highRisk && data.evidence && <p>Advisory recommendation: {data.evidence.advisory_recommendation}</p>}
+        {!highRisk && data.evidence?.advisory_recommendation && <p>Advisory recommendation: {data.evidence.advisory_recommendation}</p>}
       </section>
 
       <section className="case-pane money-pane" aria-labelledby="money-title">

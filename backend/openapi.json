@@ -382,7 +382,7 @@
           "evidence": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EvidencePack"
+                "$ref": "#/components/schemas/EvidenceView"
               },
               {
                 "type": "null"
@@ -766,17 +766,25 @@
         "title": "EvidenceFact",
         "type": "object"
       },
-      "EvidencePack": {
+      "EvidenceView": {
+        "description": "A4 pack as served: the advisory recommendation is withheld on HIGH_RISK cases (R14).",
         "properties": {
           "advisory_recommendation": {
-            "enum": [
-              "APPROVE",
-              "SHORT_PAY",
-              "REJECT",
-              "NEEDS_INFO"
+            "anyOf": [
+              {
+                "enum": [
+                  "APPROVE",
+                  "SHORT_PAY",
+                  "REJECT",
+                  "NEEDS_INFO"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Advisory Recommendation",
-            "type": "string"
+            "title": "Advisory Recommendation"
           },
           "facts": {
             "items": {
@@ -795,7 +803,7 @@
           "facts",
           "advisory_recommendation"
         ],
-        "title": "EvidencePack",
+        "title": "EvidenceView",
         "type": "object"
       },
       "ExecutionRow": {

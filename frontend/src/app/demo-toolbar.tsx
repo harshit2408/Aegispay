@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { components } from "@/lib/api";
 import { api } from "@/lib/client";
-import { demoMode } from "@/lib/demo-display";
+import { demoFailure, demoMode, showsDemoToolbar } from "@/lib/demo-display";
 import { useSession } from "./session";
 
 export function DemoWorkspace() {
@@ -22,38 +22,54 @@ export function DemoWorkspace() {
     {mode?.enabled && <div className="sandbox-banner">SANDBOX DEMO · Supplier and purchasing records include simulation</div>}
     {mode?.replayed && <div className="replay-banner">REPLAY · Recorded responses · No live money movement</div>}
     {error && <p role="status">{error} <button type="button" onClick={() => setAttempt((value) => value + 1)}>Retry demo status</button></p>}
-    {!error && mode?.enabled && operator && !busy && ["admin", "controller"].includes(operator.role) &&
-      <DemoControls key={`${operator.operator_id}:${operator.csrf_token}`} operator={operator} replayed={mode.replayed} />}
+    {!error && mode && operator && !busy && showsDemoToolbar(mode, operator.role) &&
+      <DemoControls key={`${operator.operator_id}:${operator.csrf_token}`} csrfToken={operator.csrf_token} replayed={mode.replayed} />}
   </>;
 }
 
-function DemoControls({ operator, replayed }: { operator: components["schemas"]["SessionView"]; replayed: boolean }) {
+const LIVE_ONLY_REASON = "Replay only: live detector and scenario admission are not available on this server. Upload invoices from the Inbox as a controller.";
+
+function DemoControls({ csrfToken, replayed }: { csrfToken: string; replayed: boolean }) {
   const [control, setControl] = useState<components["schemas"]["DemoControlView"]>();
   const [receipt, setReceipt] = useState<components["schemas"]["DocumentReceipt"]>();
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState("");
   const [message, setMessage] = useState("");
-  async function run(action: () => Promise<void>) {
+  const [failure, setFailure] = useState("");
+  async function run(label: string, action: () => Promise<string>) {
     if (pending) return;
-    setPending(true); setMessage(""); setReceipt(undefined);
-    try { await action(); } catch (error) { setMessage(error instanceof Error ? error.message : "Demo action could not be confirmed."); }
-    finally { setPending(false); }
+    setPending(label); setMessage(""); setFailure(""); setReceipt(undefined);
+    try { setMessage(await action()); } catch (error) { setFailure(demoFailure(error)); }
+    finally { setPending(""); }
   }
-  return <section className="demo-controls" aria-label={operator.role === "admin" ? "Demo toolbar" : "Replay scenario runner"} aria-busy={pending}>
-    <h2>{operator.role === "admin" ? "Demo toolbar" : "Replay scenario runner"}</h2>
-    {!replayed && <p>Live reset and scenario orchestration are not yet connected. Use the owner sandbox runbook.</p>}
-    {operator.role === "admin" ? <>
-      <p>Reset starts a new run. Forensics state applies to newly run scenarios only.</p>
-      <div className="studio-toolbar">
-        <button type="button" disabled={pending || !replayed} onClick={() => void run(async () => { setControl(await api.resetDemo(operator.csrf_token)); setMessage("New replay run ready. Existing payment history is preserved."); })}>Reset run</button>
-        <button type="button" disabled={pending || !replayed} onClick={() => void run(async () => { setControl(await api.setDetector(true, operator.csrf_token)); setMessage("Forensics detector ON for new scenarios."); })}>Forensics detector ON</button>
-        <button type="button" disabled={pending || !replayed} onClick={() => void run(async () => { setControl(await api.setDetector(false, operator.csrf_token)); setMessage("Forensics detector OFF for new scenarios. Payee remains locked."); })}>Forensics detector OFF</button>
-      </div>
-      <p>Sign in as a controller to run S1–S4. Scenario upload identity stays separate from administration.</p>
-      {control && <p>Run {control.run_id} · Detector {control.detector_enabled ? "ON" : "OFF"}</p>}
-    </> : <div className="studio-toolbar">{(["S1", "S2", "S3", "S4"] as const).map((scenario) =>
-      <button key={scenario} type="button" disabled={pending || !replayed} onClick={() => void run(async () => { setReceipt(await api.runScenario(scenario, operator.csrf_token)); setMessage(`${scenario} admitted. Open the case for server results.`); })}>Run {scenario}</button>)}
-    </div>}
-    <p role="status">{message}</p>
+  const detector = control?.detector_enabled;
+  return <section className="demo-controls" aria-labelledby="demo-toolbar-title" aria-busy={Boolean(pending)}>
+    <h2 id="demo-toolbar-title">Demo toolbar</h2>
+    <p>Mode: <strong>{replayed ? "REPLAY (recorded sandbox responses)" : "LIVE sandbox"}</strong>. Reset starts a new run; payment history is preserved. Forensics state applies to newly run scenarios only.</p>
+    <div className="studio-toolbar">
+      <button type="button" disabled={Boolean(pending)} onClick={() => void run(replayed ? "Resetting replay run…" : "Resetting: waiting for the owner reset runner (up to 25 s)…", async () => {
+        const view = await api.resetDemo(csrfToken);
+        setControl(view);
+        return `Run ${view.run_id} ready${view.previous_run_id ? `, replacing ${view.previous_run_id}` : ""}. Detector ON.`;
+      })}>Reset run</button>
+      {([true, false] as const).map((enabled) =>
+        <button key={String(enabled)} type="button" aria-pressed={detector === enabled} aria-describedby={replayed ? undefined : "demo-live-reason"}
+          disabled={Boolean(pending) || !replayed} onClick={() => void run(`Turning forensics detector ${enabled ? "ON" : "OFF"}…`, async () => {
+            setControl(await api.setDetector(enabled, csrfToken));
+            return enabled ? "Forensics detector ON for new scenarios." : "Forensics detector OFF for new scenarios. Payee remains locked.";
+          })}>Forensics detector {enabled ? "ON" : "OFF"}</button>)}
+    </div>
+    <div className="studio-toolbar">
+      {(["S1", "S2", "S3", "S4"] as const).map((scenario) =>
+        <button key={scenario} type="button" aria-describedby={replayed ? undefined : "demo-live-reason"} disabled={Boolean(pending) || !replayed}
+          onClick={() => void run(`Running ${scenario}…`, async () => {
+            setReceipt(await api.runScenario(scenario, csrfToken));
+            return `${scenario} admitted. Open the case for server results.`;
+          })}>Run {scenario}</button>)}
+    </div>
+    {!replayed && <p id="demo-live-reason">{LIVE_ONLY_REASON}</p>}
+    {control && <p>Run {control.run_id} · Detector {control.detector_enabled ? "ON" : "OFF"} (server confirmed)</p>}
+    <p role="status">{pending || message}</p>
+    <p role="alert">{failure}</p>
     {receipt && <p><Link href={`/cases/${encodeURIComponent(receipt.execution_id)}`}>Open scenario case</Link>
       {receipt.duplicate_of_execution_id && <> · <Link href={`/cases/${encodeURIComponent(receipt.duplicate_of_execution_id)}`}>Open original execution</Link></>}</p>}
   </section>;

@@ -20,8 +20,8 @@ export function JudgeGuide() {
           <p>REPLAY identifies recorded responses with no live money movement. SANDBOX DEMO identifies demo mode. A simulated webhook is never proof of payment; settlement requires server confirmation.</p>
           <p>In this demo, the Vendor Simulator holds the supplier app credentials to issue invoices, provide read access and reconcile after payment. In production the supplier controls that account. Model tools have read access only. The supplier portal is a simulator.</p>
           <h3>Operator access</h3>
-          <p>Use the named operator ID and password supplied by the demo owner. Passwords are never published here. A controller uploads; a different eligible controller or CFO reviews. Admin resets replay runs and changes detector state; the controller runs scenarios.</p>
-          <p>To rehearse S1–S4, an admin resets the run, then a controller runs each scenario from the replay runner. S4 links its original S1 case. Turn the detector OFF as admin before a new S3 run to see the independent payee lock.</p>
+          <p>Use the named operator ID and password supplied by the demo owner. Passwords are never published here. A controller uploads; a different eligible controller or CFO reviews. Admin owns the demo toolbar: reset, scenario runs and detector state. Admin can never approve.</p>
+          <p>To rehearse S1–S4, an admin resets the run, then runs each scenario from the demo toolbar; a controller or CFO reviews the cases. S4 links its original S1 case. Turn the detector OFF as admin before a new S3 run to see the independent payee lock.</p>
         </section>
       </div>
     </details>

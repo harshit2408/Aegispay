@@ -20,8 +20,17 @@ test("S1–S4 replay uses real authenticated routes, graph decisions and browser
     const reset = await admin.post(`${apiURL}/api/demo/reset`, { headers: { "X-CSRF-Token": adminCSRF } });
     expect(reset.ok(), await reset.text()).toBeTruthy();
     expect((await reset.json()).replayed).toBe(true);
+    // PRD §14.5: scenario runs belong to the admin-only demo toolbar.
+    const denied = await controller.post(`${apiURL}/api/demo/scenarios/S1/run`, { headers: { "X-CSRF-Token": controllerCSRF } });
+    expect(denied.status()).toBe(403);
+
+    const health = await admin.get(`${apiURL}/api/health`);
+    expect(health.ok(), await health.text()).toBeTruthy();
+    expect(await health.json()).toMatchObject({ demo_enabled: true, replay_mode: true });
 
     await page.goto("/");
+    // Persistent global REPLAY indicator, driven by the health flag (R24, PRD §16 Honesty).
+    await expect(page.locator(".replay-banner").filter({ hasText: /^REPLAY · / }).first()).toBeVisible();
     await page.getByText("Operator sign in", { exact: true }).click();
     await page.getByLabel("Operator ID", { exact: true }).fill("demo-cfo");
     await page.getByLabel("Password", { exact: true }).fill(password);
@@ -34,8 +43,8 @@ test("S1–S4 replay uses real authenticated routes, graph decisions and browser
       ["S2", "SHORT_PAY", "$425.00"],
       ["S3", "FREEZE", "$400.00"],
     ]) {
-      const response = await controller.post(`${apiURL}/api/demo/scenarios/${scenario}/run`, {
-        headers: { "X-CSRF-Token": controllerCSRF },
+      const response = await admin.post(`${apiURL}/api/demo/scenarios/${scenario}/run`, {
+        headers: { "X-CSRF-Token": adminCSRF },
       });
       expect(response.status(), await response.text()).toBe(202);
       const receipt = await response.json();
@@ -61,8 +70,8 @@ test("S1–S4 replay uses real authenticated routes, graph decisions and browser
       }
     }
 
-    const duplicate = await controller.post(`${apiURL}/api/demo/scenarios/S4/run`, {
-      headers: { "X-CSRF-Token": controllerCSRF },
+    const duplicate = await admin.post(`${apiURL}/api/demo/scenarios/S4/run`, {
+      headers: { "X-CSRF-Token": adminCSRF },
     });
     expect(duplicate.status(), await duplicate.text()).toBe(202);
     const receipt = await duplicate.json();
@@ -77,8 +86,8 @@ test("S1–S4 replay uses real authenticated routes, graph decisions and browser
       headers: { "X-CSRF-Token": adminCSRF }, data: { enabled: false },
     });
     expect(disabled.ok(), await disabled.text()).toBeTruthy();
-    const fallback = await controller.post(`${apiURL}/api/demo/scenarios/S3/run`, {
-      headers: { "X-CSRF-Token": controllerCSRF },
+    const fallback = await admin.post(`${apiURL}/api/demo/scenarios/S3/run`, {
+      headers: { "X-CSRF-Token": adminCSRF },
     });
     expect(fallback.status(), await fallback.text()).toBe(202);
     await page.goto(`/cases/${(await fallback.json()).execution_id}`);

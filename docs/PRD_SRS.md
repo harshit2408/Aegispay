@@ -1239,7 +1239,7 @@ All routes except `/api/health`, `/api/auth/login` and the PayPal webhook routes
 | `GET` | `/api/vendor-sim/invoices` | any | Supplier-side view of invoices, payments and notices (no risk or gate data) |
 | `POST` | `/api/vendor-sim/notices/{notice_id}/respond` | any | Accept / contest (P1: triggers the Vendor Agent) |
 | `POST` | `/api/demo/reset` | admin, **only if `DEMO_ENABLED`** | New run suffix; recreate PayPal invoices, PDFs, POs, GRNs; mark executions archived (audit chain kept) |
-| `POST` | `/api/demo/scenarios/{scenario_id}/run` | controller, **only if `DEMO_ENABLED`** | Feed the seeded PDF for S1–S5 into `/api/documents` |
+| `POST` | `/api/demo/scenarios/{scenario_id}/run` | admin (§14.5 toolbar; admin cannot approve, R18), **only if `DEMO_ENABLED`**; replay mode only until live scenario admission exists | Feed the seeded PDF for S1–S5 into `/api/documents` |
 | `POST` | `/api/demo/forensics-detector` | admin, **only if `DEMO_ENABLED`** | `{enabled: bool}` for the kill-switch proof; recorded on each execution |
 | `GET` | `/api/health` | — | DB, both OAuth tokens (settlement reports its own), both webhook registrations, distinct accounts (R12), demo/replay flags, halt state, last anchor age |
 
