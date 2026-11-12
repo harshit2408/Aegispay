@@ -1,5 +1,6 @@
 """Demo controls and replay scenarios, gated by mode, role and session CSRF (R24–R25)."""
 
+import asyncio
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import COOKIE, roles, token_hash
 from app.config import get_settings
 from app.db import get_session
+from app.demo import runtime
 from app.demo.runtime import DemoUnavailable, admit, control
 from app.models.core import Operator
 from app.routers.documents import DocumentReceipt
@@ -20,6 +22,7 @@ def enabled():
 
 
 router = APIRouter(prefix="/api/demo", tags=["demo"], dependencies=[Depends(enabled)])
+WAITERS = asyncio.Semaphore(4)  # bounds concurrent live-reset waits per API process
 Session = Annotated[AsyncSession, Depends(get_session)]
 
 
@@ -47,13 +50,55 @@ def unavailable(error):
     return HTTPException(code, str(error))
 
 
+async def live_reset(request: Request, session: AsyncSession, actor: Operator):
+    """Queue a reset for the owner runner and wait for it; the API never seeds trust roots."""
+    if WAITERS.locked():
+        raise HTTPException(429, "Too many reset requests are already waiting")
+    async with WAITERS:
+        return await _live_reset(request, session, actor)
+
+
+async def _live_reset(request: Request, session: AsyncSession, actor: Operator):
+    try:
+        request_id = await runtime.request_live_reset(
+            session, actor.operator_id, bucket=token_hash(request.cookies[COOKIE])
+        )
+    except DemoUnavailable as error:
+        await session.rollback()
+        raise unavailable(error) from None
+    outcome = await runtime.wait_for_reset(
+        session,
+        request_id,
+        timeout=runtime.LIVE_RESET_WAIT_SECONDS,
+        interval=runtime.LIVE_RESET_POLL_SECONDS,
+    )
+    if outcome is None:
+        raise HTTPException(504, "Reset pending: the owner reset runner has not finished")
+    kind, payload = outcome
+    run_id = payload.get("run_id")
+    if (
+        kind != runtime.RESET_DONE
+        or not isinstance(run_id, str)
+        or not runtime.RUN_ID.fullmatch(run_id)
+    ):
+        raise HTTPException(502, "Reset failed in the owner reset runner")
+    previous = payload.get("previous_run_id")
+    return DemoControlView(
+        run_id=run_id,
+        detector_enabled=True,
+        previous_run_id=previous if isinstance(previous, str) else None,
+        replayed=False,
+    )
+
+
 @router.post("/reset", response_model=DemoControlView)
 async def reset(
     request: Request,
     session: Session,
     actor: Annotated[Operator, Depends(roles("admin"))],
 ):
-    replay_settings()
+    if not get_settings().demo_replay_mode:
+        return await live_reset(request, session, actor)
     try:
         return await control(session, actor.operator_id, bucket=token_hash(request.cookies[COOKIE]))
     except DemoUnavailable as error:

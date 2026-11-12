@@ -8,6 +8,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.db import get_sessionmaker
+from app.demo import reset_runner
 from app.demo.seeder import DemoSeed, assert_demo, manifest_for, seed_demo
 from app.paypal.client import PayPalClient
 from app.vendor_sim.gateway import VendorGateway
@@ -17,9 +18,12 @@ async def run(args: argparse.Namespace) -> dict:
     settings = Settings(_env_file=None)
     assert_demo(settings)
     config = DemoSeed.model_validate_json(args.config.read_text(encoding="utf-8"))
+    serve_resets = getattr(args, "serve_resets", False)
     if not args.apply_db:
         if args.send_invoices:
             raise ValueError("--send-invoices also requires --apply-db")
+        if serve_resets:
+            raise ValueError("--serve-resets also requires --apply-db")
         return manifest_for(config)
     gateway = None
     client = None
@@ -37,6 +41,21 @@ async def run(args: argparse.Namespace) -> dict:
         )
         gateway = VendorGateway(Invoicing(client))
     try:
+        if serve_resets:
+            sessions = get_sessionmaker(settings.database_url)
+            options = {
+                "template": config,
+                "settings": settings,
+                "manifest_dir": args.manifest_dir,
+                "gateway": gateway,
+            }
+            if getattr(args, "once", False):
+                async with reset_runner.exclusive(sessions):
+                    return {
+                        "handled_request": await reset_runner.process_pending(sessions, **options)
+                    }
+            await reset_runner.serve(sessions, **options)
+            return {"stopped": True}
         return await seed_demo(
             get_sessionmaker(settings.database_url),
             config=config,
@@ -60,6 +79,14 @@ def main() -> None:
     parser.add_argument("--manifest-dir", type=Path, default=Path(".demo-runs"))
     parser.add_argument("--apply-db", action="store_true")
     parser.add_argument("--send-invoices", action="store_true")
+    parser.add_argument(
+        "--serve-resets",
+        action="store_true",
+        help="owner-side loop that fulfils POST /api/demo/reset requests with a fresh run suffix",
+    )
+    parser.add_argument(
+        "--once", action="store_true", help="with --serve-resets: handle one request"
+    )
     manifest = asyncio.run(run(parser.parse_args()))
     sys.stdout.write(json.dumps(manifest, indent=2) + "\n")
 

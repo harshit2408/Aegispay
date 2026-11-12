@@ -8,8 +8,10 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import require_operator, roles
+from app.config import get_settings
 from app.db import get_session
 from app.decision.dispatch import DecisionConflict, DispatchUnavailable
+from app.demo.runtime import archive_filter
 from app.models.core import GoodsReceipt, MandatePolicy, Operator, PurchaseOrder, VendorMaster
 from app.models.payables import (
     Approval,
@@ -107,12 +109,16 @@ async def _live_invoice_status(request: Request, row, stored: str | None) -> str
 
 @router.get("", response_model=list[ExecutionRow], operation_id="list_executions")
 async def list_executions(session: Session, viewer: Viewer):
-    result = await session.execute(
+    query = (
         select(InvoiceExecution, VendorMaster.vendor_name)
         .outerjoin(VendorMaster, VendorMaster.vendor_id == InvoiceExecution.vendor_id)
         .order_by(InvoiceExecution.created_at.desc(), InvoiceExecution.execution_id)
         .limit(200)
     )
+    archived = await archive_filter(session, get_settings())
+    if archived is not None:
+        query = query.where(~archived)
+    result = await session.execute(query)
     return [
         ExecutionRow(
             execution_id=row.execution_id,

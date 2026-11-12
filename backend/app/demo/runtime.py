@@ -10,7 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from reportlab.pdfgen import canvas
-from sqlalchemy import select, text, union_all
+from sqlalchemy import and_, false, func, or_, select, text, union_all
 
 from app.audit.events import enqueue_event
 from app.decision.match import normalize_invoice_number
@@ -23,6 +23,19 @@ from app.vendor_sim.gateway import Invoice, InvoiceItem
 
 class DemoUnavailable(ValueError):
     pass
+
+
+RESET_REQUEST = "DEMO_RESET_REQUEST"
+RESET_DONE = "DEMO_RESET_DONE"
+RESET_FAILED = "DEMO_RESET_FAILED"
+RESET_STARTED = "DEMO_RESET_STARTED"  # claims a request and fixes its run id, so retries resume
+RESET_EVENTS = (RESET_REQUEST, RESET_STARTED, RESET_DONE, RESET_FAILED)
+RESET_STALE = timedelta(minutes=10)
+LIVE_RESET_WAIT_SECONDS = 25.0
+LIVE_RESET_POLL_SECONDS = 0.5
+RUN_ID = re.compile(r"[a-z0-9-]{1,12}")
+# Only cases needing no action leave the grid; in-flight or manual-review cases stay visible.
+ARCHIVABLE_STATUSES = ("SETTLED", "REJECTED", "DUPLICATE_BLOCKED")
 
 
 async def latest_control(session):
@@ -84,16 +97,133 @@ async def control(session, actor, *, bucket, detector_enabled=None):
     return {**state, "previous_run_id": previous, "replayed": True}
 
 
+async def _reset_events(session):
+    events = union_all(
+        select(AuditQueue.ts, AuditQueue.event_type, AuditQueue.payload).where(
+            AuditQueue.execution_id == "demo-control", AuditQueue.event_type.in_(RESET_EVENTS)
+        ),
+        select(ExecutionEvent.ts, ExecutionEvent.event_type, ExecutionEvent.payload).where(
+            ExecutionEvent.execution_id == "demo-control",
+            ExecutionEvent.event_type.in_(RESET_EVENTS),
+        ),
+    ).subquery()
+    return (await session.execute(select(events).order_by(events.c.ts.desc()).limit(50))).all()
+
+
+def _outcome(rows, request_id):
+    for _, kind, payload in rows:
+        if kind in (RESET_DONE, RESET_FAILED) and payload.get("request_id") == request_id:
+            return kind, payload
+    return None
+
+
+def _started_run(rows, request_id):
+    for _, kind, payload in rows:
+        run_id = payload.get("run_id")
+        if (
+            kind == RESET_STARTED
+            and payload.get("request_id") == request_id
+            and isinstance(run_id, str)
+            and RUN_ID.fullmatch(run_id)
+        ):
+            return run_id
+    return None
+
+
+async def pending_reset(session):
+    """Newest live-reset request without an outcome: (request_id, ts, started_run_id) or None."""
+    rows = await _reset_events(session)
+    for ts, kind, payload in rows:
+        if kind != RESET_REQUEST:
+            continue
+        request_id = payload.get("request_id")
+        if not isinstance(request_id, str) or _outcome(rows, request_id) is not None:
+            return None
+        if datetime.now(UTC) - ts >= RESET_STALE:
+            return None
+        return request_id, ts, _started_run(rows, request_id)
+    return None
+
+
+async def request_live_reset(session, actor, *, bucket):
+    """Record one reset request for the owner runner; a pending request is reused, not stacked.
+
+    The API role cannot write POs, GRNs, mandates or vendor identity (R15, R16, R22), so the
+    run itself is recreated by the owner-credentialed runner (python -m app.demo --serve-resets).
+    """
+    await session.execute(text("SELECT pg_advisory_xact_lock(9140013)"))
+    await throttle(session, bucket)  # same limit whether or not a request is already pending
+    pending = await pending_reset(session)
+    if pending is not None:
+        await session.commit()
+        return pending[0]
+    request_id = uuid4().hex
+    await enqueue_event(
+        session,
+        execution_id="demo-control",
+        actor=actor,
+        event_type=RESET_REQUEST,
+        payload={"request_id": request_id, "session_hash": bucket},
+    )
+    await session.commit()
+    return request_id
+
+
+async def wait_for_reset(session, request_id, *, timeout, interval):
+    """Poll in short transactions (never holding a lock) for the runner's outcome."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while True:
+        outcome = _outcome(await _reset_events(session), request_id)
+        await session.rollback()
+        if outcome is not None or loop.time() >= deadline:
+            return outcome
+        await asyncio.sleep(interval)
+
+
+async def archive_filter(session, settings):
+    """Derived 'archived' (PRD §13 reset): earlier demo runs leave the grid; rows and audit stay."""
+    if not settings.demo_enabled:
+        return None
+    clauses = []
+    settled = InvoiceExecution.status.in_(ARCHIVABLE_STATUSES)
+    active = await session.scalar(select(MandatePolicy.policy_id).where(MandatePolicy.is_active))
+    if active and active.startswith("demo-"):
+        clauses.append(
+            and_(
+                settled,
+                InvoiceExecution.policy_id.startswith("demo-"),
+                InvoiceExecution.policy_id != active,
+            )
+        )
+    if settings.demo_replay_mode:
+        try:
+            run_id = (await latest_control(session))["run_id"]
+        except DemoUnavailable:
+            run_id = None
+        if run_id:
+            clauses.append(
+                and_(
+                    settled,
+                    InvoiceExecution.replayed.is_(True),
+                    ~InvoiceExecution.execution_id.startswith(f"demo-{run_id}-"),
+                )
+            )
+    return func.coalesce(or_(*clauses), false()) if clauses else None
+
+
 async def throttle(session, bucket):
     since = datetime.now(UTC) - timedelta(minutes=1)
     events = union_all(
         select(AuditQueue.queue_seq).where(
-            AuditQueue.event_type.in_(("DEMO_RUN", "DEMO_RESET", "DEMO_DETECTOR")),
+            AuditQueue.event_type.in_(("DEMO_RUN", "DEMO_RESET", "DEMO_DETECTOR", RESET_REQUEST)),
             AuditQueue.ts >= since,
             AuditQueue.payload["session_hash"].astext == bucket,
         ),
         select(ExecutionEvent.event_seq).where(
-            ExecutionEvent.event_type.in_(("DEMO_RUN", "DEMO_RESET", "DEMO_DETECTOR")),
+            ExecutionEvent.event_type.in_(
+                ("DEMO_RUN", "DEMO_RESET", "DEMO_DETECTOR", RESET_REQUEST)
+            ),
             ExecutionEvent.ts >= since,
             ExecutionEvent.payload["session_hash"].astext == bucket,
         ),

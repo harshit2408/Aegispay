@@ -118,6 +118,8 @@ class SettlementSettings(_PayPalSettings):
     vendor_client_id: str = Field(min_length=1, repr=False)
     vendor_client_secret: SecretStr = Field(min_length=1)
     vendor_account_email: str = Field(min_length=1, repr=False)
+    treasury_webhook_id: str = ""
+    vendor_webhook_id: str = ""
     audit_hmac_key: SecretStr = Field(min_length=32)
     audit_anchor_repo: str = Field(default="", repr=False)
     audit_anchor_token: SecretStr | None = None

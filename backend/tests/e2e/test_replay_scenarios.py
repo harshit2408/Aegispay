@@ -17,6 +17,7 @@ from app.decision.analyze import build_analyzer
 from app.decision.approve import approve_for_payment
 from app.decision.dispatch import Dispatcher
 from app.decision.graph import build_graph
+from app.demo import runtime
 from app.demo.runtime import DemoUnavailable, ReplayReader
 from app.demo.seeder import OPERATORS, DemoSeed, seed_demo
 from app.models.payables import InvoiceExecution, POLedger, SettlementOutbox, SpendLedger
@@ -175,8 +176,12 @@ async def test_demo_disabled_and_live_mode_fail_closed(replay_app, monkeypatch):
         await login(client, "admin", password)
         monkeypatch.setenv("DEMO_REPLAY_MODE", "false")
         get_settings.cache_clear()
-        response = await client.post("/api/demo/reset")
-        assert response.status_code == 503
+        monkeypatch.setattr(runtime, "LIVE_RESET_WAIT_SECONDS", 0.05)
+        # Live reset is owner-runner work: with no runner the request stays pending (504)...
+        assert (await client.post("/api/demo/reset")).status_code == 504
+        # ...and live mode still refuses the replay-only controls.
+        detector = await client.post("/api/demo/forensics-detector", json={"enabled": True})
+        assert detector.status_code == 503
         monkeypatch.setenv("DEMO_ENABLED", "false")
         get_settings.cache_clear()
         assert (await client.post("/api/demo/reset")).status_code == 404
