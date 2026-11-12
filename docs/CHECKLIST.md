@@ -107,7 +107,7 @@ The [[PLAN]] explains the why; this file is the state.
 
 ## P3 — Agents, auth, deploy (Nov 3–6) · exit: **hosted S1–S4 green on Render**; rough-cut video Nov 5
 
-- [ ] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2) (WIP A) (PARTIAL: reviewed module merged in PR #37 — 2fc54e8; graph wiring and eval cases remain)
+- [x] **P3-01** @A A4 Investigator: read-only Agent Toolkit tools, ≤ 6 calls, citation validator; startup assertion over tool names (R2) — 38f1327 (#54) + e398b0d (#59; A4 wired at risk ≥ 30, 4 case-pinned read-only tools asserted at boot, vendor_asserted tagging, 60 s node timeout, recommendation withheld on HIGH_RISK; 45 scripted eval cases in EVAL.md, no live-model run)
 - [ ] **P3-02** @A A5 Notice drafter: numbers filled by template; vendor accept/contest flow (WIP A) (PARTIAL: reviewed drafter merged in PR #38 — db942a3; graph/eval wiring and vendor accept/contest flow remain)
 - [x] **P3-03** @A Operator auth (controller, cfo, admin), httpOnly session, rate limits, CORS to frontend origin only — b7f26ce (#46; authenticated role/CSRF/session/CORS regressions verified in the 1153-test backend run)
 - [ ] **P3-04** @B `render.yaml` + deploy by **Nov 4**; single worker; uptime ping on `/api/health` (WIP B) (BLOCKED: blueprint ready; owner will supply hosted URLs and uptime evidence)
