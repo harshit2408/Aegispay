@@ -1,11 +1,11 @@
 """PayPal webhook routes (PRD §9.4, R10, R25).
 
-Order: per-app rate limit (60/min, §13) -> size cap -> verify from the raw bytes -> check the
-resource is ours -> dedupe by event id -> store. A verified webhook is stored as a hint for the
-settlement process, which confirms it with a GET before any money transition; this router writes
-no money state. Simulator events verify with the literal WEBHOOK_ID, are stored `simulated=true`
-and are never consumed; their routes exist only when DEMO_ENABLED (R24). Unverified bodies keep a
-2 KB sample only (R25).
+Order: PayPal headers present -> per-app rate limit (60/min, §13) -> size cap -> verify from
+the raw bytes -> check the resource is ours -> dedupe by event id -> store. A verified webhook is
+stored as a hint for the settlement process, which confirms it with a GET before any money
+transition; this router writes no money state. Simulator events verify with the literal
+WEBHOOK_ID, are stored `simulated=true` and are never consumed; their routes exist only when
+DEMO_ENABLED (R24). Unverified bodies keep a 2 KB sample only (R25).
 """
 
 import hashlib
@@ -43,6 +43,7 @@ KEPT_HEADERS = (
     "paypal-auth-algo",
     "paypal-cert-url",
 )
+REQUIRED_HEADERS = frozenset((*KEPT_HEADERS, "paypal-transmission-sig"))
 SIMULATOR_WEBHOOK_ID = "WEBHOOK_ID"
 APPS = {"treasury": "TREASURY", "vendor": "VENDOR"}
 
@@ -120,11 +121,15 @@ async def receive(
     verifier: WebhookVerifier,
     webhook_ids: dict[str, str],
 ) -> Response:
+    # Header-less junk is refused before it is counted or stored, so it cannot starve signed events.
+    if not all(request.headers.get(name) for name in REQUIRED_HEADERS):
+        raise HTTPException(400, "webhook verification failed")
     # Counted before reading or verifying, so a flood cannot spend PayPal verification calls.
     # PayPal retries non-2xx deliveries and the reconciler polls, so a 429 only delays a hint.
     bucket = f"webhook:{app}:{'simulated' if simulated else 'live'}"
     if await bucket_hit(session, bucket, datetime.now(UTC)) > PER_APP_PER_MINUTE:
         await session.commit()
+        log.warning("ALERT webhook rate limited app=%s simulated=%s", app, simulated)
         raise HTTPException(429, "webhook rate limited")
     await session.commit()
     raw = await _read_capped(request)

@@ -19,7 +19,12 @@ from app.routers.documents import MAX_PDF_BYTES
 from tests.seed import seed_world
 
 # §13: only login and the PayPal-signed webhook routes are reachable without a session.
-CSRF_EXEMPT = ("/api/auth/login", "/api/webhooks/paypal/")
+CSRF_EXEMPT = {
+    "/api/auth/login",
+    "/api/webhooks/paypal/treasury",
+    "/api/webhooks/paypal/vendor",
+    "/api/webhooks/paypal/simulator/{account}",
+}
 
 
 def _calls(dependant):
@@ -46,7 +51,7 @@ def test_every_state_changing_route_requires_csrf():
     missing = [
         route.path
         for route in routes
-        if not route.path.startswith(CSRF_EXEMPT) and require_csrf not in _calls(route.dependant)
+        if route.path not in CSRF_EXEMPT and require_csrf not in _calls(route.dependant)
     ]
     assert missing == []
 
