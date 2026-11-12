@@ -340,6 +340,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/vendor-sim/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Invoices */
+        get: operations["list_vendor_sim_invoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vendor-sim/notices/{notice_id}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Respond To Notice */
+        post: operations["respond_vendor_sim_notice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/vendors/changes/{change_id}/approve": {
         parameters: {
             query?: never;
@@ -569,6 +603,12 @@ export interface components {
             /** Settlement Timeline */
             settlement_timeline: components["schemas"]["SettlementEventView"][];
             short_pay: components["schemas"]["ShortPayDecision"] | null;
+            /**
+             * Short Pay Balance
+             * @default NONE
+             * @enum {string}
+             */
+            short_pay_balance: "NONE" | "NOTICE_SENT" | "ACCEPTED" | "CONTESTED";
             /**
              * Status
              * @enum {string}
@@ -916,6 +956,31 @@ export interface components {
             /** Vendor Version */
             vendor_version: number;
         };
+        /** NoticeReceipt */
+        NoticeReceipt: {
+            /** Notice Id */
+            notice_id: string;
+            /**
+             * Responded At
+             * Format: date-time
+             */
+            responded_at: string;
+            /**
+             * Short Pay Balance
+             * @enum {string}
+             */
+            short_pay_balance: "ACCEPTED" | "CONTESTED";
+        };
+        /** NoticeResponse */
+        NoticeResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "ACCEPT" | "CONTEST";
+            /** Reason */
+            reason?: string | null;
+        };
         /** OperatorView */
         OperatorView: {
             /** Operator Id */
@@ -1128,6 +1193,43 @@ export interface components {
              * @enum {string}
              */
             type: "node" | "settlement" | "webhook";
+        };
+        /** SupplierInvoice */
+        SupplierInvoice: {
+            /** Billed Cents */
+            billed_cents: number | null;
+            /** Invoice Number */
+            invoice_number: string | null;
+            notice: components["schemas"]["SupplierNotice"] | null;
+            /** Paypal Invoice Id */
+            paypal_invoice_id: string;
+            /** Paypal Status */
+            paypal_status: string | null;
+            /** Received Cents */
+            received_cents: number;
+            /** Vendor Name */
+            vendor_name: string | null;
+        };
+        /** SupplierNotice */
+        SupplierNotice: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Delta Cents */
+            delta_cents: number;
+            /** Notice Id */
+            notice_id: string;
+            /** Responded At */
+            responded_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "NOTICE_SENT" | "ACCEPTED" | "CONTESTED";
+            /** Text */
+            text: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -1746,6 +1848,79 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": components["schemas"]["StreamEvent"];
+                };
+            };
+        };
+    };
+    list_vendor_sim_invoices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplierInvoice"][];
+                };
+            };
+        };
+    };
+    respond_vendor_sim_notice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notice_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeResponse"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeReceipt"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["APIError"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

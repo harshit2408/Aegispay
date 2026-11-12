@@ -143,6 +143,8 @@ class CaseDetail(BaseModel):
     risk: RiskAssessment | None
     evidence: EvidencePack | None
     short_pay: ShortPayDecision | None
+    # §12.4: CONTESTED is surfaced to the controller here; NONE until settlement sends the notice.
+    short_pay_balance: Literal["NONE", "NOTICE_SENT", "ACCEPTED", "CONTESTED"] = "NONE"
     gate: GateDecision | None
     approvals: list[ApprovalView]
     settlement_timeline: list[SettlementEventView]

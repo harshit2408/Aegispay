@@ -20,10 +20,17 @@ from app.decision.graph import build_graph
 from app.demo import runtime
 from app.demo.runtime import DemoUnavailable, ReplayReader
 from app.demo.seeder import OPERATORS, DemoSeed, seed_demo
-from app.models.payables import InvoiceExecution, POLedger, SettlementOutbox, SpendLedger
+from app.models.payables import (
+    InvoiceExecution,
+    POLedger,
+    SettlementOutbox,
+    ShortPayNotice,
+    SpendLedger,
+)
 from app.routers import auth, contracts, demo
 from app.settlement.po_ledger import reserve
 from app.settlement.transitions import apply
+from app.vendor_sim.notices import create_notice, governed_drafter
 
 
 @pytest.fixture
@@ -69,6 +76,7 @@ async def replay_app(pg_url, pg_sessionmaker, tmp_path, monkeypatch):
             reader=None,
             replay_reader=recorded,
             transition=apply,
+            notify=partial(create_notice, pg_sessionmaker, governed_drafter(settings)),
             approve=partial(approve_for_payment, pg_sessionmaker, apply, reserve),
         )
         dispatcher = Dispatcher(graph, pg_sessionmaker, postgres_dsn(pg_url))
@@ -123,6 +131,13 @@ async def test_s1_s2_s3_s4_replay_decisions_without_live_money(
                 short_pay = snapshot.values["short_pay"]
                 assert short_pay.expected_cost_pay_and_claim_cents == 6592
                 assert short_pay.expected_cost_short_pay_cents == 1500
+                async with pg_sessionmaker() as session:  # §12.4: replay → template, no LLM
+                    notice = await session.scalar(
+                        select(ShortPayNotice).where(ShortPayNotice.execution_id == execution_id)
+                    )
+                    row = await session.get(InvoiceExecution, execution_id)
+                assert notice.used_fallback and notice.delta_cents == 7500
+                assert "$75.00" in notice.text and row.approved_cents == 42500
             if scenario == "S3":
                 assert snapshot.values["risk"].score == 100
                 assert gate.required_approvals == 2

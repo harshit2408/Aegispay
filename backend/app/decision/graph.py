@@ -104,6 +104,7 @@ def build_graph(
     approve,
     transition,
     replay_reader=None,
+    notify=None,
     vendor_new_days=7,
     max_vendor_invoices=5,
 ):
@@ -325,6 +326,13 @@ def build_graph(
     async def approve_for_payment(state: GraphState):
         await persist_result(state, state["gate"])
         if await approve(state["execution_id"], state):
+            if notify is not None and state["gate"].route == "SHORT_PAY":
+                try:
+                    await notify(state["execution_id"])  # §12.4, idempotent on execution_id
+                except Exception:
+                    # shortcut: payment is already committed, so a notice DB failure only logs;
+                    # add a notice backfill sweep if this is ever seen outside tests.
+                    log.exception("notice failed execution_id=%s", state["execution_id"])
             return {"approval_retry": False}
         if not state.get("approval_retry"):
             return {"approval_retry": True}
