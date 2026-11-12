@@ -137,7 +137,7 @@ The [[PLAN]] explains the why; this file is the state.
 ## P5 — Ship (Nov 9–11) · exit: **submitted Nov 11** (deadline Nov 12 12:00 PT)
 
 - [ ] **P5-01** @A `README.md`: judge quickstart, hosted URL, operator logins, simulation boundary (verbatim §3) (WIP B) (PARTIAL: local replay quickstart, fixture roles, seed CLI and simulation boundary in 0d44084; hosted URL and private hosted access deferred by owner)
-- [ ] **P5-02** @A `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md`, final `docs/EVAL.md` (WIP B) (PARTIAL: current runtime and verified replay evidence reconciled in 6c3a83d/0d44084; final live-model evaluation and sandbox acceptance evidence remain with Dev A)
+- [ ] **P5-02** @A `docs/TOOLS.md`, `docs/SANDBOX_SETUP.md`, final `docs/EVAL.md` (WIP B) (PARTIAL: real sandbox S1–S4 evidence now merged in #48; release documentation refreshed against it; five-run held-out accuracy and A4/A5 evaluation/integration evidence remain with Dev A)
 - [x] **P5-03** @B Judge guide panel in the app — 514b238
 - [ ] **P5-04** @B Final video < 3 min, public on YouTube, captions, no copyrighted music
 - [ ] **P5-05** @AB Code freeze Nov 9 23:59 IST

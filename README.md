@@ -96,7 +96,13 @@ Rules R1–R25 and the threat model live in [PRD §4](docs/PRD_SRS.md). Payee lo
 
 > In production, the supplier's PayPal account belongs to the supplier. In this demo, the Vendor Simulator holds the supplier app's credentials in order to (a) issue invoices, (b) give AegisPay read access to invoices addressed to the treasury — standing in for consented third-party access through PayPal's partner/permissions model — and (c) reconcile invoices after payment, which in production the supplier's own AR system or PayPal's native invoice payment would do. The decision engine only ever receives a **read** interface to supplier data; supplier write calls live in `vendor_sim/` and are never reachable from an LLM.
 
-The `/vendor` page is labelled **Simulator**. Its synthetic preview does not establish authenticated supplier accept/contest integration. Replay and offline tests do not measure live model accuracy. Live sandbox S1–S4, complete health probes, live reset orchestration, hosted uptime and submission evidence remain tracked in [CHECKLIST](docs/CHECKLIST.md).
+The `/vendor` page is labelled **Simulator**. Its synthetic preview does not establish authenticated supplier accept/contest integration. Replay and offline tests do not measure live model accuracy. Complete health probes, live reset orchestration, hosted uptime and submission evidence remain tracked in [CHECKLIST](docs/CHECKLIST.md).
+
+### Recorded sandbox acceptance
+
+The 2026-11-12 real sandbox runs are recorded in [S1 evidence](docs/evidence/P1-12-s1.json) and [S2–S4 evidence](docs/evidence/P2-15-s2-s3-s4.json). S1 settled **48,000 cents** and its invoice became `MARKED_AS_PAID`; S2 paid **42,500 cents** and its invoice became `PARTIALLY_PAID`. S3 froze and was rejected with **zero paid**. S4 blocked the duplicate in **41–43 ms**. See [EVAL](docs/EVAL.md) for the measured runs and deviations.
+
+These are individual runs on a free OpenRouter model. S1/S2 ran before the final output-cap and classifier-prompt fixes; S3 used a reference-invoice variant. The detector-OFF and two-human approval paths were not exercised live, and the S2 notice/accept/contest flow remains absent. Held-out model accuracy and hosted acceptance remain unproved.
 
 ## Normal development and sandbox deployment
 
