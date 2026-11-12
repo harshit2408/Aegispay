@@ -1,5 +1,6 @@
 """Checkpointed orchestration of the invoice decision, with server-bound R11 resumes."""
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 
@@ -8,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 from sqlalchemy import select, update
 
+from app.agents import Halt
 from app.decision.match import match
 from app.decision.policy_gate import _hash, evaluate
 from app.decision.risk import assess
@@ -105,6 +107,7 @@ def build_graph(
     transition,
     replay_reader=None,
     investigator=None,
+    investigate_timeout_s=60,
     vendor_new_days=7,
     max_vendor_invoices=5,
 ):
@@ -194,8 +197,12 @@ def build_graph(
         if investigator is None:
             return {"evidence": None}
         try:
-            return {"evidence": await investigator(state["execution_id"], state)}
-        except Exception as exc:
+            # The worker thread cannot be killed; on timeout its late result is discarded.
+            evidence = await asyncio.wait_for(
+                investigator(state["execution_id"], state), investigate_timeout_s
+            )
+            return {"evidence": evidence}
+        except (Exception, Halt) as exc:  # Halt is BaseException: never leave ANALYZING stuck
             log.warning(
                 "investigate failed execution_id=%s error=%s",
                 state["execution_id"],

@@ -17,7 +17,8 @@ WRITE_VERBS = frozenset(
 # Vendor-writable keys (incl. PayPal Invoicing names); strings under them are wrapped.
 VENDOR_FIELDS = frozenset(
     "note memo terms terms_and_conditions description name reference business_name email_address "
-    "additional_notes title comments comment full_name given_name surname".split()
+    "additional_notes title comments comment full_name given_name surname invoice_number "
+    "vendor_name".split()
 )
 OPEN, CLOSE = "<untrusted vendor_text>", "</untrusted>"
 
