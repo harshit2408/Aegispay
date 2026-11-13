@@ -145,6 +145,7 @@ async def halting(execution_id, state):
 async def test_timeout_or_halt_means_unavailable_and_case_freezes(
     pg_url, pg_sessionmaker, investigator
 ):
+    investigator = AsyncMock(side_effect=investigator)
     async with AsyncPostgresSaver.from_conn_string(postgres_dsn(pg_url)) as saver:
         await saver.setup()
         values = await run_case(
@@ -154,6 +155,7 @@ async def test_timeout_or_halt_means_unavailable_and_case_freezes(
             investigator=investigator,
             investigate_timeout_s=0.1,
         )
+    investigator.assert_awaited_once()  # the timeout/halt path really ran, not a skipped node
     assert values["evidence"] is None and values["gate"].route == "FREEZE"
     assert "HIGH_RISK" in values["gate"].reasons  # the gate still ran on full facts
     assert (await stored(pg_sessionmaker)).status == "FROZEN"  # never stuck in ANALYZING
