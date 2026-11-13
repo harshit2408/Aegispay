@@ -13,7 +13,9 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.payables import InvoiceExecution, Payout
+from app.models.auth import OpsAlert
+from app.models.payables import InvoiceExecution, Payout, ShortPayNotice
+from app.ops.alerts import enqueue_alert
 from app.paypal.client import PayPalError
 from app.paypal.payouts import PayoutCommand, PayoutItem, Payouts
 from app.settlement import halt as halt_flag
@@ -31,6 +33,10 @@ FAILED = frozenset({"FAILED", "RETURNED", "BLOCKED", "DENIED"})
 REVERSED = frozenset({"REFUNDED", "REVERSED"})
 POLLED = ("PAYOUT_SUBMITTED", "PAYOUT_SUCCEEDED")
 RECORDPAY_GRACE = timedelta(minutes=5)  # longer than one record call with its client retries
+NOTICE_GRACE = timedelta(
+    minutes=5
+)  # > graph NOTIFY_TIMEOUT_S: the A5 notice may land after SETTLED
+NOTICE_SWEEP_LIMIT = 50
 
 
 class Reconciler:
@@ -60,6 +66,10 @@ class Reconciler:
                 await self.reconcile(execution_id)
             except Exception:  # noqa: BLE001 - retried on the next tick
                 log.exception("reconcile failed execution_id=%s", execution_id)
+        try:
+            await self.sweep_notices()
+        except Exception:  # noqa: BLE001 - retried on the next tick
+            log.exception("short-pay notice sweep failed")
         return len(ids)
 
     async def reconcile(self, execution_id: str) -> str:
@@ -189,9 +199,72 @@ class Reconciler:
             if execution.status != "PAYOUT_SUCCEEDED":
                 return execution.status
             await transitions.apply(s, execution, "SETTLED", actor="system:reconciler")
-            if execution.route == "SHORT_PAY":
-                execution.short_pay_balance = "NOTICE_SENT"
+            short_pay = execution.route == "SHORT_PAY"
+        if short_pay:
+            try:  # own transaction: a notice problem can never undo SETTLED
+                await self._send_notice(execution_id)
+            except Exception:  # noqa: BLE001 - the sweep retries it next pass
+                log.exception("short-pay notice send failed execution_id=%s", execution_id)
         return "SETTLED"
+
+    async def sweep_notices(self) -> None:
+        """Send late notices; alert once on a missing one (§12.4). Bounded per pass."""
+        alerted = select(OpsAlert.alert_id).where(
+            OpsAlert.event == "SHORT_PAY_NOTICE_MISSING",
+            OpsAlert.execution_id == InvoiceExecution.execution_id,
+        )
+        drafted = select(ShortPayNotice.notice_id).where(
+            ShortPayNotice.execution_id == InvoiceExecution.execution_id
+        )
+        async with self._sm() as s:
+            ids = list(
+                await s.scalars(
+                    select(InvoiceExecution.execution_id)
+                    .where(
+                        InvoiceExecution.status == "SETTLED",
+                        InvoiceExecution.route == "SHORT_PAY",
+                        InvoiceExecution.short_pay_balance == "NONE",
+                        drafted.exists() | ~alerted.exists(),
+                    )
+                    .order_by(InvoiceExecution.execution_id)
+                    .limit(NOTICE_SWEEP_LIMIT)
+                )
+            )
+        for execution_id in ids:
+            try:
+                await self._send_notice(execution_id)
+            except Exception:  # noqa: BLE001 - retried on the next tick
+                log.exception("short-pay notice send failed execution_id=%s", execution_id)
+
+    async def _send_notice(self, execution_id: str) -> None:
+        """Only a stored A5 notice can be "sent"; settlement never drafts one (R22). The graph
+        drafts after approval, so a missing notice is alerted only after NOTICE_GRACE."""
+        async with self._sm() as s, s.begin():
+            execution = await _lock(s, execution_id)
+            if (
+                execution.status != "SETTLED"
+                or execution.route != "SHORT_PAY"
+                or execution.short_pay_balance != "NONE"
+            ):
+                return
+            if await s.scalar(
+                select(ShortPayNotice.notice_id).where(ShortPayNotice.execution_id == execution_id)
+            ):
+                execution.short_pay_balance = "NOTICE_SENT"
+                return
+            payout = await _payout(s, execution_id)
+            settled_at = payout.recordpay_sent_at if payout is not None else None
+            if settled_at is not None and self._clock() - settled_at < NOTICE_GRACE:
+                return
+            if not await s.scalar(
+                select(OpsAlert.alert_id)
+                .where(
+                    OpsAlert.event == "SHORT_PAY_NOTICE_MISSING",
+                    OpsAlert.execution_id == execution_id,
+                )
+                .limit(1)
+            ):
+                await enqueue_alert(s, "SHORT_PAY_NOTICE_MISSING", execution_id)
 
     async def _mark_recordpay_sent(self, execution_id: str) -> bool:
         """Write-ahead for record-payment (R7). False if another pass claimed it first."""

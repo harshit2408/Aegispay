@@ -154,6 +154,41 @@ class Approval(Base):
     created_at: Mapped[datetime] = mapped_column(TS, server_default=NOW)
 
 
+class ShortPayNotice(Base):
+    """A5 notice for one SHORT_PAY execution (PRD §12.4). Text only; never sets an amount (R3)."""
+
+    __tablename__ = "short_pay_notices"
+    __table_args__ = (
+        CheckConstraint("delta_cents > 0", name="ck_notice_delta"),
+        CheckConstraint("char_length(text) BETWEEN 1 AND 2000", name="ck_notice_text"),
+        CheckConstraint(
+            "reason IS NULL OR (response IS NOT NULL AND char_length(reason) <= 1000)",
+            name="ck_notice_reason",
+        ),
+        CheckConstraint(
+            "response IS NULL OR response IN ('ACCEPTED','CONTESTED')", name="ck_notice_response"
+        ),
+        CheckConstraint(
+            "(response IS NULL) = (responded_at IS NULL)"
+            " AND (response IS NULL) = (responded_by IS NULL)",
+            name="ck_notice_responded",
+        ),
+    )
+
+    notice_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    execution_id: Mapped[str] = mapped_column(
+        ForeignKey("invoice_executions.execution_id"), unique=True
+    )
+    text: Mapped[str] = mapped_column(Text)
+    delta_cents: Mapped[int] = mapped_column(BigInteger)
+    used_fallback: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(TS, server_default=NOW)
+    response: Mapped[str | None] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
+    responded_by: Mapped[str | None] = mapped_column(ForeignKey("operators.operator_id"))
+    responded_at: Mapped[datetime | None] = mapped_column(TS)
+
+
 class SpendLedger(Base):
     """R8: committed(date) = Σ RESERVE − Σ RELEASE on that business_date."""
 

@@ -9,6 +9,7 @@ import pytest
 import respx
 from sqlalchemy import select, text
 
+from app.models.auth import OpsAlert
 from app.models.core import PurchaseOrder
 from app.models.payables import (
     InvoiceExecution,
@@ -22,7 +23,7 @@ from app.paypal.client import PayPalClient
 from app.paypal.invoicing import Invoicing
 from app.paypal.payouts import Payouts
 from app.settlement import po_ledger, spend_ledger
-from app.settlement.reconciler import Reconciler, run_forever
+from app.settlement.reconciler import NOTICE_GRACE, Reconciler, run_forever
 from app.vendor_sim.gateway import VendorGateway
 from tests.seed import PAYER_ID, POLICY_ID, seed_approved, seed_world
 
@@ -165,9 +166,56 @@ async def test_settled_execution_is_not_recorded_twice(env):
 
 async def test_short_pay_route_marks_notice_sent(env):
     await env.sql("update invoice_executions set route = 'SHORT_PAY'")
+    await env.sql(
+        "insert into short_pay_notices (notice_id, execution_id, text, delta_cents, used_fallback)"
+        " values ('NTC-e1', 'e1', 'notice', 7500, true)"
+    )
     env.set_item("SUCCESS")
     await env.rec.reconcile("e1")
     assert (await env.execution()).short_pay_balance == "NOTICE_SENT"
+    assert await env.rows(OpsAlert) == []
+
+
+async def test_short_pay_without_a_notice_alerts_once_after_the_grace(env):
+    await env.sql("update invoice_executions set route = 'SHORT_PAY'")
+    env.set_item("SUCCESS")
+    assert await env.rec.reconcile("e1") == "SETTLED"
+    await env.rec.sweep_notices()
+    assert (await env.execution()).short_pay_balance == "NONE"
+    assert await env.rows(OpsAlert) == []  # the graph may still be drafting it
+    env.rec._clock = lambda: NOW + NOTICE_GRACE + timedelta(seconds=1)
+    for _ in range(3):
+        await env.rec.run_once()
+    (alert,) = await env.rows(OpsAlert)  # raised once, not every pass
+    assert (alert.event, alert.execution_id) == ("SHORT_PAY_NOTICE_MISSING", "e1")
+    assert (await env.execution()).short_pay_balance == "NONE"
+
+
+async def test_late_notice_is_sent_by_the_next_pass(env):
+    await env.sql("update invoice_executions set route = 'SHORT_PAY'")
+    env.set_item("SUCCESS")
+    assert await env.rec.reconcile("e1") == "SETTLED"
+    env.rec._clock = lambda: NOW + NOTICE_GRACE + timedelta(seconds=1)
+    await env.rec.run_once()  # missing past the grace: alert
+    await env.sql(
+        "insert into short_pay_notices (notice_id, execution_id, text, delta_cents, used_fallback)"
+        " values ('NTC-e1', 'e1', 'notice', 7500, true)"
+    )
+    await env.rec.run_once()
+    execution = await env.execution()
+    assert (execution.status, execution.short_pay_balance) == ("SETTLED", "NOTICE_SENT")
+
+
+async def test_notice_lookup_failure_never_undoes_settled(env, monkeypatch):
+    await env.sql("update invoice_executions set route = 'SHORT_PAY'")
+    env.set_item("SUCCESS")
+
+    async def broken(execution_id):
+        raise RuntimeError("db hiccup")
+
+    monkeypatch.setattr(env.rec, "_send_notice", broken)
+    assert await env.rec.reconcile("e1") == "SETTLED"
+    assert (await env.execution()).status == "SETTLED"
 
 
 async def _crash_after_record_call(env, sent_at=NOW - timedelta(minutes=10)):

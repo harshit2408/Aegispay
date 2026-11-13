@@ -276,6 +276,7 @@ async def get_execution(execution_id: str, request: Request, session: Session, v
         risk=row.risk_json,
         evidence=_evidence_view(row.evidence_pack_json, gate),
         short_pay=row.short_pay_json,
+        short_pay_balance=row.short_pay_balance or "NONE",
         gate=gate,
         approvals=[
             {

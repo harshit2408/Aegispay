@@ -23,6 +23,7 @@ from app.routers import (
     mandates,
     ops,
     stream,
+    vendor_sim,
     vendors,
     webhooks,
 )
@@ -62,6 +63,7 @@ async def lifespan(app: FastAPI):
                 from app.decision.investigate import build_investigator
                 from app.settlement.po_ledger import reserve
                 from app.settlement.transitions import apply
+                from app.vendor_sim.notices import create_notice, governed_drafter
 
                 dsn = make_conninfo(
                     postgres_dsn(settings.checkpoint_db_url),
@@ -103,6 +105,7 @@ async def lifespan(app: FastAPI):
                     if settings.llm_api_key
                     else None,
                     transition=apply,
+                    notify=partial(create_notice, sessions, governed_drafter(settings)),
                     approve=partial(approve_for_payment, sessions, apply, reserve, **gate_settings),
                     **gate_settings,
                 )
@@ -200,6 +203,7 @@ def create_app(*, demo_enabled: bool = False) -> FastAPI:
         mandates,
         ops,
         stream,
+        vendor_sim,
         vendors,
         webhooks,
     ):

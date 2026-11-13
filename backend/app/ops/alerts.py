@@ -18,6 +18,7 @@ EVENTS = frozenset(
         "MANDATE_ACTIVATED",
         "WEBHOOK_SIGNATURE_FAILURE",
         "APPROVAL_OUTSIDE_HOURS",
+        "SHORT_PAY_NOTICE_MISSING",  # §12.4: short-paid without a stored notice
     }
 )
 

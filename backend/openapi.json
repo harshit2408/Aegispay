@@ -514,6 +514,17 @@
               }
             ]
           },
+          "short_pay_balance": {
+            "default": "NONE",
+            "enum": [
+              "NONE",
+              "NOTICE_SENT",
+              "ACCEPTED",
+              "CONTESTED"
+            ],
+            "title": "Short Pay Balance",
+            "type": "string"
+          },
           "status": {
             "enum": [
               "RECEIVED",
@@ -1541,6 +1552,65 @@
         "title": "MatchReport",
         "type": "object"
       },
+      "NoticeReceipt": {
+        "properties": {
+          "notice_id": {
+            "title": "Notice Id",
+            "type": "string"
+          },
+          "responded_at": {
+            "format": "date-time",
+            "title": "Responded At",
+            "type": "string"
+          },
+          "short_pay_balance": {
+            "enum": [
+              "ACCEPTED",
+              "CONTESTED"
+            ],
+            "title": "Short Pay Balance",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notice_id",
+          "short_pay_balance",
+          "responded_at"
+        ],
+        "title": "NoticeReceipt",
+        "type": "object"
+      },
+      "NoticeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "ACCEPT",
+              "CONTEST"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "pattern": "^[^\\x00-\\x1f\\x7f]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "NoticeResponse",
+        "type": "object"
+      },
       "OperatorView": {
         "properties": {
           "operator_id": {
@@ -2126,6 +2196,141 @@
           "ts"
         ],
         "title": "StreamEvent",
+        "type": "object"
+      },
+      "SupplierInvoice": {
+        "properties": {
+          "billed_cents": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Billed Cents"
+          },
+          "invoice_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Number"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SupplierNotice"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Present once settlement sent the notice"
+          },
+          "paypal_invoice_id": {
+            "title": "Paypal Invoice Id",
+            "type": "string"
+          },
+          "paypal_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paypal Status"
+          },
+          "received_cents": {
+            "description": "Payout item confirmed SUCCESS by PayPal, else 0",
+            "minimum": 0.0,
+            "title": "Received Cents",
+            "type": "integer"
+          },
+          "vendor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vendor Name"
+          }
+        },
+        "required": [
+          "paypal_invoice_id",
+          "invoice_number",
+          "vendor_name",
+          "paypal_status",
+          "billed_cents",
+          "received_cents",
+          "notice"
+        ],
+        "title": "SupplierInvoice",
+        "type": "object"
+      },
+      "SupplierNotice": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "delta_cents": {
+            "minimum": 0.0,
+            "title": "Delta Cents",
+            "type": "integer"
+          },
+          "notice_id": {
+            "title": "Notice Id",
+            "type": "string"
+          },
+          "responded_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responded At"
+          },
+          "status": {
+            "enum": [
+              "NOTICE_SENT",
+              "ACCEPTED",
+              "CONTESTED"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "description": "Untrusted LLM prose with template-filled numbers; plain text",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "notice_id",
+          "text",
+          "delta_cents",
+          "status",
+          "created_at",
+          "responded_at"
+        ],
+        "title": "SupplierNotice",
         "type": "object"
       },
       "ValidationError": {
@@ -2994,6 +3199,135 @@
         "summary": "Execution Stream",
         "tags": [
           "stream"
+        ]
+      }
+    },
+    "/api/vendor-sim/invoices": {
+      "get": {
+        "description": "Role: any authenticated operator (PRD §13). Simulator only: the operator acts as the supplier; responses are attributable via responded_by and the audit chain. Open notices first, then newest; at most 50 rows.",
+        "operationId": "list_vendor_sim_invoices",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SupplierInvoice"
+                  },
+                  "title": "Response List Vendor Sim Invoices",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "No valid session"
+          }
+        },
+        "summary": "Supplier view: invoices, payments received and sent short-pay notices",
+        "tags": [
+          "vendor-sim"
+        ]
+      }
+    },
+    "/api/vendor-sim/notices/{notice_id}/respond": {
+      "post": {
+        "description": "Role: any authenticated operator (PRD §13). Simulator only: the operator acts as the supplier; responses are attributable via responded_by and the audit chain. Requires the X-CSRF-Token header. The paid amount never changes.",
+        "operationId": "respond_vendor_sim_notice",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notice_id",
+            "required": true,
+            "schema": {
+              "title": "Notice Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoticeResponse"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeReceipt"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Missing or invalid CSRF token"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Unknown notice"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIError"
+                }
+              }
+            },
+            "description": "Notice not sent yet, or already answered"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Supplier Accept / Contest of a sent short-pay notice (one response only)",
+        "tags": [
+          "vendor-sim"
         ]
       }
     },
